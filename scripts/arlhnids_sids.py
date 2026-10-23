@@ -35,7 +35,8 @@ BENIGN = "Normal"  # benign label in all three paper datasets
 
 def balance(X, y, ratio, fcm_params, method, seed):
     """Per class: target = round(ratio * count). Below count -> FCM undersample; above -> oversample.
-    GAMO sees only the classes that are not undersampled (Table 5 minority). Returns (X, y, synthetic mask, info)."""
+    GAMO sees only the classes that are not undersampled (Table 5 minority).
+    Returns (X, y, synthetic mask, info, kept): real rows come first, as input rows `kept` (sorted)."""
     rng = np.random.default_rng(seed)
     keep, over = [], {}
     for c in np.unique(y):
@@ -49,7 +50,7 @@ def balance(X, y, ratio, fcm_params, method, seed):
     keep = np.sort(np.concatenate(keep))
     X, y = X[keep], y[keep]
     if method == "none" or not over:
-        return X, y, np.zeros(len(y), bool), {}
+        return X, y, np.zeros(len(y), bool), {}, keep
     if method == "gamo":
         minor = np.isin(y, [c for c in np.unique(y) if ratio[c] >= 1])
         Xg, yg, info = gamo.oversample(X[minor], y[minor], over, seed,
@@ -57,10 +58,10 @@ def balance(X, y, ratio, fcm_params, method, seed):
                                                                     flush=True))
         n = int(minor.sum())
         X, y = np.concatenate([X, Xg[n:]]), np.concatenate([y, yg[n:]])
-        return X, y, np.arange(len(y)) >= len(keep), info
+        return X, y, np.arange(len(y)) >= len(keep), info, keep
     k = min(5, min(int((y == c).sum()) for c in over) - 1)
     Xr, yr = SMOTE(sampling_strategy=over, k_neighbors=k, random_state=seed).fit_resample(X, y)
-    return Xr.astype(np.float32), yr, np.arange(len(yr)) >= len(y), {}  # imblearn appends synthetic rows
+    return Xr.astype(np.float32), yr, np.arange(len(yr)) >= len(y), {}, keep  # imblearn appends synthetic rows
 
 
 def report(y, pred, classes):
@@ -113,7 +114,7 @@ def run(ds, mode, seed, method):
         X, y = prep.transform(raw[feats]), pd.Categorical(raw["y"].astype(str), categories=classes).codes
         del raw
         ratio = {i: ratio_by_name[c] for i, c in enumerate(classes)}
-        X, y, synth, info["balance_info"] = balance(X, y, ratio, paper.FCM[ds], method, seed)
+        X, y, synth, info["balance_info"], _ = balance(X, y, ratio, paper.FCM[ds], method, seed)
         tr, te = train_test_split(np.arange(len(y)), test_size=0.2, random_state=seed)  # Algorithm 1 line 11
         Xtr, ytr, Xte, yte = X[tr], y[tr], X[te], y[te]
         info["test_synthetic_share"] = float(synth[te].mean())
@@ -130,7 +131,7 @@ def run(ds, mode, seed, method):
         Xte, yte = prep.transform(df.iloc[te][feats]), y_all[te]
         del df
         ratio = {i: ratio_by_name[c] for i, c in enumerate(classes)}
-        Xtr, ytr, synth_tr, info["balance_info"] = balance(Xtr, ytr, ratio, paper.FCM[ds], method, seed)
+        Xtr, ytr, synth_tr, info["balance_info"], _ = balance(Xtr, ytr, ratio, paper.FCM[ds], method, seed)
         info["cleaning"] = {k: v for k, v in rep.items() if k not in ("per_class", "kept_rows")}
         info["train_synthetic_share"] = float(synth_tr.mean())
         synth_te = np.zeros(len(yte), bool)
