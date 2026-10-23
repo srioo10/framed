@@ -19,10 +19,10 @@ DATASETS = ["unsw_official", "unsw_raw", "bot_iot", "ciciot_paper", "ciciot_csv"
 def naive_overlap(df, dataset):
     """Share of test rows whose features (leak columns already removed) exactly match a training row,
     under the split the paper / dataset authors used, before any dedup."""
-    feats = [c for c in clean.feature_columns(df) if c not in set(clean.LEAK_COLS[dataset])]
-    h = clean.row_hash(df, feats)
+    h = clean.row_hash(df, clean.feature_columns(df, dataset))
     if "src" in df and set(df["src"].unique()) == {"train", "test"}:
-        tr, te = np.flatnonzero(df["src"].to_numpy() == "train"), np.flatnonzero(df["src"].to_numpy() == "test")
+        is_train = df["src"].to_numpy() == "train"
+        tr, te = np.flatnonzero(is_train), np.flatnonzero(~is_train)
         how = "official train/test files"
     else:
         tr, te = split.paper_split(df, seed=0)

@@ -1,4 +1,6 @@
 """Splits (PREREG §4, §6). All functions return positional index arrays into the cleaned frame."""
+from itertools import islice
+
 import numpy as np
 from sklearn.model_selection import StratifiedGroupKFold, train_test_split
 
@@ -14,8 +16,9 @@ def grouped_split(df, seed):
     # sklearn's SGKF shuffle only breaks ties, so the seed picks the fold instead:
     # seeds 0-4 put every group in test exactly once (5-fold CV over groups).
     g = df["group"].to_numpy()
-    rest, te = list(StratifiedGroupKFold(5, shuffle=True, random_state=0).split(idx, y, g))[seed % 5]
-    tr, va = list(StratifiedGroupKFold(4, shuffle=True, random_state=0).split(rest, y[rest], g[rest]))[seed % 4]
+    rest, te = next(islice(StratifiedGroupKFold(5, shuffle=True, random_state=0).split(idx, y, g), seed % 5, None))
+    tr, va = next(islice(StratifiedGroupKFold(4, shuffle=True, random_state=0).split(rest, y[rest], g[rest]),
+                         seed % 4, None))
     return rest[tr], rest[va], te
 
 

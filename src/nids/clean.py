@@ -29,15 +29,18 @@ def group_ids(df, dataset):
     return None
 
 
-def feature_columns(df):
-    return [c for c in df.columns if c not in LABELS]
+def feature_columns(df, dataset=None):
+    """Feature columns; with `dataset`, also excluding that dataset's leak columns."""
+    drop = set(LABELS) | set(LEAK_COLS[dataset] if dataset else ())
+    return [c for c in df.columns if c not in drop]
 
 
 def row_hash(df, cols):
     """64-bit hash per row over `cols`, built column by column so a 46M-row frame is never copied."""
     h = np.zeros(len(df), dtype=np.uint64)
     for c in cols:
-        h = h * np.uint64(1_000_003) ^ pd.util.hash_array(df[c].to_numpy())
+        h *= np.uint64(1_000_003)
+        h ^= pd.util.hash_array(df[c].to_numpy())
     return h
 
 
@@ -47,7 +50,7 @@ def clean(df, dataset):
     y = df["y"].astype(str).to_numpy()
     groups = group_ids(df, dataset)
     leak = set(LEAK_COLS[dataset])
-    feats = [c for c in feature_columns(df) if c not in leak]
+    feats = feature_columns(df, dataset)
 
     finite = np.ones(len(df), dtype=bool)
     for c in feats:
@@ -65,6 +68,7 @@ def clean(df, dataset):
     dup = np.zeros(len(df), dtype=bool)
     dup[alive] = pd.Series(h[alive]).duplicated().to_numpy()
     keep = finite & ~conflict & ~dup
+    del h, pairs, fin, alive  # free ~1 GB of temporaries before the frame copy
 
     out = df.loc[keep, [c for c in df.columns if c not in leak]].reset_index(drop=True)
     if groups is not None:
@@ -90,4 +94,4 @@ def clean(df, dataset):
 
 def weight_follows_number(df):
     """CICIoT `Weight` leaks like `Number` if it is a deterministic function of it."""
-    return bool(df.groupby("Number", observed=True)["Weight"].nunique().max() == 1)
+    return not df[["Number", "Weight"]].drop_duplicates()["Number"].duplicated().any()
