@@ -52,8 +52,8 @@ def test_clean_per_class_report_sums_to_totals():
 
 
 def test_group_ids_follow_preregistration():
-    bot = pd.DataFrame({"pkSeqID": [1, 9_999, 10_000, 25_000]})
-    assert list(clean.group_ids(bot, "bot_iot")) == [0, 0, 1, 2]
+    # BoT-IoT pkSeqID follows class order, not time, so it has no usable group (PREREG §9)
+    assert clean.group_ids(pd.DataFrame({"pkSeqID": [1, 2]}), "bot_iot") is None
     hour = 394_979 * 3600
     unsw = pd.DataFrame({"stime": [hour, hour + 3599, hour + 3600]})
     g = clean.group_ids(unsw, "unsw_raw")

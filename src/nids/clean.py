@@ -17,13 +17,12 @@ LEAK_COLS = {
 
 
 def group_ids(df, dataset):
-    """Split groups: capture file, 1-hour stime window, or 10k-pkSeqID block. None = no group id."""
+    """Split groups: capture file or 1-hour stime window. None = no group id (stratified random split).
+    BoT-IoT has none: its pkSeqID follows class order, not time (PREREG §9)."""
     if dataset == "ciciot_csv":
         return df["src"]
     if dataset == "unsw_raw":
         return df["stime"] // 3600
-    if dataset == "bot_iot":
-        return df["pkSeqID"] // 10_000
     return None
 
 
@@ -81,6 +80,7 @@ def clean(df, dataset):
         "duplicates": int(dup.sum()),
         "rows_out": int(keep.sum()),
         "per_class": per,
+        "kept_rows": np.flatnonzero(keep),  # positions in the input frame, row i of `out` = input kept_rows[i]
     }
     return out, report
 
