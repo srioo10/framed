@@ -177,11 +177,11 @@ def main():
     # attack-present false-alarm cost: realised benign-test FPR minus the 1% target
     drift = outer.pivot_table(index="heldout", columns="member", values="test_fpr@0.01", aggfunc="mean") - 0.01
     print("## Benign-test FPR minus 1% target (attack-present false-alarm cost when ct_* are causal)\n")
-    print(drift.round(4).to_markdown())
+    print(drift.round(4).to_string())
     kd = outer[outer.member.isin(["mlp_ce", "mlp_kd"])].pivot_table(index="heldout", columns="member",
                                                                     values="tpr@0.01", aggfunc="mean")
     print("\n## KD vs CE, TPR@1%\n")
-    print(kd.round(3).to_markdown())
+    print(kd.round(3).to_string())
     if a.json:
         a.json.write_text(json.dumps({"inner": inner.to_dict("records"), "outer": outer.to_dict("records")},
                                      indent=1, default=float))
