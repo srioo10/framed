@@ -71,3 +71,12 @@ def test_weight_follows_number():
     assert clean.weight_follows_number(df)
     df.loc[3, "Weight"] = 8.0
     assert not clean.weight_follows_number(df)
+
+
+def test_group_stays_aligned_with_rows_after_drops():
+    df = _frame()
+    df["src"] = ["f1"] * 4 + ["f2"] * 3
+    out, rep = clean.clean(df, "ciciot_csv")
+    expected = clean.group_ids(df, "ciciot_csv").to_numpy()[rep["kept_rows"]]
+    assert list(out["group"]) == list(expected)
+    assert list(out["a"]) == list(df["a"].to_numpy()[rep["kept_rows"]])

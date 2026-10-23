@@ -27,6 +27,13 @@ def test_grouped_split_depends_on_seed():
     assert not np.array_equal(split.grouped_split(df, seed=0)[2], split.grouped_split(df, seed=1)[2])
 
 
+def test_seeds_0_to_4_are_5_fold_cv_over_groups():
+    df = _frame()
+    tests = [split.grouped_split(df, seed)[2] for seed in range(5)]
+    assert sorted(np.concatenate(tests)) == list(range(len(df)))  # disjoint and covering
+    assert np.array_equal(split.grouped_split(df, 5)[2], tests[0])
+
+
 def test_random_split_used_when_no_group_column():
     df = _frame().drop(columns="group")
     tr, va, te = split.grouped_split(df, seed=0)
