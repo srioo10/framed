@@ -219,3 +219,8 @@ Split rows: train 16,859,127 / val 5,619,709 / test 5,619,710.
 | Backdoor_Malware | 3,218 | 0 | 0 | 0 | 3,218 | 100.0% |
 | Recon-PingSweep | 2,262 | 0 | 0 | 2 | 2,260 | 99.9% |
 | Uploading_Attack | 1,252 | 0 | 0 | 0 | 1,252 | 100.0% |
+
+## Cross-checks against published duplicate rates
+
+- **CICIoT2023 MERGED_CSV.** We find 39.8% duplicates over the 45 non-`Number` features, and 40.0% over the 37 features it shares with the CIC CSV release. Abou El Houda et al. (arXiv 2608.10349) report 54.8% on "the 39-feature representation" (21.1M unique rows out of 46.8M). Their exact column list is not given, so the gap is unresolved. Our rate is the more conservative one: fewer rows are removed.
+- **BoT-IoT 10-best.** With every column except `pkSeqID` kept, there are 0.0% duplicates, because `seq` and the ports make rows unique. Dropping identifiers and label columns (our protocol) gives 55.0%, and 69.8% of official test rows then already appear in train. The "~97% of a naive split are duplicates" figure (Purkaystha et al., 2026) uses a feature set we could not reconstruct.

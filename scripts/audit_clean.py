@@ -15,6 +15,9 @@ from nids import clean, load, split  # noqa: E402
 OUT = Path(__file__).resolve().parents[1] / "results"
 DATASETS = ["unsw_official", "unsw_raw", "bot_iot", "ciciot_paper", "ciciot_csv", "ciciot_merged"]
 
+# Measured once by hand (not rerun by audit()); kept here so regenerating the report keeps it.
+CROSS_CHECKS = '\n## Cross-checks against published duplicate rates\n\n- **CICIoT2023 MERGED_CSV.** We find 39.8% duplicates over the 45 non-`Number` features, and 40.0% over the 37 features it shares with the CIC CSV release. Abou El Houda et al. (arXiv 2608.10349) report 54.8% on "the 39-feature representation" (21.1M unique rows out of 46.8M). Their exact column list is not given, so the gap is unresolved. Our rate is the more conservative one: fewer rows are removed.\n- **BoT-IoT 10-best.** With every column except `pkSeqID` kept, there are 0.0% duplicates, because `seq` and the ports make rows unique. Dropping identifiers and label columns (our protocol) gives 55.0%, and 69.8% of official test rows then already appear in train. The "~97% of a naive split are duplicates" figure (Purkaystha et al., 2026) uses a feature set we could not reconstruct.\n'
+
 
 def naive_overlap(df, dataset):
     """Share of test rows whose features (leak columns already removed) exactly match a training row,
@@ -102,7 +105,7 @@ def to_markdown(results):
             lines.append(f"| {cls} | {c['rows_in']:,} | {c['nonfinite']:,} | {c['conflict_rows']:,} "
                          f"| {c['duplicates']:,} | {c['rows_out']:,} | {pct(c['rows_out'] / c['rows_in'])} |")
         lines.append("")
-    return "\n".join(lines)
+    return "\n".join(lines) + CROSS_CHECKS
 
 
 if __name__ == "__main__":
