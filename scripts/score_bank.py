@@ -56,8 +56,8 @@ def fine_family(df, ds):
     fam = df["family"].astype(str).to_numpy()
     if ds != "ciciot_csv":
         return fam.copy()
-    y = df["y"].astype(str).to_numpy()
-    return np.where(fam == "Flood", np.where(np.char.startswith(y.astype(str), "DDoS"), "DDoS", "DoS"), fam)
+    ddos = df["y"].astype(str).str.lower().str.startswith("ddos").to_numpy()
+    return np.where(fam == "Flood", np.where(ddos, "DDoS", "DoS"), fam)
 
 
 def cap_by_block(idx, groups, cap, rng):
