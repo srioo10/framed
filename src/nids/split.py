@@ -2,12 +2,13 @@
 from itertools import islice
 
 import numpy as np
+import pandas as pd
 from sklearn.model_selection import StratifiedGroupKFold, train_test_split
 
 
 def grouped_split(df, seed):
     """60/20/20 train/val/test. StratifiedGroupKFold on `group` when present, else stratified random."""
-    y = df["y"].astype(str).to_numpy()
+    y = pd.factorize(df["y"], sort=True)[0]  # sorted int codes: same classes as the strings, no 46M-string sort
     idx = np.arange(len(df))
     if "group" not in df.columns:
         rest, te = train_test_split(idx, test_size=0.2, random_state=seed, stratify=y)

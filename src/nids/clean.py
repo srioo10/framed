@@ -73,6 +73,8 @@ def clean(df, dataset):
     out = df.loc[keep, [c for c in df.columns if c not in leak]].reset_index(drop=True)
     if groups is not None:
         out["group"] = groups.to_numpy()[keep]
+    for c in ("y", "family", "src"):  # categorical: ~1 byte/row instead of a Python string
+        out[c] = out[c].astype("category")
 
     def count(mask):
         return pd.Series(y[mask]).value_counts()
