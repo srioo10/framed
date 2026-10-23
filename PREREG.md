@@ -106,4 +106,6 @@ Reporting: mean ± 95% cluster-bootstrap CI (10,000 resamples over families). Ev
 
 ## 9. Deviations
 
-*(none yet)*
+| Date | Section | Change | Reason |
+|---|---|---|---|
+| 2026-10-23 | §4 | For grouped splits, the seed selects the fold (test = fold `seed % 5` of a fixed `StratifiedGroupKFold(5)`, val = fold `seed % 4` of the inner `StratifiedGroupKFold(4)`) instead of seeding the shuffle. Seeds 0–4 therefore form 5-fold cross-validation over groups. | sklearn's `StratifiedGroupKFold(shuffle=True)` only shuffles ties, so different seeds gave identical splits (caught by `tests/test_split.py`). Decided before any model was trained. |
