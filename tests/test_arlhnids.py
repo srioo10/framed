@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from nids import load
-from nids.arlhnids import fcm, gwo, paper, sids
+from nids.arlhnids import fcm, gamo, gwo, paper, sids
 from nids.arlhnids.prep import Prep, majority_classes
 
 
@@ -53,3 +53,17 @@ def test_hard_vote_takes_majority_and_breaks_ties_low():
     models = {"a": Fixed([1, 2]), "b": Fixed([1, 0]), "c": Fixed([0, 1])}
     vote, _, _ = sids.fit_predict(models, None, None, np.zeros((2, 1)), None, None, k=3)
     assert list(vote) == [1, 0]
+
+
+def test_gamo_hits_targets_with_convex_rows_of_the_right_class(monkeypatch):
+    monkeypatch.setattr(gamo, "STEPS", 30)
+    rng = np.random.default_rng(0)
+    X = np.concatenate([rng.normal(c * 5, 1, size=(n, 4)) for c, n in [(0, 400), (1, 60), (2, 20)]]).astype(np.float32)
+    y = np.repeat([0, 1, 2], [400, 60, 20])
+    Xo, yo, info = gamo.oversample(X, y, {1: 400, 2: 300}, seed=0)
+    assert np.array_equal(Xo[:len(y)], X) and np.array_equal(yo[:len(y)], y)  # real rows first, untouched
+    assert np.bincount(yo).tolist() == [400, 400, 300]
+    for c in (1, 2):  # convex combinations of the class's own rows stay inside its bounding box
+        real, fake = X[y == c], Xo[len(y):][yo[len(y):] == c]
+        assert (fake >= real.min(0) - 1e-4).all() and (fake <= real.max(0) + 1e-4).all()
+    assert info["gamo_basis"] == {"1": 45, "2": 15}  # 75% of each grown class
