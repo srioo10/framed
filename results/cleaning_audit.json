@@ -1,0 +1,1075 @@
+{
+ "unsw_official": {
+  "dataset": "unsw_official",
+  "rows_in": 257673,
+  "nonfinite": 0,
+  "conflict_rows": 40406,
+  "duplicates": 66034,
+  "rows_out": 151233,
+  "dup_rate": 0.25627054444974834,
+  "conflict_rate": 0.15681115211915878,
+  "naive_split": "official train/test files",
+  "naive_test_rows_in_train": 0.10376281397269592,
+  "split_seed0": {
+   "rows": {
+    "train": 90739,
+    "val": 30247,
+    "test": 30247
+   },
+   "family_rows": {
+    "Analysis+Backdoor": {
+     "train": 480,
+     "val": 160,
+     "test": 160
+    },
+    "Benign": {
+     "train": 51184,
+     "val": 17062,
+     "test": 17062
+    },
+    "DoS": {
+     "train": 2173,
+     "val": 724,
+     "test": 724
+    },
+    "Exploits": {
+     "train": 15270,
+     "val": 5090,
+     "test": 5090
+    },
+    "Fuzzers": {
+     "train": 11249,
+     "val": 3750,
+     "test": 3750
+    },
+    "Generic": {
+     "train": 4370,
+     "val": 1456,
+     "test": 1456
+    },
+    "Recon": {
+     "train": 5051,
+     "val": 1684,
+     "test": 1684
+    },
+    "Shellcode+Worms": {
+     "train": 962,
+     "val": 321,
+     "test": 321
+    }
+   },
+   "classes_missing_from_train": [],
+   "classes_missing_from_test": []
+  },
+  "per_class": {
+   "Analysis": {
+    "rows_in": 2677,
+    "nonfinite": 0,
+    "conflict_rows": 2061,
+    "duplicates": 166,
+    "rows_out": 450
+   },
+   "Backdoor": {
+    "rows_in": 2329,
+    "nonfinite": 0,
+    "conflict_rows": 1977,
+    "duplicates": 2,
+    "rows_out": 350
+   },
+   "DoS": {
+    "rows_in": 16353,
+    "nonfinite": 0,
+    "conflict_rows": 12665,
+    "duplicates": 67,
+    "rows_out": 3621
+   },
+   "Exploits": {
+    "rows_in": 44525,
+    "nonfinite": 0,
+    "conflict_rows": 16509,
+    "duplicates": 2566,
+    "rows_out": 25450
+   },
+   "Fuzzers": {
+    "rows_in": 24246,
+    "nonfinite": 0,
+    "conflict_rows": 3617,
+    "duplicates": 1880,
+    "rows_out": 18749
+   },
+   "Generic": {
+    "rows_in": 58871,
+    "nonfinite": 0,
+    "conflict_rows": 374,
+    "duplicates": 51215,
+    "rows_out": 7282
+   },
+   "Normal": {
+    "rows_in": 93000,
+    "nonfinite": 0,
+    "conflict_rows": 928,
+    "duplicates": 6764,
+    "rows_out": 85308
+   },
+   "Reconnaissance": {
+    "rows_in": 13987,
+    "nonfinite": 0,
+    "conflict_rows": 2246,
+    "duplicates": 3322,
+    "rows_out": 8419
+   },
+   "Shellcode": {
+    "rows_in": 1511,
+    "nonfinite": 0,
+    "conflict_rows": 14,
+    "duplicates": 52,
+    "rows_out": 1445
+   },
+   "Worms": {
+    "rows_in": 174,
+    "nonfinite": 0,
+    "conflict_rows": 15,
+    "duplicates": 0,
+    "rows_out": 159
+   }
+  }
+ },
+ "ciciot_paper": {
+  "dataset": "ciciot_paper",
+  "rows_in": 401260,
+  "nonfinite": 18,
+  "conflict_rows": 2608,
+  "duplicates": 51638,
+  "rows_out": 346996,
+  "dup_rate": 0.1286954007805763,
+  "conflict_rate": 0.006499818064908459,
+  "naive_split": "random 80/20 (paper Algorithm 1)",
+  "naive_test_rows_in_train": 0.1698773862333649,
+  "split_seed0": {
+   "rows": {
+    "train": 208197,
+    "val": 69399,
+    "test": 69400
+   },
+   "family_rows": {
+    "Benign": {
+     "train": 77818,
+     "val": 25939,
+     "test": 25940
+    },
+    "BruteForce": {
+     "train": 7830,
+     "val": 2610,
+     "test": 2610
+    },
+    "Flood": {
+     "train": 78379,
+     "val": 26126,
+     "test": 26127
+    },
+    "Mirai": {
+     "train": 9000,
+     "val": 3000,
+     "test": 3000
+    },
+    "Recon": {
+     "train": 1357,
+     "val": 453,
+     "test": 452
+    },
+    "Spoofing": {
+     "train": 31895,
+     "val": 10632,
+     "test": 10632
+    },
+    "Web": {
+     "train": 1918,
+     "val": 639,
+     "test": 639
+    }
+   },
+   "classes_missing_from_train": [],
+   "classes_missing_from_test": []
+  },
+  "per_class": {
+   "Brute Force": {
+    "rows_in": 13064,
+    "nonfinite": 0,
+    "conflict_rows": 14,
+    "duplicates": 0,
+    "rows_out": 13050
+   },
+   "DDoS": {
+    "rows_in": 137254,
+    "nonfinite": 1,
+    "conflict_rows": 0,
+    "duplicates": 47281,
+    "rows_out": 89972
+   },
+   "DoS": {
+    "rows_in": 40686,
+    "nonfinite": 2,
+    "conflict_rows": 0,
+    "duplicates": 24,
+    "rows_out": 40660
+   },
+   "Mirai": {
+    "rows_in": 15090,
+    "nonfinite": 2,
+    "conflict_rows": 0,
+    "duplicates": 88,
+    "rows_out": 15000
+   },
+   "Normal": {
+    "rows_in": 129832,
+    "nonfinite": 8,
+    "conflict_rows": 59,
+    "duplicates": 68,
+    "rows_out": 129697
+   },
+   "Recon": {
+    "rows_in": 2262,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 0,
+    "rows_out": 2262
+   },
+   "Spoofing": {
+    "rows_in": 59854,
+    "nonfinite": 5,
+    "conflict_rows": 2514,
+    "duplicates": 4176,
+    "rows_out": 53159
+   },
+   "Web-Based": {
+    "rows_in": 3218,
+    "nonfinite": 0,
+    "conflict_rows": 21,
+    "duplicates": 1,
+    "rows_out": 3196
+   }
+  }
+ },
+ "bot_iot": {
+  "dataset": "bot_iot",
+  "rows_in": 3668522,
+  "nonfinite": 0,
+  "conflict_rows": 54931,
+  "duplicates": 1963333,
+  "rows_out": 1650258,
+  "dup_rate": 0.535183651617736,
+  "conflict_rate": 0.014973605173963792,
+  "naive_split": "official train/test files",
+  "naive_test_rows_in_train": 0.6982724664545015,
+  "split_seed0": {
+   "rows": {
+    "train": 990154,
+    "val": 330052,
+    "test": 330052
+   },
+   "family_rows": {
+    "Benign": {
+     "train": 253,
+     "val": 84,
+     "test": 84
+    },
+    "Flood": {
+     "train": 974421,
+     "val": 324808,
+     "test": 324808
+    },
+    "Recon": {
+     "train": 15435,
+     "val": 5145,
+     "test": 5145
+    },
+    "Theft": {
+     "train": 45,
+     "val": 15,
+     "test": 15
+    }
+   },
+   "classes_missing_from_train": [],
+   "classes_missing_from_test": []
+  },
+  "per_class": {
+   "DDoS": {
+    "rows_in": 1926624,
+    "nonfinite": 0,
+    "conflict_rows": 51384,
+    "duplicates": 968458,
+    "rows_out": 906782
+   },
+   "DoS": {
+    "rows_in": 1650260,
+    "nonfinite": 0,
+    "conflict_rows": 2787,
+    "duplicates": 930218,
+    "rows_out": 717255
+   },
+   "Normal": {
+    "rows_in": 477,
+    "nonfinite": 0,
+    "conflict_rows": 3,
+    "duplicates": 53,
+    "rows_out": 421
+   },
+   "Reconnaissance": {
+    "rows_in": 91082,
+    "nonfinite": 0,
+    "conflict_rows": 757,
+    "duplicates": 64600,
+    "rows_out": 25725
+   },
+   "Theft": {
+    "rows_in": 79,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 4,
+    "rows_out": 75
+   }
+  }
+ },
+ "unsw_raw": {
+  "dataset": "unsw_raw",
+  "rows_in": 2540047,
+  "nonfinite": 0,
+  "conflict_rows": 42360,
+  "duplicates": 484135,
+  "rows_out": 2013552,
+  "dup_rate": 0.19060080384339345,
+  "conflict_rate": 0.016676856766823605,
+  "naive_split": "random 80/20 (paper Algorithm 1)",
+  "naive_test_rows_in_train": 0.22983208991948978,
+  "split_seed0": {
+   "rows": {
+    "train": 1212229,
+    "val": 401121,
+    "test": 400202
+   },
+   "family_rows": {
+    "Analysis+Backdoor": {
+     "train": 446,
+     "val": 173,
+     "test": 169
+    },
+    "Benign": {
+     "train": 1167176,
+     "val": 385801,
+     "test": 384902
+    },
+    "DoS": {
+     "train": 2155,
+     "val": 726,
+     "test": 732
+    },
+    "Exploits": {
+     "train": 15051,
+     "val": 5295,
+     "test": 5044
+    },
+    "Fuzzers": {
+     "train": 11188,
+     "val": 3911,
+     "test": 3590
+    },
+    "Generic": {
+     "train": 10317,
+     "val": 3117,
+     "test": 3747
+    },
+    "Recon": {
+     "train": 4937,
+     "val": 1787,
+     "test": 1686
+    },
+    "Shellcode+Worms": {
+     "train": 959,
+     "val": 311,
+     "test": 332
+    }
+   },
+   "classes_missing_from_train": [],
+   "classes_missing_from_test": [],
+   "groups": {
+    "total": 149,
+    "train": 89,
+    "test": 30
+   }
+  },
+  "per_class": {
+   "Analysis": {
+    "rows_in": 2677,
+    "nonfinite": 0,
+    "conflict_rows": 2094,
+    "duplicates": 142,
+    "rows_out": 441
+   },
+   "Backdoor": {
+    "rows_in": 2329,
+    "nonfinite": 0,
+    "conflict_rows": 1982,
+    "duplicates": 0,
+    "rows_out": 347
+   },
+   "DoS": {
+    "rows_in": 16353,
+    "nonfinite": 0,
+    "conflict_rows": 12679,
+    "duplicates": 61,
+    "rows_out": 3613
+   },
+   "Exploits": {
+    "rows_in": 44525,
+    "nonfinite": 0,
+    "conflict_rows": 16592,
+    "duplicates": 2543,
+    "rows_out": 25390
+   },
+   "Fuzzers": {
+    "rows_in": 24246,
+    "nonfinite": 0,
+    "conflict_rows": 3707,
+    "duplicates": 1850,
+    "rows_out": 18689
+   },
+   "Generic": {
+    "rows_in": 215481,
+    "nonfinite": 0,
+    "conflict_rows": 1998,
+    "duplicates": 196302,
+    "rows_out": 17181
+   },
+   "Normal": {
+    "rows_in": 2218764,
+    "nonfinite": 0,
+    "conflict_rows": 1022,
+    "duplicates": 279863,
+    "rows_out": 1937879
+   },
+   "Reconnaissance": {
+    "rows_in": 13987,
+    "nonfinite": 0,
+    "conflict_rows": 2255,
+    "duplicates": 3322,
+    "rows_out": 8410
+   },
+   "Shellcode": {
+    "rows_in": 1511,
+    "nonfinite": 0,
+    "conflict_rows": 16,
+    "duplicates": 52,
+    "rows_out": 1443
+   },
+   "Worms": {
+    "rows_in": 174,
+    "nonfinite": 0,
+    "conflict_rows": 15,
+    "duplicates": 0,
+    "rows_out": 159
+   }
+  }
+ },
+ "ciciot_csv": {
+  "dataset": "ciciot_csv",
+  "rows_in": 46776697,
+  "nonfinite": 1037,
+  "conflict_rows": 14586830,
+  "duplicates": 12113357,
+  "rows_out": 20075473,
+  "dup_rate": 0.2589670995556236,
+  "conflict_rate": 0.3118465885890226,
+  "naive_split": "random 80/20 (paper Algorithm 1)",
+  "naive_test_rows_in_train": 0.5929524742018997,
+  "split_seed0": {
+   "rows": {
+    "train": 12043851,
+    "val": 4013992,
+    "test": 4017630
+   },
+   "family_rows": {
+    "Benign": {
+     "train": 655717,
+     "val": 218556,
+     "test": 218550
+    },
+    "BruteForce": {
+     "train": 7826,
+     "val": 2608,
+     "test": 2610
+    },
+    "Flood": {
+     "train": 9212317,
+     "val": 3070150,
+     "test": 3073769
+    },
+    "Mirai": {
+     "train": 1472747,
+     "val": 490914,
+     "test": 490954
+    },
+    "Recon": {
+     "train": 408322,
+     "val": 136263,
+     "test": 136331
+    },
+    "Spoofing": {
+     "train": 272081,
+     "val": 90541,
+     "test": 90607
+    },
+    "Web": {
+     "train": 14841,
+     "val": 4960,
+     "test": 4809
+    }
+   },
+   "classes_missing_from_train": [],
+   "classes_missing_from_test": [],
+   "groups": {
+    "total": 3090,
+    "train": 1854,
+    "test": 618
+   }
+  },
+  "per_class": {
+   "Backdoor_Malware": {
+    "rows_in": 3218,
+    "nonfinite": 0,
+    "conflict_rows": 24,
+    "duplicates": 1,
+    "rows_out": 3193
+   },
+   "BenignTraffic": {
+    "rows_in": 1098191,
+    "nonfinite": 65,
+    "conflict_rows": 2912,
+    "duplicates": 2391,
+    "rows_out": 1092823
+   },
+   "BrowserHijacking": {
+    "rows_in": 5859,
+    "nonfinite": 0,
+    "conflict_rows": 154,
+    "duplicates": 3,
+    "rows_out": 5702
+   },
+   "CommandInjection": {
+    "rows_in": 5409,
+    "nonfinite": 0,
+    "conflict_rows": 5,
+    "duplicates": 21,
+    "rows_out": 5383
+   },
+   "DDoS-ACK_Fragmentation": {
+    "rows_in": 285075,
+    "nonfinite": 30,
+    "conflict_rows": 4,
+    "duplicates": 1342,
+    "rows_out": 283699
+   },
+   "DDoS-HTTP_Flood": {
+    "rows_in": 28790,
+    "nonfinite": 0,
+    "conflict_rows": 9,
+    "duplicates": 0,
+    "rows_out": 28781
+   },
+   "DDoS-ICMP_Flood": {
+    "rows_in": 7200501,
+    "nonfinite": 65,
+    "conflict_rows": 0,
+    "duplicates": 5237284,
+    "rows_out": 1963152
+   },
+   "DDoS-ICMP_Fragmentation": {
+    "rows_in": 452490,
+    "nonfinite": 46,
+    "conflict_rows": 0,
+    "duplicates": 2157,
+    "rows_out": 450287
+   },
+   "DDoS-PSHACK_FLOOD": {
+    "rows_in": 4094772,
+    "nonfinite": 45,
+    "conflict_rows": 108,
+    "duplicates": 2394634,
+    "rows_out": 1699985
+   },
+   "DDoS-RSTFINFLOOD": {
+    "rows_in": 4045279,
+    "nonfinite": 31,
+    "conflict_rows": 5,
+    "duplicates": 2750337,
+    "rows_out": 1294906
+   },
+   "DDoS-SYN_Flood": {
+    "rows_in": 4059179,
+    "nonfinite": 82,
+    "conflict_rows": 2406480,
+    "duplicates": 84262,
+    "rows_out": 1568355
+   },
+   "DDoS-SlowLoris": {
+    "rows_in": 23426,
+    "nonfinite": 1,
+    "conflict_rows": 0,
+    "duplicates": 0,
+    "rows_out": 23425
+   },
+   "DDoS-SynonymousIP_Flood": {
+    "rows_in": 3598133,
+    "nonfinite": 33,
+    "conflict_rows": 2454557,
+    "duplicates": 137630,
+    "rows_out": 1005913
+   },
+   "DDoS-TCP_Flood": {
+    "rows_in": 4497649,
+    "nonfinite": 103,
+    "conflict_rows": 2894060,
+    "duplicates": 196691,
+    "rows_out": 1406795
+   },
+   "DDoS-UDP_Flood": {
+    "rows_in": 5412231,
+    "nonfinite": 62,
+    "conflict_rows": 2915812,
+    "duplicates": 696606,
+    "rows_out": 1799751
+   },
+   "DDoS-UDP_Fragmentation": {
+    "rows_in": 286925,
+    "nonfinite": 30,
+    "conflict_rows": 0,
+    "duplicates": 1617,
+    "rows_out": 285278
+   },
+   "DNS_Spoofing": {
+    "rows_in": 178898,
+    "nonfinite": 5,
+    "conflict_rows": 1556,
+    "duplicates": 3857,
+    "rows_out": 173480
+   },
+   "DictionaryBruteForce": {
+    "rows_in": 13064,
+    "nonfinite": 0,
+    "conflict_rows": 20,
+    "duplicates": 0,
+    "rows_out": 13044
+   },
+   "DoS-HTTP_Flood": {
+    "rows_in": 71861,
+    "nonfinite": 4,
+    "conflict_rows": 55,
+    "duplicates": 355,
+    "rows_out": 71447
+   },
+   "DoS-SYN_Flood": {
+    "rows_in": 2028836,
+    "nonfinite": 45,
+    "conflict_rows": 1007309,
+    "duplicates": 24912,
+    "rows_out": 996570
+   },
+   "DoS-TCP_Flood": {
+    "rows_in": 2671430,
+    "nonfinite": 67,
+    "conflict_rows": 1664689,
+    "duplicates": 41649,
+    "rows_out": 965025
+   },
+   "DoS-UDP_Flood": {
+    "rows_in": 3072990,
+    "nonfinite": 107,
+    "conflict_rows": 1207956,
+    "duplicates": 352060,
+    "rows_out": 1512867
+   },
+   "MITM-ArpSpoofing": {
+    "rows_in": 307560,
+    "nonfinite": 18,
+    "conflict_rows": 22784,
+    "duplicates": 5009,
+    "rows_out": 279749
+   },
+   "Mirai-greeth_flood": {
+    "rows_in": 991834,
+    "nonfinite": 60,
+    "conflict_rows": 0,
+    "duplicates": 57446,
+    "rows_out": 934328
+   },
+   "Mirai-greip_flood": {
+    "rows_in": 751646,
+    "nonfinite": 57,
+    "conflict_rows": 0,
+    "duplicates": 27997,
+    "rows_out": 723592
+   },
+   "Mirai-udpplain": {
+    "rows_in": 890574,
+    "nonfinite": 67,
+    "conflict_rows": 0,
+    "duplicates": 93812,
+    "rows_out": 796695
+   },
+   "Recon-HostDiscovery": {
+    "rows_in": 134378,
+    "nonfinite": 1,
+    "conflict_rows": 1164,
+    "duplicates": 53,
+    "rows_out": 133160
+   },
+   "Recon-OSScan": {
+    "rows_in": 98259,
+    "nonfinite": 4,
+    "conflict_rows": 2772,
+    "duplicates": 338,
+    "rows_out": 95145
+   },
+   "Recon-PingSweep": {
+    "rows_in": 2262,
+    "nonfinite": 0,
+    "conflict_rows": 5,
+    "duplicates": 0,
+    "rows_out": 2257
+   },
+   "Recon-PortScan": {
+    "rows_in": 82284,
+    "nonfinite": 1,
+    "conflict_rows": 2842,
+    "duplicates": 476,
+    "rows_out": 78965
+   },
+   "SqlInjection": {
+    "rows_in": 5245,
+    "nonfinite": 1,
+    "conflict_rows": 1,
+    "duplicates": 0,
+    "rows_out": 5243
+   },
+   "Uploading_Attack": {
+    "rows_in": 1252,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 0,
+    "rows_out": 1252
+   },
+   "VulnerabilityScan": {
+    "rows_in": 373351,
+    "nonfinite": 7,
+    "conflict_rows": 1538,
+    "duplicates": 417,
+    "rows_out": 371389
+   },
+   "XSS": {
+    "rows_in": 3846,
+    "nonfinite": 0,
+    "conflict_rows": 9,
+    "duplicates": 0,
+    "rows_out": 3837
+   }
+  }
+ },
+ "ciciot_merged": {
+  "dataset": "ciciot_merged",
+  "rows_in": 46686579,
+  "nonfinite": 0,
+  "conflict_rows": 0,
+  "duplicates": 18588033,
+  "rows_out": 28098546,
+  "dup_rate": 0.39814510718380114,
+  "conflict_rate": 0.0,
+  "naive_split": "random 80/20 (paper Algorithm 1)",
+  "naive_test_rows_in_train": 0.44232089821100623,
+  "split_seed0": {
+   "rows": {
+    "train": 16859127,
+    "val": 5619709,
+    "test": 5619710
+   },
+   "family_rows": {
+    "Benign": {
+     "train": 658907,
+     "val": 219635,
+     "test": 219635
+    },
+    "BruteForce": {
+     "train": 7838,
+     "val": 2613,
+     "test": 2613
+    },
+    "Flood": {
+     "train": 14404545,
+     "val": 4801516,
+     "test": 4801518
+    },
+    "Mirai": {
+     "train": 1268527,
+     "val": 422842,
+     "test": 422841
+    },
+    "Recon": {
+     "train": 212535,
+     "val": 70844,
+     "test": 70844
+    },
+    "Spoofing": {
+     "train": 291878,
+     "val": 97293,
+     "test": 97293
+    },
+    "Web": {
+     "train": 14897,
+     "val": 4966,
+     "test": 4966
+    }
+   },
+   "classes_missing_from_train": [],
+   "classes_missing_from_test": [],
+   "weight_follows_number_on_train": false
+  },
+  "per_class": {
+   "Backdoor_Malware": {
+    "rows_in": 3218,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 0,
+    "rows_out": 3218
+   },
+   "BenignTraffic": {
+    "rows_in": 1098195,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 18,
+    "rows_out": 1098177
+   },
+   "BrowserHijacking": {
+    "rows_in": 5859,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 0,
+    "rows_out": 5859
+   },
+   "CommandInjection": {
+    "rows_in": 5409,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 0,
+    "rows_out": 5409
+   },
+   "DDoS-ACK_Fragmentation": {
+    "rows_in": 285104,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 10171,
+    "rows_out": 274933
+   },
+   "DDoS-HTTP_Flood": {
+    "rows_in": 28790,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 18,
+    "rows_out": 28772
+   },
+   "DDoS-ICMP_Flood": {
+    "rows_in": 7200504,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 5391331,
+    "rows_out": 1809173
+   },
+   "DDoS-ICMP_Fragmentation": {
+    "rows_in": 452489,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 8510,
+    "rows_out": 443979
+   },
+   "DDoS-PSHACK_Flood": {
+    "rows_in": 4094755,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 2447671,
+    "rows_out": 1647084
+   },
+   "DDoS-RSTFINFlood": {
+    "rows_in": 4045285,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 2973326,
+    "rows_out": 1071959
+   },
+   "DDoS-SYN_Flood": {
+    "rows_in": 4059190,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 2125743,
+    "rows_out": 1933447
+   },
+   "DDoS-SlowLoris": {
+    "rows_in": 23426,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 0,
+    "rows_out": 23426
+   },
+   "DDoS-SynonymousIP_Flood": {
+    "rows_in": 3598138,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 532172,
+    "rows_out": 3065966
+   },
+   "DDoS-TCP_Flood": {
+    "rows_in": 4497667,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 2928062,
+    "rows_out": 1569605
+   },
+   "DDoS-UDP_Flood": {
+    "rows_in": 5412287,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 0,
+    "rows_out": 5412287
+   },
+   "DDoS-UDP_Fragmentation": {
+    "rows_in": 286925,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 0,
+    "rows_out": 286925
+   },
+   "DNS_Spoofing": {
+    "rows_in": 178911,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 38,
+    "rows_out": 178873
+   },
+   "DictionaryBruteForce": {
+    "rows_in": 13064,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 0,
+    "rows_out": 13064
+   },
+   "DoS-HTTP_Flood": {
+    "rows_in": 71864,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 78,
+    "rows_out": 71786
+   },
+   "DoS-SYN_Flood": {
+    "rows_in": 2028834,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 399238,
+    "rows_out": 1629596
+   },
+   "DoS-TCP_Flood": {
+    "rows_in": 2671445,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 892537,
+    "rows_out": 1778908
+   },
+   "DoS-UDP_Flood": {
+    "rows_in": 3318595,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 358862,
+    "rows_out": 2959733
+   },
+   "MITM-ArpSpoofing": {
+    "rows_in": 307593,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 2,
+    "rows_out": 307591
+   },
+   "Mirai-greeth_flood": {
+    "rows_in": 991866,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 318634,
+    "rows_out": 673232
+   },
+   "Mirai-greip_flood": {
+    "rows_in": 751682,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 201280,
+    "rows_out": 550402
+   },
+   "Mirai-udpplain": {
+    "rows_in": 890576,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 0,
+    "rows_out": 890576
+   },
+   "Recon-HostDiscovery": {
+    "rows_in": 134378,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 33,
+    "rows_out": 134345
+   },
+   "Recon-OSScan": {
+    "rows_in": 98259,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 147,
+    "rows_out": 98112
+   },
+   "Recon-PingSweep": {
+    "rows_in": 2262,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 2,
+    "rows_out": 2260
+   },
+   "Recon-PortScan": {
+    "rows_in": 82284,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 160,
+    "rows_out": 82124
+   },
+   "SqlInjection": {
+    "rows_in": 5245,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 0,
+    "rows_out": 5245
+   },
+   "Uploading_Attack": {
+    "rows_in": 1252,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 0,
+    "rows_out": 1252
+   },
+   "VulnerabilityScan": {
+    "rows_in": 37382,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 0,
+    "rows_out": 37382
+   },
+   "XSS": {
+    "rows_in": 3846,
+    "nonfinite": 0,
+    "conflict_rows": 0,
+    "duplicates": 0,
+    "rows_out": 3846
+   }
+  }
+ }
+}

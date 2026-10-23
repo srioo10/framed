@@ -31,6 +31,13 @@ def test_ciciot_paper_matches_table4():
     assert df.shape[1] == 39 + 3  # 39 features + y, family, src
 
 
+def test_unsw_raw_blank_counters_are_zero():
+    # blanks in the raw files mean "not applicable"; the official sets store them as 0
+    df = load.unsw_raw()
+    for c in ("ct_flw_http_mthd", "is_ftp_login", "ct_ftp_cmd"):
+        assert df[c].notna().all() and (df[c] == 0).mean() > 0.9
+
+
 @pytest.mark.parametrize("label,family", [
     ("DDoS-RSTFINFlood", "Flood"), ("DoS-HTTP_Flood", "Flood"), ("Mirai-greip_flood", "Mirai"),
     ("VulnerabilityScan", "Recon"), ("DNS_Spoofing", "Spoofing"), ("DictionaryBruteForce", "BruteForce"),

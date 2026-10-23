@@ -17,12 +17,15 @@ LEAK_COLS = {
 
 
 def group_ids(df, dataset):
-    """Split groups: capture file or 1-hour stime window. None = no group id (stratified random split).
+    """Split groups: tenth of a capture file or 10-minute stime window. None = no group id (stratified random split).
     BoT-IoT has none: its pkSeqID follows class order, not time (PREREG §9)."""
     if dataset == "ciciot_csv":
-        return df["src"]
+        # 10 contiguous blocks per capture file: BruteForce has 1 file and Spoofing 3, so whole files are too coarse
+        codes = pd.factorize(df["src"])[0]
+        pos = pd.Series(codes).groupby(codes).cumcount().to_numpy()
+        return pd.Series(codes * 10 + pos * 10 // np.bincount(codes)[codes], index=df.index)
     if dataset == "unsw_raw":
-        return df["stime"] // 3600
+        return df["stime"] // 600
     return None
 
 

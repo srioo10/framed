@@ -54,10 +54,16 @@ def test_clean_per_class_report_sums_to_totals():
 def test_group_ids_follow_preregistration():
     # BoT-IoT pkSeqID follows class order, not time, so it has no usable group (PREREG §9)
     assert clean.group_ids(pd.DataFrame({"pkSeqID": [1, 2]}), "bot_iot") is None
-    hour = 394_979 * 3600
-    unsw = pd.DataFrame({"stime": [hour, hour + 3599, hour + 3600]})
+    t = 2_369_879 * 600
+    unsw = pd.DataFrame({"stime": [t, t + 599, t + 600]})
     g = clean.group_ids(unsw, "unsw_raw")
     assert g.iloc[0] == g.iloc[1] != g.iloc[2]
+    # CICIoT: each capture file is cut into 10 contiguous blocks
+    cic = pd.DataFrame({"src": ["a"] * 20 + ["b"] * 10})
+    g = clean.group_ids(cic, "ciciot_csv")
+    assert g.nunique() == 20
+    assert g.iloc[0] == g.iloc[1] != g.iloc[2] and g.iloc[20] != g.iloc[21]
+    assert not set(g.iloc[:20]) & set(g.iloc[20:])
 
 
 def test_weight_follows_number():

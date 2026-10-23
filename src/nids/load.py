@@ -123,8 +123,10 @@ def unsw_raw():
         # ports have a few hex / '-' values in the raw files
         for c in ("sport", "dsport"):
             df[c] = pd.to_numeric(df[c], errors="coerce")
+        # blank = not applicable (non-HTTP / non-FTP flow); the official sets store these as 0
         for c in ("ct_flw_http_mthd", "is_ftp_login", "ct_ftp_cmd"):
-            df[c] = pd.to_numeric(df[c], errors="coerce")
+            blank = df[c].isna() | df[c].astype(str).str.strip().eq("")
+            df[c] = pd.to_numeric(df[c].mask(blank, 0), errors="coerce")
         return _downcast(df)
     return _cached("unsw_raw", build)
 
