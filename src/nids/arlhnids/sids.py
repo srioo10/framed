@@ -30,7 +30,7 @@ def build(params, seed):
         "ET": ExtraTreesClassifier(random_state=seed, n_jobs=-1, **p["ET"]),
         "AB": AdaBoostClassifier(random_state=seed, **p["AB"]),
         "LGBM": LGBMClassifier(random_state=seed, n_jobs=-1, verbose=-1, **p["LGBM"]),
-        "CB": CatBoostClassifier(random_seed=seed, thread_count=-1, verbose=0, **p["CB"]),
+        "CB": CatBoostClassifier(random_seed=seed, thread_count=-1, verbose=0, allow_writing_files=False, **p["CB"]),
         "XGB": XGBClassifier(random_state=seed, n_jobs=-1, tree_method="hist", **p["XGB"]),
     }
 
