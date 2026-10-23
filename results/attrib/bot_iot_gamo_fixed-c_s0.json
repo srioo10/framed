@@ -1,0 +1,113 @@
+{
+ "dataset": "bot_iot",
+ "fixed": "c",
+ "seed": 0,
+ "balance": "gamo",
+ "balance_info": {
+  "gamo_m_holdout_acc": 0.9998908952048442,
+  "gamo_basis": {
+   "2": 282,
+   "4": 50
+  },
+  "gamo_diversity": {
+   "2": {
+    "spread_ratio": 0.8378553073291711,
+    "fake_to_real_nn": 0.9482033252716064,
+    "real_to_real_nn": 0.09190932661294937,
+    "unique_share": 0.8085
+   },
+   "4": {
+    "spread_ratio": 0.001674120773411918,
+    "fake_to_real_nn": 0.04097458906471729,
+    "real_to_real_nn": 0.00013180637324694544,
+    "unique_share": 0.115
+   }
+  }
+ },
+ "test_synthetic_share": 0.35002997637156597,
+ "rows": {
+  "train": 254436,
+  "test": 85067
+ },
+ "gwo_features": [
+  "pkSeqID"
+ ],
+ "sids": {
+  "accuracy": 1.0,
+  "macro": {
+   "p": 1.0,
+   "r": 1.0,
+   "f": 1.0
+  },
+  "weighted": {
+   "p": 1.0,
+   "r": 1.0,
+   "f": 1.0
+  },
+  "far_benign": 0.0,
+  "far_macro": 0.0,
+  "attack_recall": 1.0,
+  "per_class": {
+   "DDoS": {
+    "p": 1.0,
+    "r": 1.0,
+    "f1": 1.0,
+    "n": 18505
+   },
+   "DoS": {
+    "p": 1.0,
+    "r": 1.0,
+    "f1": 1.0,
+    "n": 18315
+   },
+   "Normal": {
+    "p": 1.0,
+    "r": 1.0,
+    "f1": 1.0,
+    "n": 14303
+   },
+   "Reconnaissance": {
+    "p": 1.0,
+    "r": 1.0,
+    "f1": 1.0,
+    "n": 18361
+   },
+   "Theft": {
+    "p": 1.0,
+    "r": 1.0,
+    "f1": 1.0,
+    "n": 15583
+   }
+  },
+  "f1_consistent": true
+ },
+ "per_model_accuracy": {
+  "DT": 1.0,
+  "RF": 1.0,
+  "ET": 0.9999529782406809,
+  "AB": 0.8318619441146391,
+  "LGBM": 0.9966261887688528,
+  "CB": 0.9946982966367687,
+  "XGB": 0.9966849659680017
+ },
+ "accuracy_real_test_rows": 1.0,
+ "test_nn_distance": {
+  "real": {
+   "median": 4.708766937255859e-06,
+   "share_below_0.01": 1.0,
+   "n": 5000
+  },
+  "synthetic": {
+   "median": 0.0,
+   "share_below_0.01": 1.0,
+   "n": 5000
+  }
+ },
+ "seconds": {
+  "data": 365.6722309589386,
+  "gwo": 18.14674973487854,
+  "sids": 278.0661313533783
+ },
+ "commit": "c332174003b32577aad60963643dfd1e59187530",
+ "dirty": false
+}

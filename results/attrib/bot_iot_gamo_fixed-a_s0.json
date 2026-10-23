@@ -1,0 +1,113 @@
+{
+ "dataset": "bot_iot",
+ "fixed": "a",
+ "seed": 0,
+ "balance": "gamo",
+ "balance_info": {
+  "gamo_m_holdout_acc": 0.9998254037538193,
+  "gamo_basis": {
+   "2": 358,
+   "4": 59
+  },
+  "gamo_diversity": {
+   "2": {
+    "spread_ratio": 0.30430057776483965,
+    "fake_to_real_nn": 0.3491331934928894,
+    "real_to_real_nn": 0.08635981380939484,
+    "unique_share": 0.725
+   },
+   "4": {
+    "spread_ratio": 0.008359896863877338,
+    "fake_to_real_nn": 0.3264746218919754,
+    "real_to_real_nn": 0.00011219034058740363,
+    "unique_share": 0.4295
+   }
+  }
+ },
+ "test_synthetic_share": 0.3452696938098398,
+ "rows": {
+  "train": 336649,
+  "test": 84392
+ },
+ "gwo_features": [
+  "pkSeqID"
+ ],
+ "sids": {
+  "accuracy": 1.0,
+  "macro": {
+   "p": 1.0,
+   "r": 1.0,
+   "f": 1.0
+  },
+  "weighted": {
+   "p": 1.0,
+   "r": 1.0,
+   "f": 1.0
+  },
+  "far_benign": 0.0,
+  "far_macro": 0.0,
+  "attack_recall": 1.0,
+  "per_class": {
+   "DDoS": {
+    "p": 1.0,
+    "r": 1.0,
+    "f1": 1.0,
+    "n": 18360
+   },
+   "DoS": {
+    "p": 1.0,
+    "r": 1.0,
+    "f1": 1.0,
+    "n": 18423
+   },
+   "Normal": {
+    "p": 1.0,
+    "r": 1.0,
+    "f1": 1.0,
+    "n": 14619
+   },
+   "Reconnaissance": {
+    "p": 1.0,
+    "r": 1.0,
+    "f1": 1.0,
+    "n": 18361
+   },
+   "Theft": {
+    "p": 1.0,
+    "r": 1.0,
+    "f1": 1.0,
+    "n": 14629
+   }
+  },
+  "f1_consistent": true
+ },
+ "per_model_accuracy": {
+  "DT": 1.0,
+  "RF": 1.0,
+  "ET": 0.9999644516067874,
+  "AB": 0.6534268651056973,
+  "LGBM": 0.9972272253294151,
+  "CB": 0.9948573324485733,
+  "XGB": 0.9972153758650109
+ },
+ "accuracy_real_test_rows": 1.0,
+ "test_nn_distance": {
+  "real": {
+   "median": 3.814697265625e-06,
+   "share_below_0.01": 1.0,
+   "n": 5000
+  },
+  "synthetic": {
+   "median": 0.0,
+   "share_below_0.01": 1.0,
+   "n": 5000
+  }
+ },
+ "seconds": {
+  "data": 352.6237151622772,
+  "gwo": 15.878287315368652,
+  "sids": 436.76866149902344
+ },
+ "commit": "c332174003b32577aad60963643dfd1e59187530",
+ "dirty": false
+}
