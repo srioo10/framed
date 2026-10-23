@@ -1,0 +1,16 @@
+.venv/
+data/processed/
+runs/
+__pycache__/
+*.zip
+*.csv
+*.pdf
+.claude/settings.local.json
+
+# local-only: tooling and course notes, not part of the research artifact
+.claude/
+CLAUDE.md
+HANDOFF.md
+PLAN.md
+reports/
+research_notes/
