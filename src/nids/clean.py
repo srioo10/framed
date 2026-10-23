@@ -31,47 +31,55 @@ def feature_columns(df):
     return [c for c in df.columns if c not in LABELS]
 
 
-def row_hash(df):
-    return pd.util.hash_pandas_object(df[feature_columns(df)], index=False).to_numpy()
+def row_hash(df, cols):
+    """64-bit hash per row over `cols`, built column by column so a 46M-row frame is never copied."""
+    h = np.zeros(len(df), dtype=np.uint64)
+    for c in cols:
+        h = h * np.uint64(1_000_003) ^ pd.util.hash_array(df[c].to_numpy())
+    return h
 
 
 def clean(df, dataset):
-    """Return (cleaned frame, report). Report counts are rows removed at each step, overall and per class."""
-    y_in = df["y"].astype(str).to_numpy()
+    """Return (cleaned frame, report). Report counts are rows removed at each step, overall and per class.
+    Works on masks and copies the frame once at the end (the CICIoT frames are ~9 GB)."""
+    y = df["y"].astype(str).to_numpy()
     groups = group_ids(df, dataset)
-    df = df.drop(columns=[c for c in LEAK_COLS[dataset] if c in df.columns])
+    leak = set(LEAK_COLS[dataset])
+    feats = [c for c in feature_columns(df) if c not in leak]
+
+    finite = np.ones(len(df), dtype=bool)
+    for c in feats:
+        v = df[c]
+        finite &= np.isfinite(v.to_numpy(dtype="float64", na_value=np.nan)) if pd.api.types.is_numeric_dtype(v) \
+            else v.notna().to_numpy()
+
+    h = row_hash(df, feats)
+    fin = np.flatnonzero(finite)
+    pairs = pd.DataFrame({"h": h[fin], "y": y[fin]}).drop_duplicates()
+    conflict = np.zeros(len(df), dtype=bool)
+    conflict[fin] = np.isin(h[fin], pairs["h"][pairs["h"].duplicated()].to_numpy())
+
+    alive = np.flatnonzero(finite & ~conflict)
+    dup = np.zeros(len(df), dtype=bool)
+    dup[alive] = pd.Series(h[alive]).duplicated().to_numpy()
+    keep = finite & ~conflict & ~dup
+
+    out = df.loc[keep, [c for c in df.columns if c not in leak]].reset_index(drop=True)
     if groups is not None:
-        df["group"] = groups.to_numpy()
+        out["group"] = groups.to_numpy()[keep]
 
-    feats = df[feature_columns(df)]
-    num = feats.select_dtypes("number").to_numpy(dtype="float64", na_value=np.nan)
-    finite = np.isfinite(num).all(axis=1) & feats.select_dtypes(exclude="number").notna().all(axis=1).to_numpy()
-    df, y = df[finite], y_in[finite]
-
-    h = row_hash(df)
-    pairs = pd.DataFrame({"h": h, "y": y}).drop_duplicates()
-    conflict = np.isin(h, pairs["h"][pairs["h"].duplicated()].to_numpy())
-    df, h, y = df[~conflict], h[~conflict], y[~conflict]
-
-    dup = pd.Series(h).duplicated().to_numpy()
-    out = df[~dup].reset_index(drop=True)
-
-    y_fin = y_in[finite]
-    per = pd.DataFrame({
-        "rows_in": pd.Series(y_in).value_counts(),
-        "nonfinite": pd.Series(y_in[~finite]).value_counts(),
-        "conflict_rows": pd.Series(y_fin[conflict]).value_counts(),
-        "duplicates": pd.Series(y[dup]).value_counts(),
-        "rows_out": pd.Series(y[~dup]).value_counts(),
-    }).fillna(0).astype("int64")
-
+    def count(mask):
+        return pd.Series(y[mask]).value_counts()
+    per = pd.DataFrame({"rows_in": pd.Series(y).value_counts(), "nonfinite": count(~finite),
+                        "conflict_rows": count(conflict), "duplicates": count(dup),
+                        "rows_out": count(keep)}).fillna(0).astype("int64")
     report = {
         "dataset": dataset,
-        "rows_in": len(y_in),
+        "rows_in": len(y),
         "nonfinite": int((~finite).sum()),
         "conflict_rows": int(conflict.sum()),
         "duplicates": int(dup.sum()),
-        "rows_out": len(out),
+        "rows_out": int(keep.sum()),
         "per_class": per,
     }
     return out, report

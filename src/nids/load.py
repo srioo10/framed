@@ -5,6 +5,7 @@
 No cleaning happens here; see clean.py. Results are cached as parquet in data/processed/.
 """
 import io
+import os
 import warnings
 import zipfile
 from pathlib import Path
@@ -13,12 +14,13 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
 CACHE = ROOT / "data" / "processed"
+DATA = Path(os.environ.get("NIDS_DATA_DIR", ROOT))  # where the downloaded files live
 
-UNSW_ZIP = ROOT / "OneDrive_1_10-23-2026.zip"
-BOT_TRAIN = ROOT / "UNSW_2018_IoT_Botnet_Final_10_best_Training.csv"
-BOT_TEST = ROOT / "UNSW_2018_IoT_Botnet_Final_10_best_Testing.csv"
-CIC_CSV_ZIP = ROOT / "CSV.zip"  # CIC 2024 per-pcap CSVs, 39 features (the version ARLHNIDS used)
-CIC_MERGED_ZIP = ROOT / "archive(1).zip"  # original MERGED_CSV, 46 features + label
+UNSW_ZIP = DATA / "OneDrive_1_10-23-2026.zip"
+BOT_TRAIN = DATA / "UNSW_2018_IoT_Botnet_Final_10_best_Training.csv"
+BOT_TEST = DATA / "UNSW_2018_IoT_Botnet_Final_10_best_Testing.csv"
+CIC_CSV_ZIP = DATA / "CSV.zip"  # CIC 2024 per-pcap CSVs, 39 features (the version ARLHNIDS used)
+CIC_MERGED_ZIP = DATA / "archive(1).zip"  # original MERGED_CSV, 46 features + label
 
 # ARLHNIDS Table 4: one capture file per class (row counts verified exactly).
 CIC_PAPER_FILES = {

@@ -19,7 +19,7 @@ The datasets are not redistributed. Download them and place the files in the rep
 | CICIoT2023 (per-capture CSV release) | https://www.unb.ca/cic/datasets/iotdataset-2023.html | `CSV.zip` |
 | CICIoT2023 (original MERGED_CSV) | same | `archive(1).zip` |
 
-Paths are defined at the top of [`src/nids/load.py`](src/nids/load.py). Loaders cache parquet copies in `data/processed/`.
+Set `NIDS_DATA_DIR` to put them elsewhere; file names are defined at the top of [`src/nids/load.py`](src/nids/load.py). Loaders cache parquet copies in `data/processed/`.
 
 ## Setup
 
