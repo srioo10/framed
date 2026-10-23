@@ -9,31 +9,35 @@ Only the classes passed in enter the module (Table 5 minority classes); 75% of e
 basis, as Table 7 implies (e.g. UNSW Worms 130 of 174), the other 25% scores M. Rows are min-max scaled
 (Eq. 3) for training; convex combinations commute with that affine map, so output is in the input's space.
 
-Attention layer = x * softmax(W x + b) (feature-wise soft attention; Table 6 does not define it)."""
+Attention: Table 6 pairs each "Attention n" with a preceding "Dense n softmax"; we read the pair as one soft
+feature gate, x[:n] * softmax(W x + b) (the usual tabular attention block). Read literally, a softmax layer
+squashes the input and the generator collapses to one row per class (checked on UNSW)."""
 import numpy as np
 import torch
 from sklearn.model_selection import train_test_split
+from sklearn.neighbors import NearestNeighbors
 from torch import nn
 
 Z = 32           # Table 6 noise length
-STEPS = 3000     # shortcut: the paper reports no epochs/batch/lr; fixed budget, same in both orders
+STEPS = 12000    # the paper reports no epochs/batch/lr; fixed budget, same in both orders (3k left M at 0.43 on UNSW)
 BATCH = 256
 LR = 2e-4
 
 
 class Attention(nn.Module):
-    def __init__(self, n):
+    """Dense n softmax + Attention n: gate the first n inputs (the features, not the label) by softmax scores."""
+    def __init__(self, d_in, n):
         super().__init__()
-        self.score = nn.Linear(n, n)
+        self.n, self.score = n, nn.Linear(d_in, n)
 
     def forward(self, x):
-        return x * torch.softmax(self.score(x), dim=1)
+        return x[:, :self.n] * torch.softmax(self.score(x), dim=1)
 
 
 def _head(d_in, d, out):
-    """Table 6 discriminator / classifier: Dense d softmax, Attention d, 64 and 32 LeakyReLU, output."""
-    return nn.Sequential(nn.Linear(d_in, d), nn.Softmax(dim=1), Attention(d),
-                         nn.Linear(d, 64), nn.LeakyReLU(0.2), nn.Linear(64, 32), nn.LeakyReLU(0.2), nn.Linear(32, out))
+    """Table 6 discriminator / classifier: Dense d softmax + Attention d, 64 and 32 LeakyReLU, output."""
+    return nn.Sequential(Attention(d_in, d), nn.Linear(d, 64), nn.LeakyReLU(0.2),
+                         nn.Linear(64, 32), nn.LeakyReLU(0.2), nn.Linear(32, out))
 
 
 class Generator(nn.Module):
@@ -41,13 +45,12 @@ class Generator(nn.Module):
         """bases: {class index: (n_i, d) tensor of that class's real basis rows} for each oversampled class."""
         super().__init__()
         self.c = c
-        self.cfmu = nn.Sequential(nn.Linear(Z + c, 32), Attention(32),
+        self.cfmu = nn.Sequential(nn.Linear(Z + c, 32), Attention(32, 32),
                                   nn.Linear(32, 64), nn.BatchNorm1d(64), nn.ReLU(),
                                   nn.Linear(64, 32), nn.BatchNorm1d(32), nn.ReLU())
         self.bases = bases
-        # SGU: Dense 32 softmax, Attention 32, Dense n_i softmax (text §3.4.3), convex combination of the basis
-        self.sgu = nn.ModuleDict({str(i): nn.Sequential(nn.Linear(32, 32), nn.Softmax(dim=1), Attention(32),
-                                                        nn.Linear(32, len(b)), nn.Softmax(dim=1))
+        # SGU: Dense 32 softmax + Attention 32, Dense n_i softmax (text §3.4.3), convex combination of the basis
+        self.sgu = nn.ModuleDict({str(i): nn.Sequential(Attention(32, 32), nn.Linear(32, len(b)), nn.Softmax(dim=1))
                                   for i, b in bases.items()})
 
     def forward(self, z, y):
@@ -108,7 +111,7 @@ def oversample(X, y, targets, seed, log=None):
         lG.backward()
         opt["G"].step()
         if log and (step % 500 == 0 or step == STEPS - 1):
-            log(step, float(lD), float(lM), float(lG))
+            log(step, lD.item(), lM.item(), lG.item())
 
     G.eval()
     M.eval()
@@ -120,6 +123,20 @@ def oversample(X, y, targets, seed, log=None):
                 k = min(4096, n - s)
                 Xg.append(G(torch.rand(k, Z), torch.full((k,), i)).numpy())
                 yg.append(np.full(k, classes[i]))
-    Xg = np.concatenate(Xg) * span + lo
-    info = {"gamo_m_holdout_acc": m_acc, "gamo_basis": {str(classes[i]): len(b) for i, b in bases.items()}}
-    return np.concatenate([X, Xg]).astype(np.float32), np.concatenate([y, np.concatenate(yg)]), info
+    Xg, yg = np.concatenate(Xg), np.concatenate(yg)
+    info = {"gamo_m_holdout_acc": m_acc, "gamo_basis": {str(classes[i]): len(b) for i, b in bases.items()},
+            "gamo_diversity": {str(classes[i]): _diversity(b.numpy(), Xg[yg == classes[i]], rng) for i, b in bases.items()}}
+    Xg = Xg * span + lo
+    return np.concatenate([X, Xg]).astype(np.float32), np.concatenate([y, yg]), info
+
+
+def _diversity(basis, fake, rng, n=2000):
+    """Collapse check in scaled space: spread = median distance to the class mean (fake / real), and median
+    distance fake -> nearest basis row vs real -> nearest other basis row."""
+    fake = fake[rng.choice(len(fake), min(n, len(fake)), replace=False)]
+    nn = NearestNeighbors(n_neighbors=2).fit(basis)
+    spread = lambda a: float(np.median(np.linalg.norm(a - a.mean(0), axis=1)))
+    return {"spread_ratio": spread(fake) / max(spread(basis), 1e-12),
+            "fake_to_real_nn": float(np.median(nn.kneighbors(fake, 1)[0])),
+            "real_to_real_nn": float(np.median(nn.kneighbors(basis[:n])[0][:, 1])) if len(basis) > 1 else None,
+            "unique_share": len(np.unique(fake.round(4), axis=0)) / len(fake)}
