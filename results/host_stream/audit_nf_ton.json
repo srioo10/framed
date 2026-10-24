@@ -1,0 +1,121 @@
+{
+ "dataset": "nf_ton",
+ "rows": 5162083,
+ "days": 7,
+ "families": {
+  "Backdoor": {
+   "rows": 20588,
+   "hosts": 3,
+   "host_days": 6
+  },
+  "Benign": {
+   "rows": 1958266,
+   "hosts": 1998,
+   "host_days": 2656
+  },
+  "ddos": {
+   "rows": 446806,
+   "hosts": 6,
+   "host_days": 10
+  },
+  "dos": {
+   "rows": 107033,
+   "hosts": 7,
+   "host_days": 11
+  },
+  "injection": {
+   "rows": 332683,
+   "hosts": 7,
+   "host_days": 7
+  },
+  "mitm": {
+   "rows": 4495,
+   "hosts": 2,
+   "host_days": 2
+  },
+  "password": {
+   "rows": 689373,
+   "hosts": 7,
+   "host_days": 9
+  },
+  "ransomware": {
+   "rows": 2680,
+   "hosts": 3,
+   "host_days": 3
+  },
+  "scanning": {
+   "rows": 72573,
+   "hosts": 17,
+   "host_days": 27
+  },
+  "xss": {
+   "rows": 1527586,
+   "hosts": 5,
+   "host_days": 5
+  }
+ },
+ "benign_only_hosts": 1975,
+ "benign_only_host_days": 2544,
+ "single_feature_tpr": [
+  [
+   "RETRANSMITTED_OUT_PKTS",
+   0.08147531522555751
+  ],
+  [
+   "RETRANSMITTED_OUT_BYTES",
+   0.08090037602022837
+  ],
+  [
+   "RETRANSMITTED_IN_BYTES",
+   0.006634898310359174
+  ],
+  [
+   "SRC_TO_DST_IAT_MIN",
+   0.0004616368537903382
+  ],
+  [
+   "FTP_COMMAND_RET_CODE",
+   3.1212769018954577e-07
+  ],
+  [
+   "L4_DST_PORT",
+   0.0
+  ],
+  [
+   "PROTOCOL",
+   0.0
+  ],
+  [
+   "L7_PROTO",
+   0.0
+  ],
+  [
+   "IN_BYTES",
+   0.0
+  ],
+  [
+   "IN_PKTS",
+   0.0
+  ],
+  [
+   "OUT_BYTES",
+   0.0
+  ],
+  [
+   "OUT_PKTS",
+   0.0
+  ],
+  [
+   "TCP_FLAGS",
+   0.0
+  ],
+  [
+   "CLIENT_TCP_FLAGS",
+   0.0
+  ],
+  [
+   "SERVER_TCP_FLAGS",
+   0.0
+  ]
+ ]
+}

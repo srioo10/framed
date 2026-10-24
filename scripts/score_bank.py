@@ -192,6 +192,9 @@ class Bank:
         rf = models.rf(seed).fit(Xf, yf)
         xg = models.xgb(seed).fit(Xf, yf)
         mlp = models.train_mlp(Xf, yf, Xe, ye, k, seed=seed)
+        mlp8 = models.int8(mlp)
+        snm = models.train_mlp(Xf, yf, Xe, ye, k, seed=seed, arch=models.SNMLP).eval()
+        gda = models.FeatureGDA().fit(snm, Xf, yf, k)
         dben = self.frame(self.bsample, role_removal(P, "bsample"))
         bprep = mcde.RobustPrep().fit(dben)
         Xb = bprep.transform(dben)
@@ -215,11 +218,16 @@ class Bank:
             cols = {"row_id": rows.astype(np.int64), "role": role, "served": served_fold,
                     "family": self.fam[rows], "fine": self.fine[rows],
                     "rf": 1 - prf[:, bi], "xgb": 1 - pxg[:, bi], "mlp_ce": 1 - pml[:, bi],
+                    "mlp_ce_int8": 1 - models.mlp_proba(mlp8, X)[:, bi],
+                    "mlp_sn": 1 - models.mlp_proba(snm, X)[:, bi], "mlp_sn_gda": gda.score(snm, X),
                     "iforest": -iso.score_samples(xb), "clust": dist, "mode": mode}
             if kind == "outer":
                 cols["mlp_kd"] = 1 - models.mlp_proba(extra["mlp_kd"], X)[:, bi]
                 cols["xgb_tail"] = 1 - extra["xgb_tail"].predict_proba(X)[:, bi]
                 cols.update(extra["mcde"](d))
+                if role in ("test_known", "test_unknown"):  # taxonomy back-off needs the full posterior
+                    for j, f in enumerate(known):
+                        cols[f"mlp_p_{f}"] = pml[:, j]
                 if role == "test_known":
                     for name, p in (("rf", prf), ("xgb", pxg), ("mlp_ce", pml)):
                         cols[f"{name}_pred"] = np.array(known)[p.argmax(1)]
@@ -282,7 +290,7 @@ def patch_mcde(bank, run):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("dataset", choices=["unsw_raw", "ciciot_csv", "unsw_official", "nf_unsw", "nf_ton", "nf_cic"])
+    ap.add_argument("dataset", choices=["unsw_raw", "ciciot_csv", "unsw_official", "nf_unsw", "nf_ton", "nf_bot", "nf_cic"])
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--variant", default="ct_causal",
                     choices=["ct_causal", "ct_causal_all", "ct_orig", "ct_drop", "none", "host", "host_iso", "host_perm"])

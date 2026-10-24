@@ -48,11 +48,52 @@ class MLP(nn.Module):
         return self.head(h), h
 
 
-def train_mlp(Xtr, ytr, Xes, yes, k, soft=None, T=4.0, seed=0, epochs=30):
+class SNMLP(nn.Module):
+    """DDU trunk (Mukhoti et al., CVPR 2023): spectral-normalised residual layers keep feature distances
+    bi-Lipschitz, so a density on the features can see inputs far from every known class."""
+    def __init__(self, d, k, w=64):
+        super().__init__()
+        sn = nn.utils.parametrizations.spectral_norm
+        self.inp, self.res, self.head = sn(nn.Linear(d, w)), sn(nn.Linear(w, w)), nn.Linear(w, k)
+
+    def forward(self, x):
+        h = torch.relu(self.inp(x))
+        h = h + torch.relu(self.res(h))
+        return self.head(h), h
+
+
+class FeatureGDA:
+    """DDU density: one Gaussian per known class on the trunk features (shared jitter), score = -log q(h)."""
+    def fit(self, m, X, y, k):
+        with torch.no_grad():
+            H = torch.cat([m(torch.from_numpy(X[i:i + 200_000]))[1] for i in range(0, len(X), 200_000)]).double()
+        yt = torch.from_numpy(y)
+        self.mu, self.prec, self.logdet, self.logpi = [], [], [], []
+        for c in range(k):
+            h = H[yt == c]
+            mu = h.mean(0)
+            S = torch.cov((h - mu).T) + 1e-4 * torch.eye(H.shape[1], dtype=H.dtype)
+            L = torch.linalg.cholesky(S)
+            self.mu.append(mu), self.prec.append(torch.cholesky_inverse(L))
+            self.logdet.append(2 * torch.log(torch.diagonal(L)).sum()), self.logpi.append(np.log(len(h) / len(H)))
+        return self
+
+    def score(self, m, X, chunk=200_000):
+        out = []
+        with torch.no_grad():
+            for i in range(0, len(X), chunk):
+                h = m(torch.from_numpy(X[i:i + chunk]))[1].double()
+                lp = torch.stack([-0.5 * (((h - mu) @ P) * (h - mu)).sum(1) - 0.5 * ld + lpi
+                                  for mu, P, ld, lpi in zip(self.mu, self.prec, self.logdet, self.logpi)], 1)
+                out.append(-torch.logsumexp(lp, 1).numpy())
+        return np.concatenate(out)
+
+
+def train_mlp(Xtr, ytr, Xes, yes, k, soft=None, T=4.0, seed=0, epochs=30, arch=None):
     """CE on hard labels, or KD (KL to teacher soft labels at temperature T) when `soft` is given.
     Early stop on CE of (Xes, yes), which must be carved from the model's own training rows."""
     torch.manual_seed(seed)
-    m = MLP(Xtr.shape[1], k)
+    m = (arch or MLP)(Xtr.shape[1], k)
     opt = torch.optim.Adam(m.parameters(), lr=1e-3)
     Xt, yt = torch.from_numpy(Xtr), torch.from_numpy(ytr)
     St = None if soft is None else torch.from_numpy(soft.astype(np.float32))
@@ -77,6 +118,11 @@ def train_mlp(Xtr, ytr, Xes, yes, k, soft=None, T=4.0, seed=0, epochs=30):
             best, state = v, {k_: t_.clone() for k_, t_ in m.state_dict().items()}
     m.load_state_dict(state)
     return m
+
+
+def int8(m):
+    """The same MLP with int8 Linear weights (dynamic quantisation): the deployable model."""
+    return torch.ao.quantization.quantize_dynamic(m.eval(), {nn.Linear}, dtype=torch.qint8)
 
 
 def mlp_proba(m, X, chunk=200_000):

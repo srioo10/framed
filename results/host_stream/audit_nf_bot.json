@@ -1,0 +1,96 @@
+{
+ "dataset": "nf_bot",
+ "rows": 1548726,
+ "days": 6,
+ "families": {
+  "Benign": {
+   "rows": 15189,
+   "hosts": 20,
+   "host_days": 72
+  },
+  "DDoS": {
+   "rows": 287178,
+   "hosts": 8,
+   "host_days": 8
+  },
+  "DoS": {
+   "rows": 354356,
+   "hosts": 8,
+   "host_days": 8
+  },
+  "Reconnaissance": {
+   "rows": 891555,
+   "hosts": 8,
+   "host_days": 24
+  },
+  "Theft": {
+   "rows": 448,
+   "hosts": 4,
+   "host_days": 8
+  }
+ },
+ "benign_only_hosts": 12,
+ "benign_only_host_days": 31,
+ "single_feature_tpr": [
+  [
+   "SRC_TO_DST_IAT_AVG",
+   0.30624562693955215
+  ],
+  [
+   "DST_TO_SRC_IAT_MIN",
+   0.10043252950532006
+  ],
+  [
+   "RETRANSMITTED_OUT_PKTS",
+   0.0068593062964897485
+  ],
+  [
+   "RETRANSMITTED_OUT_BYTES",
+   0.006814964360168682
+  ],
+  [
+   "DST_TO_SRC_IAT_AVG",
+   0.0010576855987172139
+  ],
+  [
+   "FTP_COMMAND_RET_CODE",
+   6.520872988392194e-05
+  ],
+  [
+   "OUT_BYTES",
+   9.129222183749072e-06
+  ],
+  [
+   "IN_BYTES",
+   5.2166983907137555e-06
+  ],
+  [
+   "DNS_TTL_ANSWER",
+   1.3041745976784389e-06
+  ],
+  [
+   "L4_DST_PORT",
+   0.0
+  ],
+  [
+   "PROTOCOL",
+   0.0
+  ],
+  [
+   "L7_PROTO",
+   0.0
+  ],
+  [
+   "IN_PKTS",
+   0.0
+  ],
+  [
+   "OUT_PKTS",
+   0.0
+  ],
+  [
+   "TCP_FLAGS",
+   0.0
+  ]
+ ]
+}

@@ -152,19 +152,29 @@ def _netflow_v3(name):
         import pyarrow.compute as pc
         from pyarrow import csv as pacsv
         f = next(NF_DIR.glob(f"*/*/data/{NF_FILES[name]}"))
-        t = pacsv.read_csv(f)
+        # stream the CSV (5 GB for nf_ton): cast each batch to its narrow type so the full float64 table never exists
+        reader = pacsv.open_csv(f, read_options=pacsv.ReadOptions(block_size=1 << 26))
+        names = [c.strip() for c in reader.schema.names]
+        batches = []
+        for b in reader:
+            cols = []
+            for c, col in zip(names, b.columns):
+                if pa.types.is_floating(col.type):
+                    col = col.cast(pa.float32())
+                elif pa.types.is_string(col.type) and c != "Attack":
+                    col = col.dictionary_encode()
+                cols.append(col)
+            batches.append(pa.record_batch(cols, names=names))
+        t = pa.Table.from_batches(batches).unify_dictionaries()
+        del batches
         cols = []
-        for c, col in zip(t.column_names, t.columns):  # 20-27M rows: narrowest type that holds the column
-            if pa.types.is_floating(col.type):
-                col = col.cast(pa.float32())
-            elif pa.types.is_integer(col.type) and "MILLISECONDS" not in c:
+        for c, col in zip(t.column_names, t.columns):  # 20-27M rows: narrowest int type that holds the column
+            if pa.types.is_integer(col.type) and "MILLISECONDS" not in c:
                 lo, hi = pc.min_max(col).values()
                 if lo.as_py() is not None and -2**31 < lo.as_py() and hi.as_py() < 2**31:
                     col = col.cast(pa.int32())
-            elif pa.types.is_string(col.type) and c.strip() != "Attack":
-                col = col.dictionary_encode()
             cols.append(col)
-        df = pa.table(cols, names=[c.strip() for c in t.column_names]).to_pandas(split_blocks=True, self_destruct=True)
+        df = pa.table(cols, names=t.column_names).to_pandas(split_blocks=True, self_destruct=True)
         del t, cols
         df["y"] = df.pop("Attack").astype(str).str.strip()
         fam = {"nf_unsw": {**UNSW_FAMILY, "Benign": "Benign"}, "nf_cic": CIC2018_FAMILY}.get(name)
