@@ -274,12 +274,12 @@ def main():
     for k in ("Flood", "BruteForce"):
         for m in ("rf", "xgb"):
             g = res[(res.fold == k) & (res.model == m)]
-            a = g.hit_unk.mean() > 0.5
-            b = any(g[f"unsplit_{x}_auroc"].mean() >= 0.70 and g[f"unsplit_{x}_ratio"].mean() >= 2 for x in AGGS)
-            ok[k, m] = (a, b)
-            L.append(f"- {k} / {m}: majority in benign-dominated leaves {'yes' if a else 'NO'}; "
-                     f"unsplit deviation AUROC >= 0.70 and ratio >= 2 {'yes' if b else 'NO'}")
-    passed = all(a and b for a, b in ok.values())
+            land = g.hit_unk.mean() > 0.5
+            dev = any(g[f"unsplit_{x}_auroc"].mean() >= 0.70 and g[f"unsplit_{x}_ratio"].mean() >= 2 for x in AGGS)
+            ok[k, m] = (land, dev)
+            L.append(f"- {k} / {m}: majority in benign-dominated leaves {'yes' if land else 'NO'}; "
+                     f"unsplit deviation AUROC >= 0.70 and ratio >= 2 {'yes' if dev else 'NO'}")
+    passed = all(x and y for x, y in ok.values())
     L.append(f"\n**Step 1: {'PASS (build steps 2-4)' if passed else 'FAIL (mechanism not supported; stop)'}**")
     L.append(f"\nrefit vs bank: RF max |diff| {res[res.model == 'rf'].refit_maxdiff.max():.1e}; XGB max |diff| "
              f"{res.refit_maxdiff[res.model == 'xgb'].max():.4f} (unexplained; refit used throughout)")
