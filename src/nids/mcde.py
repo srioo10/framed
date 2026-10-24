@@ -12,11 +12,21 @@ MIN_MODE = 20  # modes with fewer training vectors use the global scale
 
 
 class RobustPrep:
-    """Median impute -> signed log -> robust scale to the 5th-95th percentile range (fit on its own rows)."""
+    """Median impute -> signed log -> robust scale to the 5th-95th percentile range (fit on its own rows).
+    onehot=True is MCDE §4.2.1: categorical columns are mode-imputed and one-hot encoded with block weight 0.5
+    (unseen categories -> all zeros). onehot=False label-encodes them (our IForest / cluster-distance members)."""
+    CAT_WEIGHT = 0.5
+
+    def __init__(self, onehot=False):
+        self.onehot = onehot
 
     def fit(self, df):
-        self.codes = {c: {v: i for i, v in enumerate(pd.unique(df[c].astype(str)))}
-                      for c in df.columns if not pd.api.types.is_numeric_dtype(df[c])}
+        cats = [c for c in df.columns if not pd.api.types.is_numeric_dtype(df[c])]
+        self.codes = {c: {v: i for i, v in enumerate(pd.unique(df[c].astype(str)))} for c in cats}
+        if self.onehot:
+            self.cats = {c: df[c].astype(str).value_counts().index.tolist() for c in cats}  # [0] = mode
+            self.codes = {}
+            df = df.drop(columns=cats)
         X = self._log(self._raw(df))
         self.med = np.nanmedian(X, 0)
         X = np.where(np.isnan(X), self.med, X)
@@ -36,9 +46,16 @@ class RobustPrep:
         return np.sign(X) * np.log1p(np.abs(X))
 
     def transform(self, df):
+        oh = []
+        if self.onehot:
+            for c, levels in self.cats.items():
+                v = df[c].astype(str).to_numpy()
+                v = np.where(pd.isna(df[c]).to_numpy(), levels[0], v)
+                oh.append((v[:, None] == np.array(levels)[None]) * self.CAT_WEIGHT)
+            df = df.drop(columns=list(self.cats))
         X = self._log(self._raw(df))
         X = np.where(np.isnan(X), self.med, X)
-        return ((X - self.med) / self.scale).astype(np.float32)
+        return np.column_stack([(X - self.med) / self.scale] + oh).astype(np.float32)
 
 
 class BenignModes:

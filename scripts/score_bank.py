@@ -10,9 +10,10 @@ Configurations
                   (a singleton pair {k, j} serves fold k with j and fold j with k)
 Window rule (unsw_raw, variant ct_causal): rows used for fitting, early stopping, rank and cal are computed with
 the model's removal set removed; pseudo-unknown rows of j with only R0 removed; final test rows with all flows.
+Variant ct_causal_all: the same causal windows over all flows for every role (no removal; attack-present windows).
 
-Usage: .venv/bin/python scripts/score_bank.py DATASET --seed 0 [--variant ct_causal|ct_orig|ct_drop]
-       [--kind outer|pairs|all] [--cap 40000] [--bcap 200000] [--extra] [--out DIR]
+Usage: .venv/bin/python scripts/score_bank.py DATASET --seed 0 [--variant ct_causal|ct_causal_all|ct_orig|ct_drop]
+       [--kind outer|pairs|all] [--cap 40000] [--bcap 200000] [--extra] [--out DIR] [--patch-mcde]
 """
 import argparse
 import json
@@ -129,8 +130,8 @@ class Bank:
     def frame(self, rows, R):
         """Feature frame for `rows`, with causal ct_* computed against all flows minus families R."""
         X = self.df.iloc[rows][self.feats].reset_index(drop=True)
-        if self.variant == "ct_causal":
-            pop = ~np.isin(self.raw_fam, list(R))
+        if self.variant in ("ct_causal", "ct_causal_all"):
+            pop = ~np.isin(self.raw_fam, [] if self.variant == "ct_causal_all" else list(R))
             X[list(windows.KEYS)] = self.flows.features(pop, self.kept[rows])
         return X
 
@@ -151,12 +152,29 @@ class Bank:
         return out
 
     # -- one removal set -----------------------------------------------------------------------------------
+    def fit_rows(self, P):
+        """(fit, early-stop) rows of the model with removal set P: capped rows minus P, 10% group-carved es."""
+        fit = np.sort(np.concatenate([r[~self.removed(r, P)] for r in self.cap.values()]))
+        es = split_by_group(fit, self.groups, np.random.default_rng([self.seed, zlib.crc32(SEP.join(P).encode())]),
+                            share=0.9)[1]
+        return np.setdiff1d(fit, es), es
+
+    def fit_mcde(self, dfit, notbenign, dben):
+        """Faithful MCDE branches (one-hot categoricals): returns score(frame) -> mcde_sup, mcde_dist, mcde_mode."""
+        sprep = mcde.RobustPrep(onehot=True).fit(dfit)
+        h = mcde.hgb(self.seed).fit(sprep.transform(dfit), notbenign.astype(int))
+        bprep = mcde.RobustPrep(onehot=True).fit(dben)
+        modes = mcde.BenignModes().fit(bprep.transform(dben), self.seed)
+
+        def score(d):
+            dist, mode = modes.score(bprep.transform(d))
+            return {"mcde_sup": h.predict_proba(sprep.transform(d))[:, 1], "mcde_dist": dist, "mcde_mode": mode}
+        return score
+
     def run_config(self, kind, P, served):
         t0 = time.time()
         seed = self.seed
-        fit = np.sort(np.concatenate([r[~self.removed(r, P)] for r in self.cap.values()]))
-        es = split_by_group(fit, self.groups, np.random.default_rng([seed, zlib.crc32(SEP.join(P).encode())]), share=0.9)[1]
-        fit = np.setdiff1d(fit, es)
+        fit, es = self.fit_rows(P)
         known = sorted(set(self.fam[fit]))
         code = {f: i for i, f in enumerate(known)}
         bi, k = code["Benign"], len(known)
@@ -170,7 +188,6 @@ class Bank:
         dben = self.frame(self.bsample, role_removal(P, "bsample"))
         bprep = mcde.RobustPrep().fit(dben)
         Xb = bprep.transform(dben)
-        del dben
         modes = mcde.BenignModes().fit(Xb, seed)
         iso = models.iforest(Xb, seed)
         extra = {}
@@ -178,8 +195,8 @@ class Bank:
             soft = models.oof_proba(Xf, yf, seed)
             extra["mlp_kd"] = models.train_mlp(Xf, yf, Xe, ye, k, soft=soft, T=4.0, seed=seed)
             extra["xgb_tail"] = models.xgb_tail(Xf, yf, bi, seed)
-            sprep = mcde.RobustPrep().fit(dfit)
-            extra["hgb"] = (sprep, mcde.hgb(seed).fit(sprep.transform(dfit), (yf != bi).astype(int)))
+            extra["mcde"] = self.fit_mcde(dfit, yf != bi, dben)
+        del dben
 
         def score(rows, role, R0=None):
             d = self.frame(rows, role_removal(P, role, R0))
@@ -195,8 +212,7 @@ class Bank:
             if kind == "outer":
                 cols["mlp_kd"] = 1 - models.mlp_proba(extra["mlp_kd"], X)[:, bi]
                 cols["xgb_tail"] = 1 - extra["xgb_tail"].predict_proba(X)[:, bi]
-                sp, h = extra["hgb"]
-                cols["mcde_sup"] = h.predict_proba(sp.transform(d))[:, 1]
+                cols.update(extra["mcde"](d))
                 if role == "test_known":
                     for name, p in (("rf", prf), ("xgb", pxg), ("mlp_ce", pml)):
                         cols[f"{name}_pred"] = np.array(known)[p.argmax(1)]
@@ -225,20 +241,55 @@ class Bank:
         return res, es, info
 
 
+def patch_mcde(bank, run):
+    """Add faithful (one-hot) MCDE columns to existing outer parts, refitting only the MCDE branches.
+    Sanity check: the refit ordinal cluster distance must reproduce the stored `clust` column."""
+    for kind, P, _ in bank.configs("outer", bank.ds in EXTRA):
+        path = run / f"config=outer_{SEP.join(P)}" / "part.parquet"
+        part = pd.read_parquet(path)
+        if "mcde_dist" in part:
+            print("skip", path.parent.name, flush=True)
+            continue
+        t0 = time.time()
+        fit, _ = bank.fit_rows(P)
+        dfit = bank.frame(fit, role_removal(P, "fit"))
+        dben = bank.frame(bank.bsample, role_removal(P, "bsample"))
+        score = bank.fit_mcde(dfit, bank.fam[fit] != "Benign", dben)
+        bprep = mcde.RobustPrep().fit(dben)
+        modes = mcde.BenignModes().fit(bprep.transform(dben), bank.seed)
+        new = {c: np.empty(len(part), np.float32 if c != "mcde_mode" else np.int16)
+               for c in ("mcde_sup", "mcde_dist", "mcde_mode", "clust_check")}
+        for role, idx in part.groupby("role", sort=False).indices.items():
+            d = bank.frame(part.row_id.to_numpy()[idx], role_removal(P, role))
+            for c, v in score(d).items():
+                new[c][idx] = v
+            new["clust_check"][idx] = modes.score(bprep.transform(d))[0]
+        err = np.abs(new.pop("clust_check") - part.clust.to_numpy()) / (np.abs(part.clust.to_numpy()) + 1e-6)
+        assert np.quantile(err, 0.99) < 1e-3, f"{path}: refit does not reproduce the stored bank ({err.max():.3g})"
+        for c, v in new.items():
+            part[c] = v
+        pq.write_table(pa.Table.from_pandas(part, preserve_index=False), path)
+        print(f"patched {path.parent.name}  {time.time() - t0:.0f}s  clust rel.err p99 {np.quantile(err, .99):.1e}",
+              flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("dataset", choices=["unsw_raw", "ciciot_csv", "unsw_official"])
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--variant", default="ct_causal", choices=["ct_causal", "ct_orig", "ct_drop", "none"])
+    ap.add_argument("--variant", default="ct_causal", choices=["ct_causal", "ct_causal_all", "ct_orig", "ct_drop", "none"])
     ap.add_argument("--kind", default="all", choices=["outer", "pairs", "all"])
     ap.add_argument("--cap", type=int, default=40000)
     ap.add_argument("--bcap", type=int, default=200000)
     ap.add_argument("--extra", action="store_true")
     ap.add_argument("--out", type=Path, default=OUT)
+    ap.add_argument("--patch-mcde", action="store_true", help="add one-hot MCDE columns to existing outer parts")
     a = ap.parse_args()
     variant = a.variant if a.dataset == "unsw_raw" else "none"
     bank = Bank(a.dataset, a.seed, variant, a.cap, a.bcap)
     run = a.out / f"{a.dataset}_{variant}_cap{a.cap}_s{a.seed}"
+    if a.patch_mcde:
+        return patch_mcde(bank, run)
     run.mkdir(parents=True, exist_ok=True)
     cfgs = bank.configs(a.kind, a.extra)
     n_scored = sum(len(bank.rank) + len(bank.cal) + (len(bank.test_benign) + sum(map(len, bank.test.values()))

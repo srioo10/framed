@@ -32,8 +32,10 @@ def mcde_score(rank, x, alpha_min):
     """MCDE fused score S = -min(u_sup / w, u_mode / (1 - w)) with mode-conditioned distance references."""
     n_min = math.ceil(5 / alpha_min)
     u_sup = fc.tail_pvalues(rank[["mcde_sup"]].to_numpy(np.float64), x[["mcde_sup"]].to_numpy(np.float64))[:, 0]
-    u_mode = fc.tail_pvalues_by_mode(rank.clust.to_numpy(np.float64), rank["mode"].to_numpy(),
-                                     x.clust.to_numpy(np.float64), x["mode"].to_numpy(), n_min)
+    # one-hot MCDE modes when the bank has them; without categorical features they equal clust / mode
+    dc, mc = ("mcde_dist", "mcde_mode") if "mcde_dist" in rank else ("clust", "mode")
+    u_mode = fc.tail_pvalues_by_mode(rank[dc].to_numpy(np.float64), rank[mc].to_numpy(),
+                                     x[dc].to_numpy(np.float64), x[mc].to_numpy(), n_min)
     return -np.minimum(u_sup / W_MCDE, u_mode / (1 - W_MCDE))
 
 

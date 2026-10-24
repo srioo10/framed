@@ -114,3 +114,14 @@ def test_manifest_no_leak():
                 assert ps is None or ((ps.family == j) | (ps.fine == j)).all()
             for role in ("rank", "cal"):
                 assert (part[part.role == role].family == "Benign").all()
+
+
+def test_mcde_onehot_prep():
+    from nids import mcde
+    df = pd.DataFrame({"a": [1.0, 2, 3, np.nan, 5], "p": pd.Categorical(["tcp", "udp", "tcp", None, "tcp"])})
+    X = mcde.RobustPrep(onehot=True).fit(df).transform(pd.concat(
+        [df, pd.DataFrame({"a": [1.0], "p": pd.Categorical(["icmp"])})], ignore_index=True))
+    assert X.shape == (6, 3)
+    assert (X[3, 1:] == [0.5, 0]).all()   # missing -> mode (tcp), block weight 0.5
+    assert (X[5, 1:] == 0).all()          # unseen category -> zeros
+    assert X[3, 0] == 0                   # median impute, centred on the median
