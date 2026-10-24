@@ -231,7 +231,7 @@ def one_seed(seed):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--seeds", type=int, nargs="+", default=[0])
+    ap.add_argument("--seeds", type=int, nargs="*", default=[])  # none: report only
     ap.add_argument("--out", type=Path, required=True)
     a = ap.parse_args()
     # one process per seed (two banks in memory at once hit the OOM killer); the report reads every seed's file
