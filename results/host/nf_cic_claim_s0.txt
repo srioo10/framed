@@ -1,0 +1,43 @@
+seeds [np.int64(0)]
+
+TPR@1%FPR, best member (name)
+                    TPR none        TPR host    TPR host_iso  TPR host_perm
+family                                                                    
+Bot           0.370 (clust)     0.760 (xgb)    0.818 (mcde)  0.095 (clust)
+BruteForce     1.000 (mcde)      0.963 (rf)      0.963 (rf)   0.437 (mcde)
+DDoS          0.540 (clust)  0.997 (mlp_ce)  0.997 (mlp_ce)  0.665 (clust)
+DoS           0.739 (clust)  0.996 (mlp_ce)  0.997 (mlp_ce)  0.712 (clust)
+Infiltration     0.111 (rf)      0.156 (rf)      0.151 (rf)     0.107 (rf)
+Web            0.801 (mcde)  0.093 (mlp_ce)   0.146 (clust)     0.596 (rf) 
+
+realised benign-test FPR of that member (target 0.01)
+              FPR none FPR host FPR host_iso FPR host_perm
+family                                                   
+Bot            0.0105   0.0090       0.0033        0.0105
+BruteForce     0.0126   0.0117       0.0115        0.0103
+DDoS           0.0105   0.0054       0.0051        0.0123
+DoS            0.0105   0.0047       0.0046        0.0109
+Infiltration   0.0049   0.0041       0.0036        0.0053
+Web            0.0080   0.0071       0.0098        0.0127 
+
+claim checks
+              host gain       gain CI iso gain perm gain  (1) gain>=0.03  (2) iso keeps >=1/2  (3) perm loses
+family                                                                                                      
+Bot             +0.390  n/a (1 seed)   +0.448    -0.275            True                 True            True
+BruteForce      -0.037  n/a (1 seed)   -0.037    -0.563           False                False           False
+DDoS            +0.457  n/a (1 seed)   +0.458    +0.125            True                 True           False
+DoS             +0.258  n/a (1 seed)   +0.258    -0.026            True                 True            True
+Infiltration    +0.045  n/a (1 seed)   +0.040    -0.004            True                 True            True
+Web             -0.709  n/a (1 seed)   -0.656    -0.205           False                False           False
+
+families with gain >= 0.03: 4; passing all three checks: 3; rule needs >= 2 (and a 5-seed CI > 0, not available with 1 seed)
+
+same-member gain vs none (TPR@1%FPR)
+ member        clust  iforest   mcde  mlp_ce     rf    xgb
+fold                                                     
+Bot          -0.370    0.000  0.469   0.081  0.303  0.511
+BruteForce    0.000    0.000 -0.068  -0.991  0.963  0.000
+DDoS         -0.536    0.000  0.506   0.841  0.976  0.965
+DoS           0.134   -0.489  0.959   0.904  0.965  0.980
+Infiltration -0.032   -0.003 -0.012   0.049  0.045  0.042
+Web           0.086    0.000 -0.801  -0.272 -0.477 -0.543
