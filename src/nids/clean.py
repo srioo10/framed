@@ -13,6 +13,11 @@ LEAK_COLS = {
     "ciciot_paper": ["Number"],
     "ciciot_csv": ["Number"],
     "ciciot_merged": ["Number"],
+    # identifiers and time are keys, never features; TTLs fingerprint the testbed hosts (sttl/dttl in unsw_*);
+    # DNS_QUERY_ID is a random transaction id; *_SECOND_BYTES = bytes / duration is inf/NaN at zero duration
+    # (dropping those rows would remove 76% of Generic) and both inputs are already features
+    **{n: ["IPV4_SRC_ADDR", "IPV4_DST_ADDR", "L4_SRC_PORT", "FLOW_START_MILLISECONDS", "FLOW_END_MILLISECONDS",
+           "MIN_TTL", "MAX_TTL", "DNS_QUERY_ID", "Label", "SRC_TO_DST_SECOND_BYTES", "DST_TO_SRC_SECOND_BYTES"] for n in ("nf_unsw", "nf_ton", "nf_bot", "nf_cic")},
 }
 
 
@@ -26,6 +31,8 @@ def group_ids(df, dataset):
         return pd.Series(codes * 10 + pos * 10 // np.bincount(codes)[codes], index=df.index)
     if dataset == "unsw_raw":
         return df["stime"] // 600
+    if dataset.startswith("nf_"):
+        return df["FLOW_START_MILLISECONDS"] // 600_000
     return None
 
 

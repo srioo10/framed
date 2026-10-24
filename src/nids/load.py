@@ -21,6 +21,9 @@ BOT_TRAIN = DATA / "UNSW_2018_IoT_Botnet_Final_10_best_Training.csv"
 BOT_TEST = DATA / "UNSW_2018_IoT_Botnet_Final_10_best_Testing.csv"
 CIC_CSV_ZIP = DATA / "CSV.zip"  # CIC 2024 per-pcap CSVs, 39 features (the version ARLHNIDS used)
 CIC_MERGED_ZIP = DATA / "archive(1).zip"  # original MERGED_CSV, 46 features + label
+NF_DIR = Path(os.environ.get("NIDS_NF_DIR", ROOT / "data" / "raw" / "netflow_v3"))  # unpacked UQ NetFlow-v3 zips
+NF_FILES = {"nf_unsw": "NF-UNSW-NB15-v3.csv", "nf_ton": "NF-ToN-IoT-v3.csv", "nf_bot": "NF-BoT-IoT-v3.csv",
+            "nf_cic": "NF-CICIDS2018-v3.csv"}
 
 # ARLHNIDS Table 4: one capture file per class (row counts verified exactly).
 CIC_PAPER_FILES = {
@@ -131,6 +134,22 @@ def unsw_raw():
     return _cached("unsw_raw", build)
 
 
+# ---------------------------------------------------------------- NetFlow-v3 (Luay et al. 2025)
+
+def _netflow_v3(name):
+    """UQ NetFlow-v3 CSV (53 nProbe features + Label + Attack). y = Attack string; UNSW families merged as in
+    unsw_raw, other datasets keep their Attack names as families."""
+    def build():
+        f = next(NF_DIR.glob(f"*/*/data/{NF_FILES[name]}"))
+        df = pd.read_csv(f, engine="pyarrow")
+        df.columns = [c.strip() for c in df.columns]
+        df["y"] = df.pop("Attack").astype(str).str.strip()
+        df["family"] = df["y"].map({**UNSW_FAMILY, "Benign": "Benign"}) if name == "nf_unsw" else df["y"]
+        df["src"] = name
+        return _downcast(df)
+    return _cached(name, build)
+
+
 # ---------------------------------------------------------------- BoT-IoT
 
 def bot_iot():
@@ -221,4 +240,5 @@ def ciciot_merged():
 LOADERS = {
     "unsw_official": unsw_official, "unsw_raw": unsw_raw, "bot_iot": bot_iot,
     "ciciot_paper": ciciot_paper, "ciciot_csv": ciciot_csv, "ciciot_merged": ciciot_merged,
+    **{n: (lambda n=n: _netflow_v3(n)) for n in NF_FILES},
 }

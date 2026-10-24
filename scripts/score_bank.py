@@ -275,7 +275,7 @@ def patch_mcde(bank, run):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("dataset", choices=["unsw_raw", "ciciot_csv", "unsw_official"])
+    ap.add_argument("dataset", choices=["unsw_raw", "ciciot_csv", "unsw_official", "nf_unsw", "nf_ton", "nf_cic"])
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--variant", default="ct_causal", choices=["ct_causal", "ct_causal_all", "ct_orig", "ct_drop", "none"])
     ap.add_argument("--kind", default="all", choices=["outer", "pairs", "all"])
