@@ -32,7 +32,7 @@ import pyarrow.parquet as pq
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from nids import clean, load, mcde, models, split, windows  # noqa: E402
+from nids import clean, hostctx, load, mcde, models, split, windows  # noqa: E402
 
 OUT = Path(os.environ.get("NIDS_BANK_DIR", "/home/srioo/Desktop/Projects/root/BigP/runs/bank"))
 EXTRA = {"ciciot_csv": [("Flood", "Mirai"), ("DoS",), ("DDoS",)]}  # joint unseen-family; two attack-type hold-outs
@@ -98,6 +98,8 @@ class Bank:
         rng = np.random.default_rng(seed)
         raw = load.LOADERS[ds]()
         self.flows = windows.Flows(raw) if ds == "unsw_raw" else None
+        self.host = hostctx.HostFlows(raw, permute_seed=seed if variant == "host_perm" else None) \
+            if variant.startswith("host") else None
         self.raw_fam = None
         if self.flows is not None:
             self.raw_fam = self.flows.family
@@ -133,6 +135,9 @@ class Bank:
         if self.variant in ("ct_causal", "ct_causal_all"):
             pop = ~np.isin(self.raw_fam, [] if self.variant == "ct_causal_all" else list(R))
             X[list(windows.KEYS)] = self.flows.features(pop, self.kept[rows])
+        if self.host is not None:  # host: removal-set population (deployable); host_iso: Benign + own family
+            H = self.host.isolated() if self.variant == "host_iso" else self.host.removal(R)
+            X[hostctx.COLS] = H[self.kept[rows]]
         return X
 
     def configs(self, kind, extra):
@@ -277,7 +282,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("dataset", choices=["unsw_raw", "ciciot_csv", "unsw_official", "nf_unsw", "nf_ton", "nf_cic"])
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--variant", default="ct_causal", choices=["ct_causal", "ct_causal_all", "ct_orig", "ct_drop", "none"])
+    ap.add_argument("--variant", default="ct_causal",
+                    choices=["ct_causal", "ct_causal_all", "ct_orig", "ct_drop", "none", "host", "host_iso", "host_perm"])
     ap.add_argument("--kind", default="all", choices=["outer", "pairs", "all"])
     ap.add_argument("--cap", type=int, default=40000)
     ap.add_argument("--bcap", type=int, default=200000)
@@ -285,7 +291,8 @@ def main():
     ap.add_argument("--out", type=Path, default=OUT)
     ap.add_argument("--patch-mcde", action="store_true", help="add one-hot MCDE columns to existing outer parts")
     a = ap.parse_args()
-    variant = a.variant if a.dataset == "unsw_raw" else "none"
+    variant = a.variant if a.dataset == "unsw_raw" or a.dataset.startswith("nf_") and a.variant.startswith("host") \
+        else "none"
     bank = Bank(a.dataset, a.seed, variant, a.cap, a.bcap)
     run = a.out / f"{a.dataset}_{variant}_cap{a.cap}_s{a.seed}"
     if a.patch_mcde:
