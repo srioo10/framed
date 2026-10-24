@@ -24,6 +24,7 @@ FPRS = (0.001, 0.01, 0.05)
 FUSION = ["rf", "xgb", "mlp_ce", "iforest", "clust"]
 OUTER = ["rf", "xgb", "xgb_tail", "mlp_ce", "mlp_kd", "iforest", "clust", "mcde"]
 MIN_ROWS = 300
+EXTRA_FOLDS = {"Flood+Mirai", "DoS", "DDoS"}  # CICIoT joint / attack-type hold-outs, reported apart
 W_MCDE = 0.9
 
 
@@ -91,7 +92,8 @@ def one_seed(run):
                 outer.append({"heldout": name.replace("__", "+"), "member": m, "n": len(unk), **r})
         else:
             for fold, ps in df[df.role == "pseudo"].groupby("served"):
-                j = sorted(set(ps.fine) - set(fold.split("__")))[0] if "fine" in ps else ps.family.iloc[0]
+                assert ps.family.nunique() == 1, (fold, ps.family.unique())
+                j = ps.family.iloc[0]
                 row = {"fold": fold.replace("__", "+"), "inner": j, "n": len(ps)}
                 if len(ps) >= MIN_ROWS:
                     row.update(pseudo_rows(rank, cal, ps))
@@ -124,7 +126,13 @@ def main():
     print(f"runs: {[r.name for r in runs]}\n")
 
     # ---- Stage 2: inner-family ceiling gate --------------------------------------------------------------
-    inner = pd.concat([v[1].assign(seed=s) for s, v in seeds.items()], ignore_index=True)
+    inner_all = pd.concat([v[1].assign(seed=s) for s, v in seeds.items()], ignore_index=True)
+    if "fold" not in inner_all:  # outer-only runs (ct_* variants, unsw_official): no rehearsal rows
+        inner_all = pd.DataFrame({"fold": [], "inner": [], "n": [], "seed": [], "headroom_vs_trees": [],
+                                  "headroom_vs_best_member": [], "union_tpr": [], "fused_tpr": []})
+        print("(outer-only run: no rehearsal rows, Stage 2/3 gates not applicable)")
+    extra = inner_all[inner_all.fold.isin(EXTRA_FOLDS)]
+    inner = inner_all[~inner_all.fold.isin(EXTRA_FOLDS)]
     elig = inner.dropna(subset=["headroom_vs_trees"]) if "headroom_vs_trees" in inner else inner.iloc[:0]
     print("## Stage 2 — ceiling on rehearsal families (gate)\n")
     print("| inner family | folds | headroom vs trees | seeds > 0 | headroom vs best member | union TPR | fused TPR |")
@@ -162,6 +170,15 @@ def main():
     print(f"\nany member CI > 0: {any_pos} -> **{'continue' if any_pos else 'ABORT fusion'}** "
           f"(needs >= 2 seeds for a CI)")
 
+    # ---- extra hold-outs: rehearsal numbers per fold (alpha for these folds is tuned on these inner families)
+    if len(extra) and "headroom_vs_trees" in extra:
+        print("\n## Extra hold-outs — rehearsal families per fold\n")
+        g = extra.dropna(subset=["headroom_vs_trees"]).groupby(["fold", "inner", "seed"]).mean(numeric_only=True)
+        cols = ["headroom_vs_trees"] + [c for c in g.columns if c.startswith("gain_")]
+        print("| fold | inner | " + " | ".join(cols) + " |\n|---|---|" + "---|" * len(cols))
+        for (fold, j), gg in g.groupby(level=[0, 1]):
+            print(f"| {fold} | {j} | " + " | ".join(fmt(*ci(gg[c])) for c in cols) + " |")
+
     # ---- outer diagnostics ---------------------------------------------------------------------------------
     outer = pd.concat([v[0].assign(seed=s) for s, v in seeds.items()], ignore_index=True)
     print("\n## Outer held-out families (diagnostic only)\n")
@@ -183,7 +200,7 @@ def main():
     print("\n## KD vs CE, TPR@1%\n")
     print(kd.round(3).to_string())
     if a.json:
-        a.json.write_text(json.dumps({"inner": inner.to_dict("records"), "outer": outer.to_dict("records")},
+        a.json.write_text(json.dumps({"inner": inner_all.to_dict("records"), "outer": outer.to_dict("records")},
                                      indent=1, default=float))
 
 
