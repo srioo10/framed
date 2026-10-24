@@ -40,7 +40,7 @@ def test_zero_share_removes_member():
     p = np.array([[0.001, 0.5], [0.5, 0.5]])
     assert np.allclose(fc.budget_fusion_score(p, [0.0, 1.0]), [-0.5, -0.5])
     assert fc.budget_fusion_score(p, [0.5, 0.5])[0] > fc.budget_fusion_score(p, [0.0, 1.0])[0]  # member 0 counts again
-    names = ["rf", "xgb", "mlp_ce", "iforest", "clust_global"]
+    names = ["rf", "xgb", "mlp_ce", "iforest", "clust"]
     assert np.allclose(fc.shares_from_alpha(1.0, names), [1 / 3, 1 / 3, 1 / 3, 0, 0])
 
 

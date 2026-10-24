@@ -1,7 +1,7 @@
 """Score-bank diagnostics for budgeted fusion (Stage 2 ceiling check + Stage 5 rehearsal), PREREG §9 H5.
 
 All functions work on per-member score matrices of shape (N, M), higher = more anomalous.
-`names` lists the M member columns, e.g. ["rf", "xgb", "mlp_ce", "iforest", "clust_global"].
+`names` lists the M member columns, e.g. ["rf", "xgb", "mlp_ce", "iforest", "clust"] (clust = global-reference cluster distance).
 b_rank / b_cal must be the group-stratified halves of benign_val (stime//600 blocks on unsw_raw,
 file blocks on CICIoT; random on unsw_official), never a positional split.
 """
@@ -94,7 +94,7 @@ def union_ceiling_check(b_rank, b_cal, attack, names, tree_cols=("rf", "xgb"), f
 
 
 def shares_from_alpha(alpha_sup, names,
-                      sup=("rf", "xgb", "mlp_ce"), dev=("iforest", "clust_global")):
+                      sup=("rf", "xgb", "mlp_ce"), dev=("iforest", "clust")):
     """One free constant: alpha_sup goes to the supervised block, the rest to the
     benign-deviation block, split equally inside each block."""
     a = np.zeros(len(names))
