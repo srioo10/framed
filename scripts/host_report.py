@@ -18,21 +18,21 @@ from nids import fusion_checks as fc  # noqa: E402
 import bank_report as br  # noqa: E402
 import score_bank as sb  # noqa: E402
 
-MEMBERS = ["rf", "xgb", "mlp_ce", "iforest", "clust", "mcde"]
+MEMBERS = ["rf", "xgb", "mlp_ce", "mlp_ce_int8", "mlp_sn", "mlp_sn_gda", "iforest", "clust", "mcde"]
 VARIANTS = ["none", "host", "host_iso", "host_perm"]
 
 
-def rows(ds):
+def rows(ds, variants=VARIANTS):
     out = []
-    for v in VARIANTS:
+    for v in variants:
         for run in sorted(sb.OUT.glob(f"{ds}_{v}_cap40000_s*")):
             seed = int(run.name.rsplit("_s", 1)[1])
             for part in sorted(run.glob("config=outer_*/part.parquet")):
                 k = part.parent.name.removeprefix("config=outer_")
                 d = pd.read_parquet(part)
                 r = {x: d[d.role == x] for x in ("rank", "cal", "test_benign", "test_unknown")}
-                for m in MEMBERS:
-                    s = {x: (br.mcde_score(r["rank"], g, 0.001) if m == "mcde" else g[m].to_numpy(np.float64))
+                for m in [m for m in MEMBERS if m == "mcde" or m in d.columns]:
+                    s = {x: (br.mcde_score(r["rank"], g, 0.01 if ds == "unsw_raw" else 0.001) if m == "mcde" else g[m].to_numpy(np.float64))
                          for x, g in r.items()}
                     th = fc.threshold(s["cal"], 0.01)
                     out.append({"variant": v, "seed": seed, "fold": k, "member": m, "n": len(r["test_unknown"]),
@@ -45,14 +45,15 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ds", default="nf_unsw")
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--variants", nargs="+", default=VARIANTS)
     a = ap.parse_args()
-    res = rows(a.ds)
+    res = rows(a.ds, a.variants)
     a.out.parent.mkdir(parents=True, exist_ok=True)
     res.to_csv(f"{a.out}_rows.csv", index=False)
     best = res.loc[res.groupby(["variant", "seed", "fold"]).tpr.idxmax()]
     f = lambda x: br.fmt(*br.ci(x)) if len(x) > 1 else f"{x.iloc[0]:.3f}"  # noqa: E731
     seeds = sorted(res.seed.unique())
-    have = [v for v in VARIANTS if v in set(res.variant)]
+    have = [v for v in a.variants if v in set(res.variant)]
     L = [f"# Host-context arm — {a.ds} (seeds {seeds})\n", "TPR@1%FPR on the held-out family, best member per seed "
          "(member most often best in brackets); 5-seed mean [CI]\n",
          "| family | n | " + " | ".join(have) + " | host − none (paired) |", "|---|---|" + "---|" * (len(have) + 1)]
@@ -62,7 +63,8 @@ def main():
             gv = g[g.variant == v]
             cells.append(f"{f(gv.tpr)} ({gv.member.mode().iloc[0]})" if len(gv) else "—")
         p = g.pivot_table(index="seed", columns="variant", values="tpr")
-        diff = f(p["host"] - p["none"]) if {"host", "none"} <= set(p.columns) and p[["host", "none"]].notna().all(1).any() else "—"
+        h, n = (a.variants + [None])[1], a.variants[0]
+        diff = f(p[h] - p[n]) if {h, n} <= set(p.columns) and p[[h, n]].notna().all(1).any() else "—"
         L.append(f"| {k} | {int(g.n.min())} | " + " | ".join(cells) + f" | {diff} |")
     L += ["\nSame member, TPR@1%FPR mean over seeds (rows: member × variant)\n"]
     piv = res.pivot_table(index=["member", "variant"], columns="fold", values="tpr").round(3)

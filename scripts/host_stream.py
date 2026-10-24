@@ -18,12 +18,14 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
+import bank_report as br  # noqa: E402
 import score_bank as sb  # noqa: E402
 
 META = ROOT / "data" / "processed" / "nf_cic_hostmeta.npz"
 DAY_MS = 86_400_000
 BUDGET, LAM, WIN, KAPPAS, ALPHA_V = 0.01, 0.1, 32, np.array([0.05, 0.1, 0.2, 0.5]), 0.01
 METHODS = ["P", "E", "W", "A"]
+MCDE_COLS = ["mcde_sup", "mcde_dist", "mcde_mode"]
 
 
 def build_meta():
@@ -86,14 +88,13 @@ def threshold(m):
     return m[j] if j < len(m) else -np.inf
 
 
-def fold(part, meta, cal_host, member, held):
+def fold(part, s, meta, cal_host, held):
     src, t, fam_all = meta["src"], meta["t"], meta["fam"]
     rid = part.row_id.to_numpy()
     h = src[rid]
     day = t[rid] // DAY_MS
     key = h.astype(np.int64) * 100_000 + day
     role = part.role.to_numpy()
-    s = part[member].to_numpy(np.float64)
     benign_host = ~np.isin(np.arange(len(cal_host)), np.unique(src[fam_all != "Benign"]))
     ch = cal_host[h] & benign_host[h]
     ref = s[(role == "rank") & ch]
@@ -131,7 +132,9 @@ def fold(part, meta, cal_host, member, held):
         res[f"flowtpr_{m}"] = float(alarm[unk].mean())
         if m == "AV":
             res["flowfpr_AV"] = float(alarm[bt].mean())
-    return res, pd.DataFrame({"fold": held, "host": ahost, "clean": clean_day, **{m: det[m] for m in det}})
+    flows = pd.DataFrame({"fold": held, "row_id": rid[m_te][unk], **{m: (st[m][unk] > th[m]) if m != "AV" else st[m][unk]
+                                                                   for m in METHODS + ["AV"]}})
+    return res, pd.DataFrame({"fold": held, "host": ahost, "clean": clean_day, **{m: det[m] for m in det}}), flows
 
 
 def boot(days, a, b, reps=2000, seed=0):
@@ -154,6 +157,7 @@ def boot(days, a, b, reps=2000, seed=0):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--meta", action="store_true")
+    ap.add_argument("--ds", default="nf_cic")
     ap.add_argument("--variant", default="none")
     ap.add_argument("--member", default="mlp_ce")
     ap.add_argument("--seed", type=int, default=0)
@@ -161,24 +165,31 @@ def main():
     a = ap.parse_args()
     if a.meta:
         return build_meta()
-    z = np.load(META, allow_pickle=False)
+    z = np.load(ROOT / "data" / "processed" / f"{a.ds}_hostmeta.npz", allow_pickle=False)
     meta = {"src": z["src"], "t": z["t"], "fam": z["fam"]}
     cal_host = host_split(z["ips"], a.seed)
-    run = sb.OUT / f"nf_cic_{a.variant}_cap40000_s{a.seed}"
-    rows, days = [], []
+    run = sb.OUT / f"{a.ds}_{a.variant}_cap40000_s{a.seed}"
+    rows, days, flows = [], [], []
     for p in sorted(run.glob("config=outer_*/part.parquet")):
         held = p.parent.name.removeprefix("config=outer_")
-        part = pd.read_parquet(p, columns=["row_id", "role", "family", a.member])
+        cols = MCDE_COLS if a.member == "mcde" else [a.member]
+        part = pd.read_parquet(p, columns=["row_id", "role", "family"] + cols)
         assert (meta["fam"][part.row_id.to_numpy()] == part.family.to_numpy()).all(), "meta rows != bank rows"
-        r, d = fold(part, meta, cal_host, a.member, held)
+        if a.member == "mcde":
+            s = br.mcde_score(part[part.role == "rank"], part, 0.01 if a.ds == "unsw_raw" else 0.001)
+        else:
+            s = part[a.member].to_numpy(np.float64)
+        r, d, fl = fold(part, s, meta, cal_host, held)
         rows.append(r)
         days.append(d)
+        flows.append(fl)
         print(json.dumps(r), flush=True)
     res, days = pd.DataFrame(rows).set_index("fold"), pd.concat(days, ignore_index=True)
     a.out.parent.mkdir(parents=True, exist_ok=True)
     res.to_json(f"{a.out}.json", orient="index", indent=1)
     days.to_csv(f"{a.out}_days.csv", index=False)
-    L = [f"# Per-host conformal CUSUM kill test — nf_cic {a.variant}, {a.member}, seed {a.seed}\n",
+    pd.concat(flows, ignore_index=True).to_parquet(f"{a.out}_flows.parquet", index=False)
+    L = [f"# Per-host conformal CUSUM — {a.ds} {a.variant}, {a.member}, seed {a.seed}\n",
          "Host-day TPR (share of attacker host-days of the held-out family with ≥ 1 alarm on a held-out flow) at a 1% "
          "benign host-day alarm budget calibrated on disjoint hosts. Clean = clean-history subset.\n",
          "| family | hosts | host-days | clean | " + " | ".join(METHODS) + " | A clean | P clean | A-V | flow TPR A / P |",
