@@ -99,13 +99,17 @@ def aggregate(z, mask):
     return {"max": np.where(k > 0, s[:, 0], np.nan), "top3": top3, "rss": np.where(k > 0, rss, np.nan)}
 
 
-def one_model(trees, gscale, X, sets):
-    """Accumulate 4b / 4c / 4d over the picked trees. sets: 'bt' benign train, 'at' attack train, 'unk', 'ben'."""
+PARTS = ("unsplit", "halfopen", "all", "unsplit_global", "halfopen_global", "all_global")
+
+
+def one_model(trees, gscale, X, gmed):
+    """Accumulate 4b / 4c / 4d over the picked trees. X: 'bt' benign train, 'at' attack train, 'unk', 'ben'.
+    *_global = the same deviation with global benign-train median and scale (leaf-conditioning control)."""
     hit = {k: [] for k in ("unk", "ben")}
     big = {k: [] for k in ("unk", "ben")}
     ge20 = {k: [] for k in ("unk", "ben")}
     cover = []
-    dev = {(s, part, a): [] for s in ("unk", "ben") for part in ("unsplit", "halfopen") for a in AGGS}
+    dev = {(s, part, a): [] for s in ("unk", "ben") for part in PARTS for a in AGGS}
     for leaves, lo, hi in trees:
         allids = np.concatenate([leaves[k] for k in ("bt", "at", "unk", "ben")])
         uniq, inv = np.unique(allids, return_inverse=True)
@@ -137,14 +141,17 @@ def one_model(trees, gscale, X, sets):
             r = shared[cid[k]]
             li = remap[cid[k][r]]
             z = np.abs(X[k][r] - med[li]) / scale[li]
-            for part, m in (("unsplit", unsplit), ("halfopen", halfopen)):
-                for a, v in aggregate(z, m[li]).items():
-                    dev[k, part, a].append(v)
+            zg = np.abs(X[k][r] - gmed) / gscale
+            every = np.ones_like(unsplit)
+            for part, m in (("unsplit", unsplit), ("halfopen", halfopen), ("all", every)):
+                for name, zz in ((part, z), (f"{part}_global", zg)):
+                    for a, v in aggregate(zz, m[li]).items():
+                        dev[k, name, a].append(v)
     res = {"hit_unk": np.mean(hit["unk"]), "hit_ben": np.mean(hit["ben"]),
            "ge20_unk": np.nanmean(ge20["unk"]), "ge20_ben": np.nanmean(ge20["ben"]),
            "ge200_unk": np.nanmean(big["unk"]), "ge200_ben": np.nanmean(big["ben"]),
            "dom_leaves_ge200": np.nanmean(cover)}
-    for part in ("unsplit", "halfopen"):
+    for part in PARTS:
         for a in AGGS:
             u = np.concatenate(dev["unk", part, a]) if dev["unk", part, a] else np.array([])
             b = np.concatenate(dev["ben", part, a]) if dev["ben", part, a] else np.array([])
@@ -192,26 +199,28 @@ def one_seed(seed):
         rep["xgb_tpr_diff"] = float(abs(((1 - xg.predict_proba(Xu)[:, bi]) > tau_new).mean()
                                         - (unk.xgb.to_numpy() > tau_old).mean()))
         rep["xgb_spearman"] = float(stats.spearmanr(s_cal, cal.xgb.to_numpy()).statistic)
-        xgb_ok = rep["xgb_tpr_diff"] <= 0.01 and rep["xgb_spearman"] >= 0.999
-        print(f"s{seed} {k} refit: rf maxdiff {rep['rf']:.1e}; xgb maxdiff {rep['xgb']:.4f} TPR@1% diff "
-              f"{rep['xgb_tpr_diff']:.4f} spearman {rep['xgb_spearman']:.5f} -> {'ok' if xgb_ok else 'EXCLUDED'}",
+        rep["xgb_tpr_bank"] = float((unk.xgb.to_numpy() > tau_old).mean())
+        rep["xgb_tpr_refit"] = float(((1 - xg.predict_proba(Xu)[:, bi]) > tau_new).mean())
+        print(f"s{seed} {k} refit: rf maxdiff {rep['rf']:.1e}; xgb maxdiff {rep['xgb']:.4f} TPR@1% bank "
+              f"{rep['xgb_tpr_bank']:.4f} refit {rep['xgb_tpr_refit']:.4f} spearman {rep['xgb_spearman']:.5f}",
               flush=True)
         ben_idx = np.sort(rng.choice(bank.test_benign, min(N_BTEST, len(bank.test_benign)), replace=False))
         X = {"bt": prep.transform(bank.frame(bank.bsample, P)), "at": Xf[yf != bi],
              "unk": prep.transform(bank.frame(bank.test[k], ())), "ben": prep.transform(bank.frame(ben_idx, ()))}
         q = np.quantile(X["bt"], [0.1, 0.9], axis=0)
         gscale = np.maximum(q[1] - q[0], 1e-6)
+        gmed = np.median(X["bt"], axis=0)
         d = Xf.shape[1]
         pick_rf = np.sort(rng.choice(len(rf.estimators_), N_TREES, replace=False))
         n_xgb = len(xg.get_booster().get_dump())
         pick_xgb = np.sort(rng.choice(n_xgb, N_TREES, replace=False))
         todo = [("rf", rf_trees(rf, X, pick_rf), [rf.estimators_[t].get_n_leaves() for t in pick_rf])]
-        if xgb_ok:
-            todo.append(("xgb", xgb_trees(xg, X, pick_xgb, d), None))
+        todo.append(("xgb", xgb_trees(xg, X, pick_xgb, d), None))  # refit XGB, used for every XGB number
         for name, trees, n_leaves in todo:
-            r = one_model(trees, gscale, X, None)
+            r = one_model(trees, gscale, X, gmed)
             r.update({"seed": seed, "fold": k, "model": name, "refit_maxdiff": rep[name], "xgb_tpr_diff": rep["xgb_tpr_diff"],
-                      "xgb_spearman": rep["xgb_spearman"], "n_unk": len(X["unk"]),
+                      "xgb_spearman": rep["xgb_spearman"],
+                      "xgb_tpr_bank": rep["xgb_tpr_bank"], "xgb_tpr_refit": rep["xgb_tpr_refit"], "n_unk": len(X["unk"]),
                       "leaves_per_tree": float(np.mean(n_leaves)) if n_leaves else np.nan})
             out.append(r)
             print(f"s{seed} {k:10s} {name:3s} hit unk {r['hit_unk']:.3f} ben {r['hit_ben']:.3f} | unsplit max "
@@ -236,13 +245,23 @@ def main():
          "|---|---|---|---|---|---|---|"]
     for (k, m), g in res.groupby(["fold", "model"], sort=False):
         L.append(f"| {k} | {m} | {f(g.hit_unk)} | {f(g.hit_ben)} | {f(g.ge20_unk)} | {f(g.ge200_unk)} | {f(g.ge200_ben)} |")
-    for part in ("unsplit", "halfopen"):
+    for part in PARTS:
         L.append(f"\n## 4c: {part}-feature deviation, held-out vs benign test rows in the same benign-dominated leaves\n")
         L.append("| fold | model | " + " | ".join(f"{a} ratio | {a} AUROC" for a in AGGS) + " |")
         L.append("|---|---|" + "---|---|" * len(AGGS))
         for (k, m), g in res.groupby(["fold", "model"], sort=False):
             L.append(f"| {k} | {m} | " + " | ".join(f"{f(g[f'{part}_{a}_ratio'])} | {f(g[f'{part}_{a}_auroc'])}"
                                                    for a in AGGS) + " |")
+    L.append("\n## Leaf conditioning vs global statistics (same rows, same leaves): AUROC leaf minus AUROC global\n")
+    L.append("| fold | model | " + " | ".join(f"{p} {a}" for p in ("unsplit", "all") for a in AGGS) + " |")
+    L.append("|---|---|" + "---|" * (2 * len(AGGS)))
+    for (k, m), g in res.groupby(["fold", "model"], sort=False):
+        L.append(f"| {k} | {m} | " + " | ".join(f(g[f"{p}_{a}_auroc"] - g[f"{p}_global_{a}_auroc"])
+                                               for p in ("unsplit", "all") for a in AGGS) + " |")
+    L.append("\n## XGB bank vs refit, TPR@1%FPR on the held-out family (refit used for every XGB number)\n")
+    L.append("| fold | bank | refit | cal Spearman |\n|---|---|---|---|")
+    for k, g in res[res.model == "xgb"].groupby("fold", sort=False):
+        L.append(f"| {k} | {f(g.xgb_tpr_bank)} | {f(g.xgb_tpr_refit)} | {g.xgb_spearman.min():.5f} |")
     L.append("\n## 4d: coverage for r >= 1 (leaves with >= 200 benign-train rows)\n")
     L.append("| model | leaves/tree | benign-dom. leaves with >= 200 | held-out hits there | benign hits there |\n|---|---|---|---|---|")
     for m, g in res.groupby("model"):
@@ -260,9 +279,14 @@ def main():
     passed = all(a and b for a, b in ok.values())
     L.append(f"\n**Step 1: {'PASS (build steps 2-4)' if passed else 'FAIL (mechanism not supported; stop)'}**")
     L.append(f"\nrefit vs bank: RF max |diff| {res[res.model == 'rf'].refit_maxdiff.max():.1e}; XGB max |diff| "
-             f"{res.refit_maxdiff[res.model == 'xgb'].max():.4f}, held-out TPR@1% diff max {res.xgb_tpr_diff.max():.4f}, "
-             f"cal Spearman min {res.xgb_spearman.min():.5f} (folds with XGB excluded: "
-             f"{len(res[res.model == 'rf']) - len(res[res.model == 'xgb'])})")
+             f"{res.refit_maxdiff[res.model == 'xgb'].max():.4f} (unexplained; refit used throughout)")
+    for k in ("Flood", "BruteForce"):
+        for m in ("rf", "xgb"):
+            g = res[(res.fold == k) & (res.model == m)]
+            best = max(AGGS, key=lambda x: g[f"unsplit_{x}_auroc"].mean())
+            L.append(f"- control {k} / {m}: best unsplit aggregate {best}: leaf AUROC {g[f'unsplit_{best}_auroc'].mean():.3f}"
+                     f" vs global same features {g[f'unsplit_global_{best}_auroc'].mean():.3f}, global all features "
+                     f"{g[f'all_global_{best}_auroc'].mean():.3f}")
     text = "\n".join(L)
     print(text)
     a.out.with_suffix(".md").write_text(text + "\n")
