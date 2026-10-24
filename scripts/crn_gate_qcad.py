@@ -2,7 +2,7 @@
 
 Per feature j, LightGBM quantile regressors (q = 0.01, 0.99) predict x_j from the other features, fitted on the
 benign-train sample only (never rank / cal). Score = max_j max(0, x_j - q99_j(x_-j), q01_j(x_-j) - x_j) / w_j with
-w_j = robust width (q99 - q01 of x_j on the fit rows, floored). Same comparison and PASS rule as crn_gates.py.
+each violation divided by the conditional interval width q99 - q01, floored at 5% of x_j's marginal width. Same comparison and PASS rule as crn_gates.py.
 Usage: .venv/bin/python scripts/crn_gate_qcad.py ciciot_csv none --seed 0 --out results/crn/qcad
 """
 import argparse
@@ -45,7 +45,8 @@ class QCAD:
         for j, (mlo, mhi), w in zip(self.cols, self.models, self.w):
             other = np.delete(X, j, axis=1)
             lo, hi = mlo.predict(other), mhi.predict(other)
-            s = np.maximum(s, np.maximum(0, np.maximum(X[:, j] - hi, lo - X[:, j])) / w)
+            width = np.maximum(hi - lo, 0.05 * w)  # QCAD: violation relative to the conditional interval
+            s = np.maximum(s, np.maximum(0, np.maximum(X[:, j] - hi, lo - X[:, j])) / width)
         return s
 
 
