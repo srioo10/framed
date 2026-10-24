@@ -4,7 +4,7 @@ RF / XGB are refit with the bank's seed, rows and preprocessing and must reprodu
 Leaf statistics come from the benign-train sample (bsample) only, known-attack counts from the model's own attack
 training rows. Per fold and model: where held-out and benign test rows land (4b), whether they deviate on the
 features the leaf's path never split on (4c), and how many hits land in leaves big enough for r >= 1 (4d).
-Usage: .venv/bin/python scripts/leaf_diagnostic.py --seeds 0 1 2 3 4 --out results/fusion/leaf_diagnostic_ciciot
+Usage (one process per seed): for s in 0 1 2 3 4; .venv/bin/python scripts/leaf_diagnostic.py --seeds $s --out results/fusion/leaf_diagnostic_ciciot; end
 """
 import argparse
 import json
@@ -234,7 +234,10 @@ def main():
     ap.add_argument("--seeds", type=int, nargs="+", default=[0])
     ap.add_argument("--out", type=Path, required=True)
     a = ap.parse_args()
-    res = pd.DataFrame([r for s in a.seeds for r in one_seed(s)])
+    # one process per seed (two banks in memory at once hit the OOM killer); the report reads every seed's file
+    for s in a.seeds:
+        Path(f"{a.out}_s{s}.json").write_text(json.dumps(one_seed(s), indent=1, default=float))
+    res = pd.DataFrame([r for f in sorted(a.out.parent.glob(f"{a.out.name}_s*.json")) for r in json.loads(f.read_text())])
     a.out.with_suffix(".json").write_text(json.dumps(res.to_dict("records"), indent=1, default=float))
     f = lambda x: br.fmt(*br.ci(x))  # noqa: E731
     L = ["# P1 step 1: closed-leaf diagnostic, CICIoT (post hoc)\n",
