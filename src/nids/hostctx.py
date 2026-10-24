@@ -44,6 +44,7 @@ class HostFlows:
         self.fail = (raw["OUT_PKTS"].to_numpy() == 0).astype(np.float64)
         self.bytes = raw["IN_BYTES"].to_numpy(np.float64)
         self._cache = {}
+        self.keep = slice(None)  # rows kept by clean; the bank sets it so caches hold only those rows
 
     def _novel(self, pair, pop, w):
         """Per flow: no earlier population flow of the same pair in [t - w, t)."""
@@ -83,10 +84,10 @@ class HostFlows:
         return np.column_stack(cols).astype(np.float32)
 
     def removal(self, R):
-        """Features with families R removed from the population (cached per removal set)."""
+        """Features of the kept rows with families R removed from the population (cached per removal set)."""
         R = tuple(sorted(R))
         if R not in self._cache:
-            self._cache[R] = self.features(~np.isin(self.family, list(R)))
+            self._cache[R] = self.features(~np.isin(self.family, list(R)))[self.keep]
         return self._cache[R]
 
     def isolated(self):
@@ -97,5 +98,5 @@ class HostFlows:
             for f in np.unique(self.family):
                 m = self.family == f
                 out[m] = self.features(ben | m)[m]
-            self._cache["iso"] = out
+            self._cache["iso"] = out[self.keep]
         return self._cache["iso"]

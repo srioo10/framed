@@ -84,6 +84,14 @@ UNSW_FAMILY = {
     "Backdoor": "Analysis+Backdoor", "Shellcode": "Shellcode+Worms", "Worms": "Shellcode+Worms",
 }
 
+CIC2018_FAMILY = {  # standard CSE-CIC-IDS2018 grouping
+    "Benign": "Benign", "Bot": "Bot", "Infilteration": "Infiltration",
+    "DoS_attacks-Hulk": "DoS", "DoS_attacks-GoldenEye": "DoS", "DoS_attacks-Slowloris": "DoS",
+    "DoS_attacks-SlowHTTPTest": "DoS", "DDOS_attack-HOIC": "DDoS", "DDOS_attack-LOIC-UDP": "DDoS",
+    "DDoS_attacks-LOIC-HTTP": "DDoS", "FTP-BruteForce": "BruteForce", "SSH-Bruteforce": "BruteForce",
+    "Brute_Force_-Web": "Web", "Brute_Force_-XSS": "Web", "SQL_Injection": "Web",
+}
+
 BOT_FAMILY = {"DDoS": "Flood", "DoS": "Flood", "Reconnaissance": "Recon", "Theft": "Theft", "Normal": "Benign"}
 
 
@@ -140,11 +148,28 @@ def _netflow_v3(name):
     """UQ NetFlow-v3 CSV (53 nProbe features + Label + Attack). y = Attack string; UNSW families merged as in
     unsw_raw, other datasets keep their Attack names as families."""
     def build():
+        import pyarrow as pa
+        import pyarrow.compute as pc
+        from pyarrow import csv as pacsv
         f = next(NF_DIR.glob(f"*/*/data/{NF_FILES[name]}"))
-        df = pd.read_csv(f, engine="pyarrow")
-        df.columns = [c.strip() for c in df.columns]
+        t = pacsv.read_csv(f)
+        cols = []
+        for c, col in zip(t.column_names, t.columns):  # 20-27M rows: narrowest type that holds the column
+            if pa.types.is_floating(col.type):
+                col = col.cast(pa.float32())
+            elif pa.types.is_integer(col.type) and "MILLISECONDS" not in c:
+                lo, hi = pc.min_max(col).values()
+                if lo.as_py() is not None and -2**31 < lo.as_py() and hi.as_py() < 2**31:
+                    col = col.cast(pa.int32())
+            elif pa.types.is_string(col.type) and c.strip() != "Attack":
+                col = col.dictionary_encode()
+            cols.append(col)
+        df = pa.table(cols, names=[c.strip() for c in t.column_names]).to_pandas(split_blocks=True, self_destruct=True)
+        del t, cols
         df["y"] = df.pop("Attack").astype(str).str.strip()
-        df["family"] = df["y"].map({**UNSW_FAMILY, "Benign": "Benign"}) if name == "nf_unsw" else df["y"]
+        fam = {"nf_unsw": {**UNSW_FAMILY, "Benign": "Benign"}, "nf_cic": CIC2018_FAMILY}.get(name)
+        df["family"] = df["y"].map(fam) if fam else df["y"]
+        assert df["family"].notna().all(), set(df["y"][df["family"].isna()])
         df["src"] = name
         return _downcast(df)
     return _cached(name, build)

@@ -106,6 +106,8 @@ class Bank:
         df, rep = clean.clean(raw, ds)
         del raw
         self.kept = rep["kept_rows"]
+        if self.host is not None:
+            self.host.keep = self.kept
         self.df = df
         self.fam = df["family"].astype(str).to_numpy()
         self.fine = fine_family(df, ds)
@@ -137,7 +139,7 @@ class Bank:
             X[list(windows.KEYS)] = self.flows.features(pop, self.kept[rows])
         if self.host is not None:  # host: removal-set population (deployable); host_iso: Benign + own family
             H = self.host.isolated() if self.variant == "host_iso" else self.host.removal(R)
-            X[hostctx.COLS] = H[self.kept[rows]]
+            X[hostctx.COLS] = H[rows]  # H is already restricted to the kept rows
         return X
 
     def configs(self, kind, extra):
