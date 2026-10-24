@@ -17,7 +17,12 @@ LEAK_COLS = {
     # DNS_QUERY_ID is a random transaction id; *_SECOND_BYTES = bytes / duration is inf/NaN at zero duration
     # (dropping those rows would remove 76% of Generic) and both inputs are already features
     **{n: ["IPV4_SRC_ADDR", "IPV4_DST_ADDR", "L4_SRC_PORT", "FLOW_START_MILLISECONDS", "FLOW_END_MILLISECONDS",
-           "MIN_TTL", "MAX_TTL", "DNS_QUERY_ID", "Label", "SRC_TO_DST_SECOND_BYTES", "DST_TO_SRC_SECOND_BYTES"] for n in ("nf_unsw", "nf_ton", "nf_bot", "nf_cic")},
+           "MIN_TTL", "MAX_TTL", "DNS_QUERY_ID", "Label", "SRC_TO_DST_SECOND_BYTES", "DST_TO_SRC_SECOND_BYTES",
+           # generator-stack fingerprints (PREREG §9 fingerprint row): minimum packet size is the bare header size
+           # of the sending stack (52 B benign Linux TCP with options vs 40 B attack generator in nf_unsw) and the
+           # max TCP window is a per-tool constant (16383 for 98% of nf_unsw attacks); alone they give 0.86-0.998
+           # TPR@1%FPR for all attacks pooled
+           "MIN_IP_PKT_LEN", "SHORTEST_FLOW_PKT", "TCP_WIN_MAX_IN", "TCP_WIN_MAX_OUT"] for n in ("nf_unsw", "nf_ton", "nf_bot", "nf_cic")},
 }
 
 
