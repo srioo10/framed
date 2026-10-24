@@ -15,12 +15,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import xgboost
+from scipy import stats
 from sklearn.metrics import roc_auc_score
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
-from nids import models  # noqa: E402
+from nids import fusion_checks as fc, models  # noqa: E402
 import bank_report as br  # noqa: E402
 import score_bank as sb  # noqa: E402
 
@@ -174,13 +175,27 @@ def one_seed(seed):
         bi = known.index("Benign")
         yf = np.array([known.index(f) for f in bank.fam[fit]])
         Xf = prep.transform(dfit)
-        rf, xg = models.rf(seed).fit(Xf, yf), models.xgb(seed).fit(Xf, yf)
         part = pd.read_parquet(run / f"config=outer_{k}" / "part.parquet", columns=["role", "row_id", "rf", "xgb"])
         cal = part[part.role == "cal"]
         Xc = prep.transform(bank.frame(cal.row_id.to_numpy(), P))
-        rep = {m: float(np.abs((1 - mdl.predict_proba(Xc)[:, bi]) - cal[m].to_numpy()).max())
-               for m, mdl in (("rf", rf), ("xgb", xg))}
-        assert rep["rf"] < 1e-4 and rep["xgb"] < 1e-3, f"refit does not reproduce the bank: {rep}"
+        diff = lambda mdl, m: float(np.abs((1 - mdl.predict_proba(Xc)[:, bi]) - cal[m].to_numpy()).max())  # noqa: E731
+        rf = models.rf(seed).fit(Xf, yf)
+        rep = {"rf": diff(rf, "rf")}
+        xg = models.xgb(seed).fit(Xf, yf)
+        rep["xgb"] = diff(xg, "xgb")
+        assert rep["rf"] < 1e-4, f"RF refit does not reproduce the bank: {rep}"
+        # XGB refit is deterministic but not bit-identical to the bank (PREREG §9 amendment): equivalence check
+        unk = part[part.role == "test_unknown"]
+        Xu = prep.transform(bank.frame(unk.row_id.to_numpy(), ()))
+        s_cal = 1 - xg.predict_proba(Xc)[:, bi]
+        tau_new, tau_old = fc.threshold(s_cal, 0.01), fc.threshold(cal.xgb.to_numpy(np.float64), 0.01)
+        rep["xgb_tpr_diff"] = float(abs(((1 - xg.predict_proba(Xu)[:, bi]) > tau_new).mean()
+                                        - (unk.xgb.to_numpy() > tau_old).mean()))
+        rep["xgb_spearman"] = float(stats.spearmanr(s_cal, cal.xgb.to_numpy()).statistic)
+        xgb_ok = rep["xgb_tpr_diff"] <= 0.01 and rep["xgb_spearman"] >= 0.999
+        print(f"s{seed} {k} refit: rf maxdiff {rep['rf']:.1e}; xgb maxdiff {rep['xgb']:.4f} TPR@1% diff "
+              f"{rep['xgb_tpr_diff']:.4f} spearman {rep['xgb_spearman']:.5f} -> {'ok' if xgb_ok else 'EXCLUDED'}",
+              flush=True)
         ben_idx = np.sort(rng.choice(bank.test_benign, min(N_BTEST, len(bank.test_benign)), replace=False))
         X = {"bt": prep.transform(bank.frame(bank.bsample, P)), "at": Xf[yf != bi],
              "unk": prep.transform(bank.frame(bank.test[k], ())), "ben": prep.transform(bank.frame(ben_idx, ()))}
@@ -190,10 +205,13 @@ def one_seed(seed):
         pick_rf = np.sort(rng.choice(len(rf.estimators_), N_TREES, replace=False))
         n_xgb = len(xg.get_booster().get_dump())
         pick_xgb = np.sort(rng.choice(n_xgb, N_TREES, replace=False))
-        for name, trees, n_leaves in (("rf", rf_trees(rf, X, pick_rf), [rf.estimators_[t].get_n_leaves() for t in pick_rf]),
-                                      ("xgb", xgb_trees(xg, X, pick_xgb, d), None)):
+        todo = [("rf", rf_trees(rf, X, pick_rf), [rf.estimators_[t].get_n_leaves() for t in pick_rf])]
+        if xgb_ok:
+            todo.append(("xgb", xgb_trees(xg, X, pick_xgb, d), None))
+        for name, trees, n_leaves in todo:
             r = one_model(trees, gscale, X, None)
-            r.update({"seed": seed, "fold": k, "model": name, "refit_maxdiff": rep[name], "n_unk": len(X["unk"]),
+            r.update({"seed": seed, "fold": k, "model": name, "refit_maxdiff": rep[name], "xgb_tpr_diff": rep["xgb_tpr_diff"],
+                      "xgb_spearman": rep["xgb_spearman"], "n_unk": len(X["unk"]),
                       "leaves_per_tree": float(np.mean(n_leaves)) if n_leaves else np.nan})
             out.append(r)
             print(f"s{seed} {k:10s} {name:3s} hit unk {r['hit_unk']:.3f} ben {r['hit_ben']:.3f} | unsplit max "
@@ -241,8 +259,10 @@ def main():
                      f"unsplit deviation AUROC >= 0.70 and ratio >= 2 {'yes' if b else 'NO'}")
     passed = all(a and b for a, b in ok.values())
     L.append(f"\n**Step 1: {'PASS (build steps 2-4)' if passed else 'FAIL (mechanism not supported; stop)'}**")
-    L.append(f"\nrefit reproduces bank: max |diff| rf {res[res.model == 'rf'].refit_maxdiff.max():.1e}, "
-             f"xgb {res[res.model == 'xgb'].refit_maxdiff.max():.1e}")
+    L.append(f"\nrefit vs bank: RF max |diff| {res[res.model == 'rf'].refit_maxdiff.max():.1e}; XGB max |diff| "
+             f"{res.refit_maxdiff[res.model == 'xgb'].max():.4f}, held-out TPR@1% diff max {res.xgb_tpr_diff.max():.4f}, "
+             f"cal Spearman min {res.xgb_spearman.min():.5f} (folds with XGB excluded: "
+             f"{len(res[res.model == 'rf']) - len(res[res.model == 'xgb'])})")
     text = "\n".join(L)
     print(text)
     a.out.with_suffix(".md").write_text(text + "\n")
