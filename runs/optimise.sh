@@ -2,7 +2,7 @@
 # Optimisation steps 1-3 (PREREG 2026-10-25 row), run after runs/onepass.sh has finished; one job at a time
 cd "$(dirname "$0")/.."
 PY=".venv/bin/python -W ignore"
-until sed -n '/^RESTART2/,$p' runs/logs/onepass.out | grep -q ALLDONE; do sleep 60; done
+until sed -n '/^RESTART2/,$p' runs/logs/onepass.out | grep -q ALLDONE; do sleep 60; done  # already met on resume
 echo "START $(date +%T)"
 tune() { OMP_NUM_THREADS=10 taskset -c 0-9 $PY scripts/tune_mlp.py "$1" --seed "$2" --variant host || echo "FAILED tune $1 s$2"; echo "DONE tune $1 s$2 $(date +%T)"; }
 for s in 1 2 3 4; do tune nf_cic $s; done
