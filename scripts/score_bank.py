@@ -39,6 +39,22 @@ EXTRA = {"ciciot_csv": [("Flood", "Mirai"), ("DoS",), ("DDoS",)]}  # joint unsee
 SEP = "__"  # family names contain "+", so configs are joined with SEP
 
 
+def read_part(p, columns=None):
+    """Bank part plus the tune_mlp.py score columns (tuned.parquet beside it: same rows, same order) when present."""
+    t = p.parent / "tuned.parquet"
+    base = ("row_id", "role", "family")
+    tcols = set(pq.read_schema(t).names) if t.exists() else set()
+    tcols -= set(base)
+    want = None if columns is None else [c for c in columns if c not in tcols]
+    d = pd.read_parquet(p, columns=want)
+    take = sorted(tcols) if columns is None else [c for c in columns if c in tcols]
+    if take:
+        x = pd.read_parquet(t, columns=["row_id"] + take)
+        assert (x.row_id.to_numpy() == d.row_id.to_numpy()).all(), f"{t} rows != part rows"
+        d = pd.concat([d, x[take]], axis=1)
+    return d
+
+
 def role_removal(P, role, R0=None):
     """Families removed from the window population for a role of the model fit with removal set P (PREREG §9):
     fit / es / bsample / rank / cal -> P; pseudo-unknown rows of outer fold R0 -> R0; final test -> nothing."""

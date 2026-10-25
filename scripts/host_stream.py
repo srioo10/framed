@@ -23,6 +23,8 @@ import score_bank as sb  # noqa: E402
 
 META = ROOT / "data" / "processed" / "nf_cic_hostmeta.npz"
 DAY_MS = 86_400_000
+UNIT_MS = {"day": DAY_MS, "hour": 3_600_000}
+MUL = 10**7  # key = host * MUL + time unit index (hours since epoch < 10^7)
 BUDGET, LAM, WIN, KAPPAS, ALPHA_V = 0.01, 0.1, 32, np.array([0.05, 0.1, 0.2, 0.5]), 0.01
 METHODS = ["P", "E", "W", "A"]
 MCDE_COLS = ["mcde_sup", "mcde_dist", "mcde_mode"]
@@ -82,18 +84,19 @@ def day_max(key, v):
 
 
 def threshold(m):
-    """Smallest h with share(daily max > h) <= BUDGET."""
+    """Smallest h with share(per-unit max > h) <= BUDGET."""
     m = np.sort(m.to_numpy())[::-1]
     j = int(np.floor(BUDGET * len(m)))
     return m[j] if j < len(m) else -np.inf
 
 
-def fold(part, s, meta, cal_host, held):
+def fold(part, s, meta, cal_host, held, unit="day"):
     src, t, fam_all = meta["src"], meta["t"], meta["fam"]
     rid = part.row_id.to_numpy()
     h = src[rid]
-    day = t[rid] // DAY_MS
-    key = h.astype(np.int64) * 100_000 + day
+    U = UNIT_MS[unit]
+    key = h.astype(np.int64) * MUL + t[rid] // DAY_MS  # stream: host-day (state resets each UTC day)
+    ukey = h.astype(np.int64) * MUL + t[rid] // U  # budget / detection unit: host-day or host-hour
     role = part.role.to_numpy()
     benign_host = ~np.isin(np.arange(len(cal_host)), np.unique(src[fam_all != "Benign"]))
     ch = cal_host[h] & benign_host[h]
@@ -101,22 +104,22 @@ def fold(part, s, meta, cal_host, held):
     # calibration streams: cal-role rows of calibration hosts
     m_cal = (role == "cal") & ch
     st_cal = stats(key[m_cal], t[rid][m_cal], s[m_cal], ref)
-    th = {m: threshold(day_max(key[m_cal], st_cal[m])) for m in METHODS}
+    th = {m: threshold(day_max(ukey[m_cal], st_cal[m])) for m in METHODS}
     # test streams: all test rows; benign host-days of test hosts and attacker host-days of the held-out family
     m_te = np.isin(role, ["test_benign", "test_known", "test_unknown"])
     st = stats(key[m_te], t[rid][m_te], s[m_te], ref)
-    k_te, unk = key[m_te], role[m_te] == "test_unknown"
+    k_te, unk = ukey[m_te], role[m_te] == "test_unknown"
     bt = (role[m_te] == "test_benign") & ~cal_host[h[m_te]] & benign_host[h[m_te]]
-    res = {"fold": held, "n_ref": int(len(ref)), "n_cal_days": int(len(np.unique(key[m_cal])))}
+    res = {"fold": held, "n_ref": int(len(ref)), "n_cal_days": int(len(np.unique(ukey[m_cal])))}
     bkeys = np.unique(k_te[bt])
     res["n_test_benign_days"] = int(len(bkeys))
     akeys = np.unique(k_te[unk])
-    ahost = akeys // 100_000
+    ahost = akeys // MUL
     res["n_attacker_hosts"], res["n_attacker_days"] = int(len(np.unique(ahost))), int(len(akeys))
     # clean history: no other attack family from that host on that day or the day before
     other = fam_all != "Benign"
     other &= fam_all != held
-    okeys = np.unique(src[other].astype(np.int64) * 100_000 + t[other] // DAY_MS)
+    okeys = np.unique(src[other].astype(np.int64) * MUL + t[other] // U)
     clean_day = ~(np.isin(akeys, okeys) | np.isin(akeys - 1, okeys))
     res["n_clean_days"] = int(clean_day.sum())
     det = {}
@@ -161,6 +164,7 @@ def main():
     ap.add_argument("--variant", default="none")
     ap.add_argument("--member", default="mlp_ce")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--unit", default="day", choices=list(UNIT_MS))
     ap.add_argument("--out", type=Path)
     a = ap.parse_args()
     if a.meta:
@@ -173,13 +177,13 @@ def main():
     for p in sorted(run.glob("config=outer_*/part.parquet")):
         held = p.parent.name.removeprefix("config=outer_")
         cols = MCDE_COLS if a.member == "mcde" else [a.member]
-        part = pd.read_parquet(p, columns=["row_id", "role", "family"] + cols)
+        part = sb.read_part(p, ["row_id", "role", "family"] + cols)
         assert (meta["fam"][part.row_id.to_numpy()] == part.family.to_numpy()).all(), "meta rows != bank rows"
         if a.member == "mcde":
             s = br.mcde_score(part[part.role == "rank"], part, 0.01 if a.ds == "unsw_raw" else 0.001)
         else:
             s = part[a.member].to_numpy(np.float64)
-        r, d, fl = fold(part, s, meta, cal_host, held)
+        r, d, fl = fold(part, s, meta, cal_host, held, a.unit)
         rows.append(r)
         days.append(d)
         flows.append(fl)

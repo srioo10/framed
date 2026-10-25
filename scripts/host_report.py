@@ -18,7 +18,8 @@ from nids import fusion_checks as fc  # noqa: E402
 import bank_report as br  # noqa: E402
 import score_bank as sb  # noqa: E402
 
-MEMBERS = ["rf", "xgb", "mlp_ce", "mlp_ce_int8", "mlp_sn", "mlp_sn_gda", "iforest", "clust", "mcde"]
+MEMBERS = ["rf", "xgb", "mlp_ce", "mlp_ce_int8", "mlp_sn", "mlp_sn_gda", "iforest", "clust", "mcde",
+           "mlp_tuned", "mlp_tuned_int8", "mlp_bal", "mlp_smote"]
 VARIANTS = ["none", "host", "host_iso", "host_perm"]
 
 
@@ -29,7 +30,7 @@ def rows(ds, variants=VARIANTS):
             seed = int(run.name.rsplit("_s", 1)[1])
             for part in sorted(run.glob("config=outer_*/part.parquet")):
                 k = part.parent.name.removeprefix("config=outer_")
-                d = pd.read_parquet(part)
+                d = sb.read_part(part)
                 r = {x: d[d.role == x] for x in ("rank", "cal", "test_benign", "test_unknown")}
                 for m in [m for m in MEMBERS if m == "mcde" or m in d.columns]:
                     s = {x: (br.mcde_score(r["rank"], g, 0.01 if ds == "unsw_raw" else 0.001) if m == "mcde" else g[m].to_numpy(np.float64))

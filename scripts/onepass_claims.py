@@ -25,11 +25,14 @@ PARENTS = {
 HOST = {"unsw_raw": ("ct_drop", "ct_causal")}  # dataset: (none variant, host variant)
 
 
+UNIT = "day"  # set from --unit: host-day or host-hour budget / detection unit
+
+
 def stream(ds, variant, member, seed, out):
     f = out / f"{variant}_{member}_s{seed}"
     if not Path(f"{f}_days.csv").exists():
         subprocess.run([sys.executable, "-W", "ignore", str(ROOT / "scripts" / "host_stream.py"), "--ds", ds,
-                        "--variant", variant, "--member", member, "--seed", str(seed), "--out", str(f)],
+                        "--variant", variant, "--member", member, "--seed", str(seed), "--unit", UNIT, "--out", str(f)],
                        check=True, stdout=subprocess.DEVNULL)
     days = pd.read_csv(f"{f}_days.csv")
     res = pd.read_json(f"{f}.json", orient="index")
@@ -89,13 +92,17 @@ def main():
     ap.add_argument("ds")
     ap.add_argument("--seeds", type=int, nargs="+", required=True)
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--unit", default="day", choices=["day", "hour"])
     a = ap.parse_args()
+    global UNIT
+    UNIT = a.unit
     a.out.mkdir(parents=True, exist_ok=True)
     none, host = HOST.get(a.ds, ("none", "host"))
     P = lambda v, m: pooled(a.ds, v, m, a.seeds, a.out)  # noqa: E731
     one, one_r = P(host, "mlp_ce")
     base, _ = P(none, "mlp_ce")
-    L = [f"# OnePass-IDS claims — {a.ds}, seeds {a.seeds}\n"]
+    L = [f"# OnePass-IDS claims — {a.ds}, seeds {a.seeds}, host-{a.unit} unit\n",
+         f"calibration host-{a.unit}s per fold (min over folds and seeds): {int(one_r.n_cal_days.min())}\n"]
     fam = one.groupby("fold").agg(hosts=("host", "nunique"), host_days=("host", "size"))
     tab = {"OnePass (host, mlp_ce, A)": (one, "A"), "per-flow MLP (none, P)": (base, "P")}
     trees = {}
@@ -108,7 +115,7 @@ def main():
         d, _ = P(host, m)
         tab[f"{m} (host, A) upper ref"] = (d, "A")
     extra = {}
-    for m in ("mlp_ce_int8", "mlp_sn_gda"):
+    for m in ("mlp_ce_int8", "mlp_sn_gda", "mlp_tuned", "mlp_tuned_int8", "mlp_bal", "mlp_smote"):
         try:
             extra[m], _ = P(host, m)
             tab[f"{m} (host, A)"] = (extra[m], "A")
@@ -139,7 +146,7 @@ def main():
         gh, gp = mo - noneA, macro(perm, "A") - noneA
         L.append(f"C3 host gain {gh:+.3f}, perm gain {gp:+.3f} → {'PASS' if gp < 0.5 * gh else 'FAIL'}")
     fpr = one_r["fpr_A"].mean()
-    L.append(f"C4 realised benign host-day alarm rate {fpr:.4f} → {'PASS' if fpr <= 0.015 else 'FAIL'}")
+    L.append(f"C4 realised benign host-{a.unit} alarm rate {fpr:.4f} → {'PASS' if fpr <= 0.015 else 'FAIL'}")
     if "mlp_ce_int8" in extra:
         d8 = mo - macro(extra["mlp_ce_int8"], "A")
         L.append(f"C5 int8 loss {d8:+.3f} → {'PASS' if d8 <= 0.02 else 'FAIL'}")
@@ -147,6 +154,13 @@ def main():
         g = macro(extra["mlp_sn_gda"], "A") - mo
         lo, hi = boot_diff(extra["mlp_sn_gda"], "A", one, "A")
         L.append(f"C6 DDU − OnePass {g:+.3f} [{lo:+.3f}, {hi:+.3f}] → {'PASS' if g >= 0.03 and lo > 0 else 'FAIL'}")
+    for m, tag in (("mlp_tuned", "T1 (host level)"), ("mlp_bal", "B1 class-weighted (host level, reported)"),
+                   ("mlp_smote", "B1 SMOTE (host level, reported)")):
+        if m in extra:
+            g = macro(extra[m], "A") - mo
+            lo, hi = boot_diff(extra[m], "A", one, "A")
+            L.append(f"{tag}: {m} − OnePass {g:+.3f} [{lo:+.3f}, {hi:+.3f}] → "
+                     f"{'PASS' if g >= 0.03 and lo > 0 else 'FAIL'}")
     if a.ds in PARENTS:
         try:
             b = backoff(a.ds, a.seeds, a.out, host)

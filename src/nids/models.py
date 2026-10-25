@@ -38,10 +38,11 @@ class Prep:
 
 
 class MLP(nn.Module):
-    def __init__(self, d, k):
+    def __init__(self, d, k, w=64, depth=2):
         super().__init__()
-        self.body = nn.Sequential(nn.Linear(d, 64), nn.ReLU(), nn.Linear(64, 32), nn.ReLU())
-        self.head = nn.Linear(32, k)
+        dims = [d] + [w] * (depth - 1) + [w // 2]  # default d-64-32: the bank's original MLP
+        self.body = nn.Sequential(*[layer for a, b in zip(dims, dims[1:]) for layer in (nn.Linear(a, b), nn.ReLU())])
+        self.head = nn.Linear(dims[-1], k)
 
     def forward(self, x):
         h = self.body(x)
@@ -51,14 +52,17 @@ class MLP(nn.Module):
 class SNMLP(nn.Module):
     """DDU trunk (Mukhoti et al., CVPR 2023): spectral-normalised residual layers keep feature distances
     bi-Lipschitz, so a density on the features can see inputs far from every known class."""
-    def __init__(self, d, k, w=64):
+    def __init__(self, d, k, w=64, depth=2):
         super().__init__()
         sn = nn.utils.parametrizations.spectral_norm
-        self.inp, self.res, self.head = sn(nn.Linear(d, w)), sn(nn.Linear(w, w)), nn.Linear(w, k)
+        self.inp = sn(nn.Linear(d, w))  # creation order inp, res, head keeps the bank's original initialisation
+        self.res = nn.ModuleList([sn(nn.Linear(w, w)) for _ in range(depth - 1)])
+        self.head = nn.Linear(w, k)
 
     def forward(self, x):
         h = torch.relu(self.inp(x))
-        h = h + torch.relu(self.res(h))
+        for r in self.res:
+            h = h + torch.relu(r(h))
         return self.head(h), h
 
 
@@ -89,7 +93,7 @@ class FeatureGDA:
         return np.concatenate(out)
 
 
-def train_mlp(Xtr, ytr, Xes, yes, k, soft=None, T=4.0, seed=0, epochs=30, arch=None):
+def train_mlp(Xtr, ytr, Xes, yes, k, soft=None, T=4.0, seed=0, epochs=30, arch=None, weight=None):
     """CE on hard labels, or KD (KL to teacher soft labels at temperature T) when `soft` is given.
     Early stop on CE of (Xes, yes), which must be carved from the model's own training rows."""
     torch.manual_seed(seed)
@@ -104,7 +108,7 @@ def train_mlp(Xtr, ytr, Xes, yes, k, soft=None, T=4.0, seed=0, epochs=30, arch=N
         for b in torch.randperm(len(yt), generator=g).split(512):
             z, _ = m(Xt[b])
             if St is None:
-                loss = nn.functional.cross_entropy(z, yt[b])
+                loss = nn.functional.cross_entropy(z, yt[b], weight=weight)
             else:  # teacher probabilities sharpened/softened at T via log-space
                 t = torch.softmax(torch.log(St[b] + 1e-8) / T, 1)
                 loss = nn.functional.kl_div(torch.log_softmax(z / T, 1), t, reduction="batchmean") * T * T
