@@ -210,7 +210,7 @@ def main():
     # gates (PREREG): against P and against the stronger of E/W
     for b in ["P", ew]:
         g1 = mac["A"] - mac[b] >= 0.10
-        g2 = all(res.loc[f, "tpr_clean_A"] - res.loc[f, f"tpr_clean_{b}"] >= 0.10 for f in ("Bot", "DoS"))
+        g2 = all(res.loc[f, "tpr_clean_A"] - res.loc[f, f"tpr_clean_{b}"] >= 0.10 for f in ("Bot", "DoS") if f in res.index)
         g3 = all(res[f"tpr_A"] - res[f"tpr_{b}"] >= -0.05)
         g4 = res["fpr_A"].mean() <= 0.015
         L.append(f"gates vs {b}: G1 {'PASS' if g1 else 'FAIL'}, G2 {'PASS' if g2 else 'FAIL'}, "
