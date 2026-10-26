@@ -1,0 +1,31 @@
+{
+ "seed": 2,
+ "held": [
+  "Mirai"
+ ],
+ "truth": "Volumetric",
+ "n_unknown": 20000,
+ "leaf": true,
+ "softmax": {
+  "flagged": 20000,
+  "tpr": 1.0,
+  "chance": 0.25,
+  "acc": 0.999,
+  "confusion": {
+   "Volumetric": 19980,
+   "Spoofing": 20
+  }
+ },
+ "ddu": {
+  "flagged": 17960,
+  "tpr": 0.898,
+  "chance": 0.25,
+  "acc": 0.9934855233853007,
+  "confusion": {
+   "Volumetric": 17843,
+   "Spoofing": 53,
+   "Recon": 32,
+   "Access": 32
+  }
+ }
+}

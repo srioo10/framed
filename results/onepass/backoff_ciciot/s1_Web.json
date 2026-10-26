@@ -1,0 +1,32 @@
+{
+ "seed": 1,
+ "held": [
+  "Web"
+ ],
+ "truth": "Access",
+ "n_unknown": 4940,
+ "leaf": true,
+ "softmax": {
+  "flagged": 983,
+  "tpr": 0.19898785425101215,
+  "chance": 0.25,
+  "acc": 0.011190233977619531,
+  "confusion": {
+   "Spoofing": 551,
+   "Recon": 420,
+   "Access": 11,
+   "Volumetric": 1
+  }
+ },
+ "ddu": {
+  "flagged": 530,
+  "tpr": 0.10728744939271255,
+  "chance": 0.25,
+  "acc": 0.08490566037735849,
+  "confusion": {
+   "Spoofing": 365,
+   "Recon": 120,
+   "Access": 45
+  }
+ }
+}

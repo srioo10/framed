@@ -1,0 +1,33 @@
+{
+ "seed": 3,
+ "held": [
+  "Flood"
+ ],
+ "truth": "Volumetric",
+ "n_unknown": 20000,
+ "leaf": true,
+ "softmax": {
+  "flagged": 19896,
+  "tpr": 0.9948,
+  "chance": 0.25,
+  "acc": 0.735876558102131,
+  "confusion": {
+   "Volumetric": 14641,
+   "Recon": 5002,
+   "Spoofing": 251,
+   "Access": 2
+  }
+ },
+ "ddu": {
+  "flagged": 19992,
+  "tpr": 0.9996,
+  "chance": 0.25,
+  "acc": 0.015006002400960384,
+  "confusion": {
+   "Recon": 10934,
+   "Spoofing": 7258,
+   "Access": 1500,
+   "Volumetric": 300
+  }
+ }
+}

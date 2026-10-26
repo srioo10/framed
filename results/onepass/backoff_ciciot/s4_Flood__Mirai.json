@@ -1,0 +1,32 @@
+{
+ "seed": 4,
+ "held": [
+  "Flood",
+  "Mirai"
+ ],
+ "truth": "Volumetric",
+ "n_unknown": 40000,
+ "leaf": false,
+ "softmax": {
+  "flagged": 37626,
+  "tpr": 0.94065,
+  "chance": 0.3333333333333333,
+  "acc": 0.0,
+  "confusion": {
+   "Spoofing": 29200,
+   "Recon": 7313,
+   "Access": 1113
+  }
+ },
+ "ddu": {
+  "flagged": 29338,
+  "tpr": 0.73345,
+  "chance": 0.3333333333333333,
+  "acc": 0.0,
+  "confusion": {
+   "Spoofing": 16787,
+   "Recon": 12446,
+   "Access": 105
+  }
+ }
+}

@@ -1,0 +1,31 @@
+{
+ "seed": 1,
+ "held": [
+  "BruteForce"
+ ],
+ "truth": "Access",
+ "n_unknown": 2608,
+ "leaf": true,
+ "softmax": {
+  "flagged": 609,
+  "tpr": 0.23351226993865032,
+  "chance": 0.25,
+  "acc": 0.026272577996715927,
+  "confusion": {
+   "Recon": 555,
+   "Spoofing": 38,
+   "Access": 16
+  }
+ },
+ "ddu": {
+  "flagged": 783,
+  "tpr": 0.30023006134969327,
+  "chance": 0.25,
+  "acc": 0.019157088122605363,
+  "confusion": {
+   "Recon": 749,
+   "Spoofing": 19,
+   "Access": 15
+  }
+ }
+}

@@ -1,0 +1,32 @@
+{
+ "seed": 3,
+ "held": [
+  "DDoS"
+ ],
+ "truth": "Volumetric",
+ "n_unknown": 15392,
+ "leaf": true,
+ "softmax": {
+  "flagged": 15391,
+  "tpr": 0.9999350311850311,
+  "chance": 0.25,
+  "acc": 0.8984471444350595,
+  "confusion": {
+   "Volumetric": 13828,
+   "Spoofing": 1562,
+   "Recon": 1
+  }
+ },
+ "ddu": {
+  "flagged": 7959,
+  "tpr": 0.5170867983367984,
+  "chance": 0.25,
+  "acc": 0.09373036813670059,
+  "confusion": {
+   "Recon": 6157,
+   "Access": 847,
+   "Volumetric": 746,
+   "Spoofing": 209
+  }
+ }
+}

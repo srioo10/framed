@@ -1,0 +1,31 @@
+{
+ "seed": 3,
+ "held": [
+  "DoS"
+ ],
+ "truth": "Volumetric",
+ "n_unknown": 4608,
+ "leaf": true,
+ "softmax": {
+  "flagged": 4608,
+  "tpr": 1.0,
+  "chance": 0.25,
+  "acc": 0.9995659722222222,
+  "confusion": {
+   "Volumetric": 4606,
+   "Spoofing": 2
+  }
+ },
+ "ddu": {
+  "flagged": 702,
+  "tpr": 0.15234375,
+  "chance": 0.25,
+  "acc": 0.9430199430199431,
+  "confusion": {
+   "Volumetric": 662,
+   "Recon": 29,
+   "Spoofing": 10,
+   "Access": 1
+  }
+ }
+}

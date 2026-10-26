@@ -1,0 +1,31 @@
+{
+ "seed": 4,
+ "held": [
+  "Recon"
+ ],
+ "truth": "Recon",
+ "n_unknown": 20000,
+ "leaf": false,
+ "softmax": {
+  "flagged": 4382,
+  "tpr": 0.2191,
+  "chance": 0.3333333333333333,
+  "acc": 0.0,
+  "confusion": {
+   "Access": 3146,
+   "Volumetric": 891,
+   "Spoofing": 345
+  }
+ },
+ "ddu": {
+  "flagged": 2719,
+  "tpr": 0.13595,
+  "chance": 0.3333333333333333,
+  "acc": 0.0,
+  "confusion": {
+   "Access": 2173,
+   "Volumetric": 276,
+   "Spoofing": 270
+  }
+ }
+}
