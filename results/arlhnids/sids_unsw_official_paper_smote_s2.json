@@ -1,0 +1,203 @@
+{
+ "dataset": "unsw_official",
+ "mode": "paper",
+ "seed": 2,
+ "balance": "smote",
+ "balance_info": {},
+ "test_synthetic_share": 0.46503173331690184,
+ "features": [
+  "dur",
+  "proto",
+  "service",
+  "state",
+  "spkts",
+  "dpkts",
+  "sbytes",
+  "dbytes",
+  "rate",
+  "sttl",
+  "dttl",
+  "sload",
+  "dload",
+  "sloss",
+  "dloss",
+  "sinpkt",
+  "dinpkt",
+  "sjit",
+  "djit",
+  "swin",
+  "stcpb",
+  "dtcpb",
+  "dwin",
+  "tcprtt",
+  "synack",
+  "ackdat",
+  "smean",
+  "dmean",
+  "trans_depth",
+  "response_body_len",
+  "ct_srv_src",
+  "ct_state_ttl",
+  "ct_dst_ltm",
+  "ct_src_dport_ltm",
+  "ct_dst_sport_ltm",
+  "ct_dst_src_ltm",
+  "is_ftp_login",
+  "ct_ftp_cmd",
+  "ct_flw_http_mthd",
+  "ct_src_ltm",
+  "ct_srv_dst",
+  "is_sm_ips_ports"
+ ],
+ "rows": {
+  "train": 324576,
+  "test": 81145
+ },
+ "train_class_counts": {
+  "Analysis": 27255,
+  "Backdoor": 27131,
+  "DoS": 29892,
+  "Exploits": 35670,
+  "Fuzzers": 31651,
+  "Generic": 24954,
+  "Normal": 64768,
+  "Reconnaissance": 29534,
+  "Shellcode": 26934,
+  "Worms": 26787
+ },
+ "gwo_features": [
+  "service",
+  "dbytes",
+  "rate",
+  "dttl",
+  "sinpkt",
+  "swin",
+  "dwin",
+  "synack",
+  "smean",
+  "ct_srv_src",
+  "ct_srv_dst"
+ ],
+ "gwo_kept": 11,
+ "paper_gwo_kept": 25,
+ "test_rows_in_train": 0.3517530346909853,
+ "test_nn_distance": {
+  "real": {
+   "median": 0.00034896972904988456,
+   "share_below_0.01": 0.6216,
+   "n": 5000
+  },
+  "synthetic": {
+   "median": 0.0018341399904948184,
+   "share_below_0.01": 0.7028,
+   "n": 5000
+  }
+ },
+ "sids": {
+  "accuracy": 0.7031856553083985,
+  "macro": {
+   "p": 0.729040166160021,
+   "r": 0.7015812479846721,
+   "f": 0.6951121789682263
+  },
+  "weighted": {
+   "p": 0.7475230043608396,
+   "r": 0.7031856553083985,
+   "f": 0.7063250614805533
+  },
+  "far_benign": 0.22101090188305253,
+  "far_macro": 0.032812485576618214,
+  "attack_recall": 0.9887540191689359,
+  "per_class": {
+   "Analysis": {
+    "p": 0.6812952705581593,
+    "r": 0.2346294937637564,
+    "f1": 0.34905042567125083,
+    "n": 6815
+   },
+   "Backdoor": {
+    "p": 0.4010196468540164,
+    "r": 0.47114682249817386,
+    "f1": 0.4332639215422852,
+    "n": 6845
+   },
+   "DoS": {
+    "p": 0.3293903548680619,
+    "r": 0.6200263504611331,
+    "f1": 0.43022352242080725,
+    "n": 7590
+   },
+   "Exploits": {
+    "p": 0.7298083504449008,
+    "r": 0.4816487859966121,
+    "f1": 0.5803115858221648,
+    "n": 8855
+   },
+   "Fuzzers": {
+    "p": 0.6293158229188731,
+    "r": 0.7614044079958996,
+    "f1": 0.689087324597008,
+    "n": 7804
+   },
+   "Generic": {
+    "p": 0.9972103708565803,
+    "r": 0.97232,
+    "f1": 0.9846079066753078,
+    "n": 6250
+   },
+   "Normal": {
+    "p": 0.9450665063500413,
+    "r": 0.7789890981169475,
+    "f1": 0.8540287256799429,
+    "n": 16144
+   },
+   "Reconnaissance": {
+    "p": 0.877303305059959,
+    "r": 0.8156356220258327,
+    "f1": 0.8453462974705841,
+    "n": 7355
+   },
+   "Shellcode": {
+    "p": 0.7957737404973586,
+    "r": 0.9033201696650578,
+    "f1": 0.8461433073023702,
+    "n": 6837
+   },
+   "Worms": {
+    "p": 0.9042182931922595,
+    "r": 0.9766917293233083,
+    "f1": 0.9390587725005421,
+    "n": 6650
+   }
+  },
+  "f1_consistent": true
+ },
+ "per_model_accuracy": {
+  "DT": 0.5488200135559801,
+  "RF": 0.7457144617659744,
+  "ET": 0.638043009427568,
+  "AB": 0.5037155708916138,
+  "LGBM": 0.711491773984842,
+  "CB": 0.6595600468297492,
+  "XGB": 0.7283258364655864
+ },
+ "accuracy_real_test_rows": 0.7192351992628426,
+ "accuracy_synthetic_test_rows": 0.6847224062541407,
+ "fit_seconds": {
+  "DT": 0.1113901138305664,
+  "RF": 5.101778030395508,
+  "ET": 11.144489288330078,
+  "AB": 43.94521427154541,
+  "LGBM": 7.220834732055664,
+  "CB": 29.22221565246582,
+  "XGB": 1.157672643661499
+ },
+ "paper_sids_accuracy": 0.9289,
+ "seconds": {
+  "data": 116.65392422676086,
+  "gwo": 11.964686393737793,
+  "sids": 101.66717720031738
+ },
+ "commit": "dbac95e8f508e095e04cd2f5a101864ee6eaadfd",
+ "dirty": false
+}

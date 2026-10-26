@@ -1,0 +1,223 @@
+{
+ "dataset": "ciciot_paper",
+ "mode": "paper",
+ "seed": 1,
+ "balance": "gamo",
+ "balance_info": {
+  "gamo_m_holdout_acc": 0.8278082518483186,
+  "gamo_basis": {
+   "0": 9798,
+   "2": 30514,
+   "3": 11317,
+   "5": 1697,
+   "7": 2414
+  },
+  "gamo_diversity": {
+   "0": {
+    "spread_ratio": 0.4390633938578971,
+    "fake_to_real_nn": 0.08148083463311195,
+    "real_to_real_nn": 0.17968441545963287,
+    "unique_share": 0.9215
+   },
+   "2": {
+    "spread_ratio": 0.002579792533193977,
+    "fake_to_real_nn": 0.10905051976442337,
+    "real_to_real_nn": 0.1306355744600296,
+    "unique_share": 0.6365
+   },
+   "3": {
+    "spread_ratio": 0.1739506659573183,
+    "fake_to_real_nn": 0.016681378707289696,
+    "real_to_real_nn": 6.190444764797576e-05,
+    "unique_share": 0.261
+   },
+   "5": {
+    "spread_ratio": 0.6348798993438197,
+    "fake_to_real_nn": 0.11505583301186562,
+    "real_to_real_nn": 0.2648926079273224,
+    "unique_share": 0.929
+   },
+   "7": {
+    "spread_ratio": 0.27367145131515214,
+    "fake_to_real_nn": 0.2548295706510544,
+    "real_to_real_nn": 0.22109363228082657,
+    "unique_share": 0.906
+   }
+  }
+ },
+ "test_synthetic_share": 0.4137831769244055,
+ "features": [
+  "Header_Length",
+  "Protocol Type",
+  "Time_To_Live",
+  "Rate",
+  "fin_flag_number",
+  "syn_flag_number",
+  "rst_flag_number",
+  "psh_flag_number",
+  "ack_flag_number",
+  "ece_flag_number",
+  "cwr_flag_number",
+  "ack_count",
+  "syn_count",
+  "fin_count",
+  "rst_count",
+  "HTTP",
+  "HTTPS",
+  "DNS",
+  "Telnet",
+  "SMTP",
+  "SSH",
+  "IRC",
+  "TCP",
+  "UDP",
+  "DHCP",
+  "ARP",
+  "ICMP",
+  "IGMP",
+  "IPv",
+  "LLC",
+  "Tot sum",
+  "Min",
+  "Max",
+  "AVG",
+  "Std",
+  "Tot size",
+  "IAT",
+  "Number",
+  "Variance"
+ ],
+ "rows": {
+  "train": 347378,
+  "test": 86845
+ },
+ "train_class_counts": {
+  "Brute Force": 40340,
+  "DDoS": 24415,
+  "DoS": 44701,
+  "Mirai": 40688,
+  "Normal": 71871,
+  "Recon": 38748,
+  "Spoofing": 47949,
+  "Web-Based": 38666
+ },
+ "gwo_features": [
+  "Time_To_Live",
+  "Rate",
+  "psh_flag_number",
+  "syn_count",
+  "SMTP",
+  "IGMP",
+  "Min"
+ ],
+ "gwo_kept": 7,
+ "paper_gwo_kept": 21,
+ "test_rows_in_train": 0.11058782889055213,
+ "test_nn_distance": {
+  "real": {
+   "median": 0.0008240044116973877,
+   "share_below_0.01": 0.8082,
+   "n": 5000
+  },
+  "synthetic": {
+   "median": 1.2834721814720345e-05,
+   "share_below_0.01": 0.998,
+   "n": 5000
+  }
+ },
+ "sids": {
+  "accuracy": 0.8760435258218665,
+  "macro": {
+   "p": 0.9407304934037262,
+   "r": 0.8765323597763939,
+   "f": 0.8958145548708626
+  },
+  "weighted": {
+   "p": 0.9116235842664694,
+   "r": 0.8760435258218665,
+   "f": 0.877783860662352
+  },
+  "far_benign": 0.018421488059125257,
+  "far_macro": 0.019408457800726822,
+  "attack_recall": 0.857467182815729,
+  "per_class": {
+   "Brute Force": {
+    "p": 0.9905200789993417,
+    "r": 0.7509482930724696,
+    "f1": 0.8542553795491966,
+    "n": 10018
+   },
+   "DDoS": {
+    "p": 0.9807308970099667,
+    "r": 0.9800796812749004,
+    "f1": 0.980405181002989,
+    "n": 6024
+   },
+   "DoS": {
+    "p": 0.9804294645284044,
+    "r": 0.9596488116353317,
+    "f1": 0.9699278447541791,
+    "n": 11276
+   },
+   "Mirai": {
+    "p": 0.9796644636502287,
+    "r": 0.9460919088766693,
+    "f1": 0.9625855437334532,
+    "n": 10184
+   },
+   "Normal": {
+    "p": 0.6450291761806386,
+    "r": 0.9815785119408748,
+    "f1": 0.7784873802545821,
+    "n": 18131
+   },
+   "Recon": {
+    "p": 0.9994491572105321,
+    "r": 0.9520411375800188,
+    "f1": 0.9751693002257337,
+    "n": 9529
+   },
+   "Spoofing": {
+    "p": 0.9500207096506972,
+    "r": 0.577992440151197,
+    "f1": 0.7187173595153541,
+    "n": 11905
+   },
+   "Web-Based": {
+    "p": 1.0,
+    "r": 0.8638780936796892,
+    "f1": 0.9269684499314129,
+    "n": 9778
+   }
+  },
+  "f1_consistent": true
+ },
+ "per_model_accuracy": {
+  "DT": 0.7185675628994185,
+  "RF": 0.8924750993148713,
+  "ET": 0.8829523864356037,
+  "AB": 0.6481893027808164,
+  "LGBM": 0.420576889861247,
+  "CB": 0.9073752087051644,
+  "XGB": 0.20877425297944613
+ },
+ "accuracy_real_test_rows": 0.8025535258298959,
+ "accuracy_synthetic_test_rows": 0.9801586197300681,
+ "fit_seconds": {
+  "DT": 0.5197551250457764,
+  "RF": 1.4978947639465332,
+  "ET": 8.7593674659729,
+  "AB": 55.123347759246826,
+  "LGBM": 15.484472513198853,
+  "CB": 40.3878870010376,
+  "XGB": 3.5133728981018066
+ },
+ "paper_sids_accuracy": 0.9831,
+ "seconds": {
+  "data": 807.6196262836456,
+  "gwo": 10.574635028839111,
+  "sids": 128.67954754829407
+ },
+ "commit": "dbac95e8f508e095e04cd2f5a101864ee6eaadfd",
+ "dirty": false
+}

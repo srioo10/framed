@@ -1,0 +1,182 @@
+{
+ "dataset": "ciciot_paper",
+ "mode": "paper",
+ "seed": 3,
+ "balance": "smote",
+ "balance_info": {},
+ "test_synthetic_share": 0.41556796591628764,
+ "features": [
+  "Header_Length",
+  "Protocol Type",
+  "Time_To_Live",
+  "Rate",
+  "fin_flag_number",
+  "syn_flag_number",
+  "rst_flag_number",
+  "psh_flag_number",
+  "ack_flag_number",
+  "ece_flag_number",
+  "cwr_flag_number",
+  "ack_count",
+  "syn_count",
+  "fin_count",
+  "rst_count",
+  "HTTP",
+  "HTTPS",
+  "DNS",
+  "Telnet",
+  "SMTP",
+  "SSH",
+  "IRC",
+  "TCP",
+  "UDP",
+  "DHCP",
+  "ARP",
+  "ICMP",
+  "IGMP",
+  "IPv",
+  "LLC",
+  "Tot sum",
+  "Min",
+  "Max",
+  "AVG",
+  "Std",
+  "Tot size",
+  "IAT",
+  "Number",
+  "Variance"
+ ],
+ "rows": {
+  "train": 347378,
+  "test": 86845
+ },
+ "train_class_counts": {
+  "Brute Force": 40320,
+  "DDoS": 24358,
+  "DoS": 44709,
+  "Mirai": 40553,
+  "Normal": 72286,
+  "Recon": 38645,
+  "Spoofing": 47863,
+  "Web-Based": 38644
+ },
+ "gwo_features": [
+  "Rate",
+  "psh_flag_number",
+  "ack_count",
+  "HTTPS",
+  "SMTP",
+  "Std",
+  "Tot size"
+ ],
+ "gwo_kept": 7,
+ "paper_gwo_kept": 21,
+ "test_rows_in_train": 0.08163970291899361,
+ "test_nn_distance": {
+  "real": {
+   "median": 0.0031223054379300452,
+   "share_below_0.01": 0.6718,
+   "n": 5000
+  },
+  "synthetic": {
+   "median": 0.01162720070796746,
+   "share_below_0.01": 0.474,
+   "n": 5000
+  }
+ },
+ "sids": {
+  "accuracy": 0.7037941159537107,
+  "macro": {
+   "p": 0.7836253531705348,
+   "r": 0.6906906704115127,
+   "f": 0.7014288776590837
+  },
+  "weighted": {
+   "p": 0.7558021723595235,
+   "r": 0.7037941159537107,
+   "f": 0.6893272973904409
+  },
+  "far_benign": 0.05701061187627004,
+  "far_macro": 0.0452197720904249,
+  "attack_recall": 0.7301711293379045,
+  "per_class": {
+   "Brute Force": {
+    "p": 0.5836575875486382,
+    "r": 0.328750747160789,
+    "f1": 0.42059648228396634,
+    "n": 10038
+   },
+   "DDoS": {
+    "p": 0.9470355731225296,
+    "r": 0.9850353560269692,
+    "f1": 0.9656617765597292,
+    "n": 6081
+   },
+   "DoS": {
+    "p": 0.9814534106107892,
+    "r": 0.9768370607028753,
+    "f1": 0.9791397945114086,
+    "n": 11268
+   },
+   "Mirai": {
+    "p": 0.990016477658234,
+    "r": 0.9898245954065317,
+    "f1": 0.9899205272339601,
+    "n": 10319
+   },
+   "Normal": {
+    "p": 0.4724681127859951,
+    "r": 0.94298938812373,
+    "f1": 0.6295242581252944,
+    "n": 17716
+   },
+   "Recon": {
+    "p": 0.7095898673100121,
+    "r": 0.24428986710963455,
+    "f1": 0.3634538152610442,
+    "n": 9632
+   },
+   "Spoofing": {
+    "p": 0.916973125884017,
+    "r": 0.5406554916187141,
+    "f1": 0.6802371334137768,
+    "n": 11991
+   },
+   "Web-Based": {
+    "p": 0.6678086704440638,
+    "r": 0.5171428571428571,
+    "f1": 0.5828972338834896,
+    "n": 9800
+   }
+  },
+  "f1_consistent": true
+ },
+ "per_model_accuracy": {
+  "DT": 0.5950716794288675,
+  "RF": 0.6998445506361909,
+  "ET": 0.7167597443721573,
+  "AB": 0.42938568714376185,
+  "LGBM": 0.4817663653635788,
+  "CB": 0.8107202487189821,
+  "XGB": 0.20399562438827798
+ },
+ "accuracy_real_test_rows": 0.816569796079204,
+ "accuracy_synthetic_test_rows": 0.5451925741202549,
+ "fit_seconds": {
+  "DT": 0.787865161895752,
+  "RF": 1.8289101123809814,
+  "ET": 10.266008138656616,
+  "AB": 66.04423379898071,
+  "LGBM": 15.375671148300171,
+  "CB": 41.67645812034607,
+  "XGB": 3.25532865524292
+ },
+ "paper_sids_accuracy": 0.9831,
+ "seconds": {
+  "data": 659.1194818019867,
+  "gwo": 11.106916189193726,
+  "sids": 143.45328330993652
+ },
+ "commit": "dbac95e8f508e095e04cd2f5a101864ee6eaadfd",
+ "dirty": false
+}

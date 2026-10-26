@@ -1,0 +1,204 @@
+{
+ "dataset": "unsw_official",
+ "mode": "paper",
+ "seed": 3,
+ "balance": "smote",
+ "balance_info": {},
+ "test_synthetic_share": 0.4640458438597572,
+ "features": [
+  "dur",
+  "proto",
+  "service",
+  "state",
+  "spkts",
+  "dpkts",
+  "sbytes",
+  "dbytes",
+  "rate",
+  "sttl",
+  "dttl",
+  "sload",
+  "dload",
+  "sloss",
+  "dloss",
+  "sinpkt",
+  "dinpkt",
+  "sjit",
+  "djit",
+  "swin",
+  "stcpb",
+  "dtcpb",
+  "dwin",
+  "tcprtt",
+  "synack",
+  "ackdat",
+  "smean",
+  "dmean",
+  "trans_depth",
+  "response_body_len",
+  "ct_srv_src",
+  "ct_state_ttl",
+  "ct_dst_ltm",
+  "ct_src_dport_ltm",
+  "ct_dst_sport_ltm",
+  "ct_dst_src_ltm",
+  "is_ftp_login",
+  "ct_ftp_cmd",
+  "ct_flw_http_mthd",
+  "ct_src_ltm",
+  "ct_srv_dst",
+  "is_sm_ips_ports"
+ ],
+ "rows": {
+  "train": 324576,
+  "test": 81145
+ },
+ "train_class_counts": {
+  "Analysis": 27260,
+  "Backdoor": 27212,
+  "DoS": 30029,
+  "Exploits": 35749,
+  "Fuzzers": 31462,
+  "Generic": 24920,
+  "Normal": 64798,
+  "Reconnaissance": 29551,
+  "Shellcode": 26877,
+  "Worms": 26718
+ },
+ "gwo_features": [
+  "proto",
+  "spkts",
+  "sttl",
+  "dload",
+  "sloss",
+  "dtcpb",
+  "smean",
+  "trans_depth",
+  "ct_dst_sport_ltm",
+  "ct_dst_src_ltm",
+  "ct_ftp_cmd",
+  "ct_src_ltm"
+ ],
+ "gwo_kept": 12,
+ "paper_gwo_kept": 25,
+ "test_rows_in_train": 0.36768747304208516,
+ "test_nn_distance": {
+  "real": {
+   "median": 0.0005358760666380029,
+   "share_below_0.01": 0.636,
+   "n": 5000
+  },
+  "synthetic": {
+   "median": 0.0020276063458996687,
+   "share_below_0.01": 0.7378,
+   "n": 5000
+  }
+ },
+ "sids": {
+  "accuracy": 0.7035923347094707,
+  "macro": {
+   "p": 0.7243697469201826,
+   "r": 0.7043967370603987,
+   "f": 0.695183311085531
+  },
+  "weighted": {
+   "p": 0.7459724538792227,
+   "r": 0.7035923347094707,
+   "f": 0.7057844955370315
+  },
+  "far_benign": 0.24779694675437508,
+  "far_macro": 0.03271209413513168,
+  "attack_recall": 0.9928803186172749,
+  "per_class": {
+   "Analysis": {
+    "p": 0.6038178164768921,
+    "r": 0.2647577092511013,
+    "f1": 0.3681094324213965,
+    "n": 6810
+   },
+   "Backdoor": {
+    "p": 0.48233792027237904,
+    "r": 0.5026611472501479,
+    "f1": 0.4922898718598422,
+    "n": 6764
+   },
+   "DoS": {
+    "p": 0.3697478991596639,
+    "r": 0.7143432174963102,
+    "f1": 0.48727805235218746,
+    "n": 7453
+   },
+   "Exploits": {
+    "p": 0.7183658712942878,
+    "r": 0.45282588878760255,
+    "f1": 0.5554934302488118,
+    "n": 8776
+   },
+   "Fuzzers": {
+    "p": 0.5741280436213217,
+    "r": 0.7640435380958338,
+    "f1": 0.6556092324208266,
+    "n": 7993
+   },
+   "Generic": {
+    "p": 0.9991792514773473,
+    "r": 0.9686505410566518,
+    "f1": 0.983678086619263,
+    "n": 6284
+   },
+   "Normal": {
+    "p": 0.9632072472981564,
+    "r": 0.752203053245625,
+    "f1": 0.8447278555996933,
+    "n": 16114
+   },
+   "Reconnaissance": {
+    "p": 0.9033175355450237,
+    "r": 0.7792313982011447,
+    "f1": 0.8366988586479368,
+    "n": 7338
+   },
+   "Shellcode": {
+    "p": 0.7458485455187845,
+    "r": 0.9186248912097476,
+    "f1": 0.8232694182645434,
+    "n": 6894
+   },
+   "Worms": {
+    "p": 0.8837473385379702,
+    "r": 0.9266259860098229,
+    "f1": 0.9046788724208079,
+    "n": 6719
+   }
+  },
+  "f1_consistent": true
+ },
+ "per_model_accuracy": {
+  "DT": 0.5381847310370325,
+  "RF": 0.7535399593320599,
+  "ET": 0.626310924887547,
+  "AB": 0.5436071230513279,
+  "LGBM": 0.7175796413827099,
+  "CB": 0.659670959393678,
+  "XGB": 0.7385297923470331
+ },
+ "accuracy_real_test_rows": 0.7097033800873764,
+ "accuracy_synthetic_test_rows": 0.6965343247908644,
+ "fit_seconds": {
+  "DT": 0.11115264892578125,
+  "RF": 4.11592960357666,
+  "ET": 10.942870616912842,
+  "AB": 39.53030347824097,
+  "LGBM": 8.28250241279602,
+  "CB": 27.083078861236572,
+  "XGB": 1.1353731155395508
+ },
+ "paper_sids_accuracy": 0.9289,
+ "seconds": {
+  "data": 106.72080731391907,
+  "gwo": 10.387524366378784,
+  "sids": 95.61850094795227
+ },
+ "commit": "dbac95e8f508e095e04cd2f5a101864ee6eaadfd",
+ "dirty": false
+}

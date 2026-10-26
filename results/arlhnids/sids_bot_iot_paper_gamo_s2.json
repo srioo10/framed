@@ -1,0 +1,154 @@
+{
+ "dataset": "bot_iot",
+ "mode": "paper",
+ "seed": 2,
+ "balance": "gamo",
+ "balance_info": {
+  "gamo_m_holdout_acc": 0.9999563509384548,
+  "gamo_basis": {
+   "2": 358,
+   "4": 59
+  },
+  "gamo_diversity": {
+   "2": {
+    "spread_ratio": 0.41957660783781364,
+    "fake_to_real_nn": 0.03536795265972614,
+    "real_to_real_nn": 0.08479507267475128,
+    "unique_share": 0.581
+   },
+   "4": {
+    "spread_ratio": 0.021212657132086362,
+    "fake_to_real_nn": 0.046036241576075554,
+    "real_to_real_nn": 9.075740672415122e-05,
+    "unique_share": 0.358
+   }
+  }
+ },
+ "test_synthetic_share": 0.3458300181690793,
+ "features": [
+  "pkSeqID",
+  "proto",
+  "saddr",
+  "sport",
+  "daddr",
+  "dport",
+  "seq",
+  "stddev",
+  "N_IN_Conn_P_SrcIP",
+  "min",
+  "state_number",
+  "mean",
+  "N_IN_Conn_P_DstIP",
+  "drate",
+  "srate",
+  "max",
+  "attack",
+  "subcategory"
+ ],
+ "rows": {
+  "train": 336832,
+  "test": 84209
+ },
+ "train_class_counts": {
+  "DDoS": 73756,
+  "DoS": 73624,
+  "Normal": 58388,
+  "Reconnaissance": 72738,
+  "Theft": 58326
+ },
+ "gwo_features": [
+  "pkSeqID"
+ ],
+ "gwo_kept": 1,
+ "paper_gwo_kept": 10,
+ "test_rows_in_train": 0.3442981154033417,
+ "test_nn_distance": {
+  "real": {
+   "median": 3.769993782043457e-06,
+   "share_below_0.01": 1.0,
+   "n": 5000
+  },
+  "synthetic": {
+   "median": 0.0,
+   "share_below_0.01": 1.0,
+   "n": 5000
+  }
+ },
+ "sids": {
+  "accuracy": 1.0,
+  "macro": {
+   "p": 1.0,
+   "r": 1.0,
+   "f": 1.0
+  },
+  "weighted": {
+   "p": 1.0,
+   "r": 1.0,
+   "f": 1.0
+  },
+  "far_benign": 0.0,
+  "far_macro": 0.0,
+  "attack_recall": 1.0,
+  "per_class": {
+   "DDoS": {
+    "p": 1.0,
+    "r": 1.0,
+    "f1": 1.0,
+    "n": 18244
+   },
+   "DoS": {
+    "p": 1.0,
+    "r": 1.0,
+    "f1": 1.0,
+    "n": 18376
+   },
+   "Normal": {
+    "p": 1.0,
+    "r": 1.0,
+    "f1": 1.0,
+    "n": 14638
+   },
+   "Reconnaissance": {
+    "p": 1.0,
+    "r": 1.0,
+    "f1": 1.0,
+    "n": 18344
+   },
+   "Theft": {
+    "p": 1.0,
+    "r": 1.0,
+    "f1": 1.0,
+    "n": 14607
+   }
+  },
+  "f1_consistent": true
+ },
+ "per_model_accuracy": {
+  "DT": 1.0,
+  "RF": 1.0,
+  "ET": 0.9998931230628555,
+  "AB": 0.6527093303566127,
+  "LGBM": 0.9977793347504423,
+  "CB": 0.9972687004951964,
+  "XGB": 0.9975537056609151
+ },
+ "accuracy_real_test_rows": 1.0,
+ "accuracy_synthetic_test_rows": 1.0,
+ "fit_seconds": {
+  "DT": 0.11292695999145508,
+  "RF": 1.1333343982696533,
+  "ET": 4.722135305404663,
+  "AB": 13.557069778442383,
+  "LGBM": 8.468709945678711,
+  "CB": 22.71077871322632,
+  "XGB": 0.5464422702789307
+ },
+ "paper_sids_accuracy": 0.9919,
+ "seconds": {
+  "data": 161.68385457992554,
+  "gwo": 3.853543758392334,
+  "sids": 54.54299187660217
+ },
+ "commit": "dbac95e8f508e095e04cd2f5a101864ee6eaadfd",
+ "dirty": false
+}

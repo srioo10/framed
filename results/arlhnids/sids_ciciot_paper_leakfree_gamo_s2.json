@@ -1,0 +1,218 @@
+{
+ "dataset": "ciciot_paper",
+ "mode": "leakfree",
+ "seed": 2,
+ "balance": "gamo",
+ "balance_info": {
+  "gamo_m_holdout_acc": 0.8320854494999739,
+  "gamo_basis": {
+   "0": 5872,
+   "2": 18297,
+   "3": 6750,
+   "5": 1018,
+   "7": 1439
+  },
+  "gamo_diversity": {
+   "0": {
+    "spread_ratio": 0.6216991369351664,
+    "fake_to_real_nn": 0.044396897777915,
+    "real_to_real_nn": 0.1953280046582222,
+    "unique_share": 0.7795
+   },
+   "2": {
+    "spread_ratio": 0.007178373833366792,
+    "fake_to_real_nn": 0.013560838531702757,
+    "real_to_real_nn": 0.14201846718788147,
+    "unique_share": 0.1745
+   },
+   "3": {
+    "spread_ratio": 0.2831591069370235,
+    "fake_to_real_nn": 0.02650943025946617,
+    "real_to_real_nn": 9.773352940101177e-05,
+    "unique_share": 0.6415
+   },
+   "5": {
+    "spread_ratio": 0.41173188523787585,
+    "fake_to_real_nn": 0.11195442453026772,
+    "real_to_real_nn": 0.29574546217918396,
+    "unique_share": 0.8245
+   },
+   "7": {
+    "spread_ratio": 0.505292332509699,
+    "fake_to_real_nn": 0.2439257651567459,
+    "real_to_real_nn": 0.24370761215686798,
+    "unique_share": 0.795
+   }
+  }
+ },
+ "cleaning": {
+  "dataset": "ciciot_paper",
+  "rows_in": 401260,
+  "nonfinite": 18,
+  "conflict_rows": 2608,
+  "duplicates": 51638,
+  "rows_out": 346996
+ },
+ "train_synthetic_share": 0.43014623442355127,
+ "features": [
+  "Header_Length",
+  "Protocol Type",
+  "Time_To_Live",
+  "Rate",
+  "fin_flag_number",
+  "syn_flag_number",
+  "rst_flag_number",
+  "psh_flag_number",
+  "ack_flag_number",
+  "ece_flag_number",
+  "cwr_flag_number",
+  "ack_count",
+  "syn_count",
+  "fin_count",
+  "rst_count",
+  "HTTP",
+  "HTTPS",
+  "DNS",
+  "Telnet",
+  "SMTP",
+  "SSH",
+  "IRC",
+  "TCP",
+  "UDP",
+  "DHCP",
+  "ARP",
+  "ICMP",
+  "IGMP",
+  "IPv",
+  "LLC",
+  "Tot sum",
+  "Min",
+  "Max",
+  "AVG",
+  "Std",
+  "Tot size",
+  "IAT",
+  "Variance"
+ ],
+ "rows": {
+  "train": 249736,
+  "test": 69400
+ },
+ "train_class_counts": {
+  "Brute Force": 30182,
+  "DDoS": 11972,
+  "DoS": 33565,
+  "Mirai": 30341,
+  "Normal": 53945,
+  "Recon": 28962,
+  "Spoofing": 31895,
+  "Web-Based": 28874
+ },
+ "gwo_features": [
+  "Time_To_Live",
+  "psh_flag_number",
+  "Tot size"
+ ],
+ "gwo_kept": 3,
+ "paper_gwo_kept": 21,
+ "test_nn_distance": {
+  "real": {
+   "median": 0.0,
+   "share_below_0.01": 0.842,
+   "n": 5000
+  }
+ },
+ "sids": {
+  "accuracy": 0.821671469740634,
+  "macro": {
+   "p": 0.5883786330599835,
+   "r": 0.5497752227936514,
+   "f": 0.5562330063923537
+  },
+  "weighted": {
+   "p": 0.8116029548545974,
+   "r": 0.821671469740634,
+   "f": 0.8023003891524294
+  },
+  "far_benign": 0.05797995373939861,
+  "far_macro": 0.031707669548753106,
+  "attack_recall": 0.8296134376438103,
+  "per_class": {
+   "Brute Force": {
+    "p": 0.2897058823529412,
+    "r": 0.15095785440613027,
+    "f1": 0.19848866498740556,
+    "n": 2610
+   },
+   "DDoS": {
+    "p": 0.9367696843944523,
+    "r": 0.953375937760489,
+    "f1": 0.9449998622930954,
+    "n": 17995
+   },
+   "DoS": {
+    "p": 0.7965440356744704,
+    "r": 0.8786276438760453,
+    "f1": 0.8355747865746697,
+    "n": 8132
+   },
+   "Mirai": {
+    "p": 0.955130320026394,
+    "r": 0.965,
+    "f1": 0.9600397943956226,
+    "n": 3000
+   },
+   "Normal": {
+    "p": 0.7674382085989762,
+    "r": 0.9420200462606014,
+    "f1": 0.845814368044859,
+    "n": 25940
+   },
+   "Recon": {
+    "p": 0.07468879668049792,
+    "r": 0.03982300884955752,
+    "f1": 0.05194805194805195,
+    "n": 452
+   },
+   "Spoofing": {
+    "p": 0.8867521367521367,
+    "r": 0.4683972911963883,
+    "f1": 0.6129985228951256,
+    "n": 10632
+   },
+   "Web-Based": {
+    "p": 0.0,
+    "r": 0.0,
+    "f1": 0.0,
+    "n": 639
+   }
+  },
+  "f1_consistent": true
+ },
+ "per_model_accuracy": {
+  "DT": 0.5521037463976946,
+  "RF": 0.7919308357348703,
+  "ET": 0.8167579250720461,
+  "AB": 0.691671469740634,
+  "LGBM": 0.6939769452449568,
+  "CB": 0.8571037463976945,
+  "XGB": 0.37377521613832854
+ },
+ "fit_seconds": {
+  "DT": 0.26299262046813965,
+  "RF": 0.8058929443359375,
+  "ET": 4.9426093101501465,
+  "AB": 26.61620283126831,
+  "LGBM": 10.93833303451538,
+  "CB": 29.212661743164062,
+  "XGB": 1.8286163806915283
+ },
+ "paper_sids_accuracy": 0.9831,
+ "seconds": {
+  "data": 574.4230027198792,
+  "gwo": 8.595502853393555,
+  "sids": 77.20585250854492
+ },
+ "commit": "dbac95e8f508e095e04cd2f5a101864ee6eaadfd",
+ "dirty": false
+}

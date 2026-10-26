@@ -1,0 +1,134 @@
+{
+ "dataset": "bot_iot",
+ "mode": "paper",
+ "seed": 2,
+ "balance": "smote",
+ "balance_info": {},
+ "test_synthetic_share": 0.3458300181690793,
+ "features": [
+  "pkSeqID",
+  "proto",
+  "saddr",
+  "sport",
+  "daddr",
+  "dport",
+  "seq",
+  "stddev",
+  "N_IN_Conn_P_SrcIP",
+  "min",
+  "state_number",
+  "mean",
+  "N_IN_Conn_P_DstIP",
+  "drate",
+  "srate",
+  "max",
+  "attack",
+  "subcategory"
+ ],
+ "rows": {
+  "train": 336832,
+  "test": 84209
+ },
+ "train_class_counts": {
+  "DDoS": 73756,
+  "DoS": 73624,
+  "Normal": 58388,
+  "Reconnaissance": 72738,
+  "Theft": 58326
+ },
+ "gwo_features": [
+  "pkSeqID"
+ ],
+ "gwo_kept": 1,
+ "paper_gwo_kept": 10,
+ "test_rows_in_train": 0.347148167060528,
+ "test_nn_distance": {
+  "real": {
+   "median": 3.769993782043457e-06,
+   "share_below_0.01": 1.0,
+   "n": 5000
+  },
+  "synthetic": {
+   "median": 0.0,
+   "share_below_0.01": 1.0,
+   "n": 5000
+  }
+ },
+ "sids": {
+  "accuracy": 0.9994062392380861,
+  "macro": {
+   "p": 0.99945634446015,
+   "r": 0.9993153967275964,
+   "f": 0.9993849137829107
+  },
+  "weighted": {
+   "p": 0.999407853244724,
+   "r": 0.9994062392380861,
+   "f": 0.9994061343045753
+  },
+  "far_benign": 0.0,
+  "far_macro": 0.0001518257040917027,
+  "attack_recall": 1.0,
+  "per_class": {
+   "DDoS": {
+    "p": 1.0,
+    "r": 1.0,
+    "f1": 1.0,
+    "n": 18244
+   },
+   "DoS": {
+    "p": 1.0,
+    "r": 1.0,
+    "f1": 1.0,
+    "n": 18376
+   },
+   "Normal": {
+    "p": 1.0,
+    "r": 1.0,
+    "f1": 1.0,
+    "n": 14638
+   },
+   "Reconnaissance": {
+    "p": 0.9972817223007503,
+    "r": 1.0,
+    "f1": 0.9986390113778649,
+    "n": 18344
+   },
+   "Theft": {
+    "p": 1.0,
+    "r": 0.9965769836379818,
+    "f1": 0.998285557536689,
+    "n": 14607
+   }
+  },
+  "f1_consistent": true
+ },
+ "per_model_accuracy": {
+  "DT": 1.0,
+  "RF": 1.0,
+  "ET": 0.9998337469866642,
+  "AB": 0.6527093303566127,
+  "LGBM": 0.9949649087389709,
+  "CB": 0.9955349190704081,
+  "XGB": 0.9971855739885286
+ },
+ "accuracy_real_test_rows": 1.0,
+ "accuracy_synthetic_test_rows": 0.9982830849529565,
+ "fit_seconds": {
+  "DT": 0.1164243221282959,
+  "RF": 1.176476001739502,
+  "ET": 4.749725103378296,
+  "AB": 12.979596853256226,
+  "LGBM": 9.951889038085938,
+  "CB": 22.938408374786377,
+  "XGB": 0.5389847755432129
+ },
+ "paper_sids_accuracy": 0.9919,
+ "seconds": {
+  "data": 106.70360970497131,
+  "gwo": 3.9062018394470215,
+  "sids": 55.403727293014526
+ },
+ "commit": "dbac95e8f508e095e04cd2f5a101864ee6eaadfd",
+ "dirty": false
+}
