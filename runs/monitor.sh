@@ -2,7 +2,7 @@
 # every 60 s: log CPU package temperature, free memory, swap and the job's RSS to runs/logs/monitor.csv.
 # Heat rule (user): > 95 C for 10 consecutive readings -> SIGSTOP the jobs; resume them once <= 85 C.
 cd "$(dirname "$0")/.."
-PAT='^.venv/bin/python -W ignore scripts/(score_bank|tune_mlp|onepass_claims|host_stream|host_report).py'
+PAT='^.venv/bin/python -W ignore scripts/(score_bank|tune_mlp|onepass_claims|host_stream|host_report|backoff_ciciot).py'
 n=0; paused=0
 [ -f runs/logs/monitor.csv ] || echo "time,temp_c,mem_avail_gb,swap_used_gb,job_rss_gb,paused" > runs/logs/monitor.csv
 while true; do

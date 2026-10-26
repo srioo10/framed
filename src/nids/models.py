@@ -82,15 +82,18 @@ class FeatureGDA:
             self.logdet.append(2 * torch.log(torch.diagonal(L)).sum()), self.logpi.append(np.log(len(h) / len(H)))
         return self
 
-    def score(self, m, X, chunk=200_000):
+    def class_loglik(self, m, X, chunk=200_000):
+        """log pi_c + log N(h; mu_c, Sigma_c) up to the shared constant, one column per known class."""
         out = []
         with torch.no_grad():
             for i in range(0, len(X), chunk):
                 h = m(torch.from_numpy(X[i:i + chunk]))[1].double()
-                lp = torch.stack([-0.5 * (((h - mu) @ P) * (h - mu)).sum(1) - 0.5 * ld + lpi
-                                  for mu, P, ld, lpi in zip(self.mu, self.prec, self.logdet, self.logpi)], 1)
-                out.append(-torch.logsumexp(lp, 1).numpy())
-        return np.concatenate(out)
+                out.append(torch.stack([-0.5 * (((h - mu) @ P) * (h - mu)).sum(1) - 0.5 * ld + lpi
+                                        for mu, P, ld, lpi in zip(self.mu, self.prec, self.logdet, self.logpi)], 1))
+        return torch.cat(out)
+
+    def score(self, m, X, chunk=200_000):
+        return -torch.logsumexp(self.class_loglik(m, X, chunk), 1).numpy()
 
 
 def train_mlp(Xtr, ytr, Xes, yes, k, soft=None, T=4.0, seed=0, epochs=30, arch=None, weight=None):
