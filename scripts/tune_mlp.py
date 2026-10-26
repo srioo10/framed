@@ -92,6 +92,8 @@ def main():
                 score, proba, _ = fit(*g, Xf, yf, Xe, ye, len(kn), a.seed)
                 s = score if score else (lambda X: 1 - proba(X)[:, cj["Benign"]])
                 inner[g].append(tpr(s(Xc), s(Xj)))
+            if bank.host is not None:  # removal-set features are cached (~0.8 GB each on nf_ton); recompute is exact
+                bank.host._cache.pop(Q, None)
         d = bank.frame(fit_r[:1], sb.role_removal(P, "fit")).shape[1]
         mean = {g: float(np.mean(v)) if v else 0.0 for g, v in inner.items()}
         best = max(GRID, key=lambda g: (round(mean[g], 4), -nparams(*g, d, nk)))
@@ -132,6 +134,8 @@ def main():
             if res[c].dtype == np.float64:
                 res[c] = res[c].astype(np.float32)
         res.to_parquet(dest / "tuned.parquet", index=False)
+        if bank.host is not None:
+            bank.host._cache.clear()
         log[k] = {"best": list(best), "params": nparams(*best, d, nk), "inner": {str(g): mean[g] for g in GRID},
                   "smote_target": {known[c]: int(cnt[c]) for c in target}, "seconds": time.time() - t0}
         print(k, json.dumps(log[k]), flush=True)
