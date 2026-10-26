@@ -13,6 +13,24 @@ Each pre-registered claim, its verdict, and the file that holds it. The criteria
 - Paper order puts 14–53% of test rows in training and makes 35–46% of the test set synthetic. On BoT-IoT, grey-wolf search keeps the row identifier `pkSeqID`, and the feature set includes the label columns.
 - 5 seeds × GAMO / SMOTE × paper / leak-free.
 
+**Attribution** (GAMO, start from the paper order and switch one step to leak-free at a time; mean over seeds 0, 1, 3; seeds 2 and 4 were not run). Steps:
+- (a) split before merging;
+- (b) split before oversampling, and oversample the training part only;
+- (c) Optuna on validation, not test;
+- (d) deduplicate;
+- (f) drop BoT-IoT label columns;
+- (g) drop BoT-IoT identifier columns.
+
+Files: `results/attrib/`; runner: `runs/attrib.sh`.
+
+| Macro-F1 | Paper order | (a) | (b) | (c) | (d) | (f) | (g) | All fixed |
+|---|---|---|---|---|---|---|---|---|
+| UNSW-NB15 | 0.871 | 0.854 | **0.394** | 0.841 | 0.875 | — | 0.868 | 0.425 |
+| CICIoT2023 (paper subset) | 0.872 | 0.887 | **0.547** | 0.899 | 0.891 | — | 0.896 | 0.566 |
+| BoT-IoT | 1.000 | 1.000 | 0.993 | 1.000 | 0.999 | 1.000 | 0.972 | **0.676** |
+
+Oversampling before the split (b) accounts for almost all of the inflation on UNSW-NB15 and CICIoT2023. On BoT-IoT no single step is enough: identifiers and labels are redundant, and only fixing all steps removes the effect.
+
 ## 2. Exploratory directions that did not go forward
 
 | Direction | Outcome | Files |
