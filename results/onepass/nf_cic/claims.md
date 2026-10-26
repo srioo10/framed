@@ -1,5 +1,8 @@
-# OnePass-IDS claims — nf_cic, seeds [1, 2, 3, 4]
+# OnePass-IDS claims — nf_cic, seeds [1, 2, 3, 4], host-day unit
 
+calibration host-days per fold (min over folds and seeds): 11567
+
+(no mlp_tuned_int8 column in these banks)
 | method | Bot | BruteForce | DDoS | DoS | Infiltration | Web | macro |
 |---|---|---|---|---|---|---|---|
 | attacker hosts / host-days | 8 / 32 | 1 / 4 | 10 / 80 | 3 / 8 | 260 / 525 | 126 / 210 | |
@@ -12,6 +15,9 @@
 | xgb (host, A) upper ref | 0.938 | 1.000 | 1.000 | 1.000 | 0.095 | 0.000 | 0.672 |
 | mlp_ce_int8 (host, A) | 0.406 | 0.750 | 1.000 | 1.000 | 0.065 | 0.010 | 0.538 |
 | mlp_sn_gda (host, A) | 0.969 | 1.000 | 1.000 | 1.000 | 0.051 | 0.071 | 0.682 |
+| mlp_tuned (host, A) | 0.969 | 1.000 | 1.000 | 1.000 | 0.055 | 0.033 | 0.676 |
+| mlp_bal (host, A) | 0.688 | 1.000 | 1.000 | 1.000 | 0.065 | 0.024 | 0.629 |
+| mlp_smote (host, A) | 0.656 | 0.750 | 1.000 | 1.000 | 0.053 | 0.029 | 0.581 |
 | host_perm (mlp_ce, A) | 0.344 | 0.000 | 0.750 | 0.375 | 0.109 | 0.071 | 0.275 |
 
 C1 OnePass − per-flow MLP: +0.334 [+0.256, +0.405] → PASS
@@ -20,6 +26,9 @@ C3 host gain +0.102, perm gain -0.162 → PASS
 C4 realised benign host-day alarm rate 0.0112 → PASS
 C5 int8 loss +0.001 → PASS
 C6 DDU − OnePass +0.143 [+0.110, +0.169] → PASS
+T1 (host level): mlp_tuned − OnePass +0.137 [+0.104, +0.161] → PASS
+B1 class-weighted (host level, reported): mlp_bal − OnePass +0.090 [+0.063, +0.117] → PASS
+B1 SMOTE (host level, reported): mlp_smote − OnePass +0.042 [+0.022, +0.064] → PASS
 C7 back-off accuracy (leaf case: ['BruteForce', 'DDoS', 'DoS', 'Web']) 0.508, chance 0.250 → FAIL
    per family: BruteForce 0.000 (n 52972), DDoS 0.897 (n 79495), DoS 0.415 (n 42750), Web 0.000 (n 35)
 underpowered (< 5 attacker hosts): ['BruteForce', 'DoS']
