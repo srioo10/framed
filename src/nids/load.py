@@ -6,10 +6,12 @@ No cleaning happens here; see clean.py. Results are cached as parquet in data/pr
 """
 import io
 import os
+import re
 import warnings
 import zipfile
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -272,7 +274,82 @@ def ciciot_merged():
     return _cached("ciciot_merged", build)
 
 
+# ---------------------------------------------------------------- CTU-13 / IoT-23 (NetFlow-v3 column names, PREREG §9 DISC)
+
+RAW = ROOT / "data" / "raw"
+PROTO = {"tcp": 6, "udp": 17, "icmp": 1}
+CTU_BOTNET = {1: "Neris", 2: "Neris", 9: "Neris", 3: "Rbot", 4: "Rbot", 10: "Rbot", 11: "Rbot", 5: "Virut",
+              13: "Virut", 6: "Menti", 7: "Sogou", 8: "Murlo", 12: "NSIS"}
+IOT23_MALWARE = {1: "HideAndSeek", 3: "Muhstik", 8: "Hakai", 9: "Hajime", 17: "Kenjiro", 33: "Kenjiro", 20: "Torii",
+                 21: "Torii", 36: "Okiru", 39: "IRCBot", 42: "Trojan", 60: "Gagfyt",
+                 **{n: "Mirai" for n in (7, 34, 35, 43, 44, 48, 49, 52)}}
+IOT23_ROWS = 300_000
+
+
+def _port(s):
+    return pd.to_numeric(s, errors="coerce").fillna(
+        s.fillna("").astype(str).map(lambda v: int(v, 16) if v.startswith("0x") else 0)).astype(np.int32)
+
+
+def _nf_frame(tag, t_ms, src, sport, dst, dport, proto, dur_ms, ib, ob, ip, op, fam, name):
+    df = pd.DataFrame({"FLOW_START_MILLISECONDS": t_ms.astype(np.int64),
+                       "IPV4_SRC_ADDR": tag + ":" + src.astype(str), "IPV4_DST_ADDR": tag + ":" + dst.astype(str),
+                       "L4_SRC_PORT": _port(sport), "L4_DST_PORT": _port(dport),
+                       "PROTOCOL": proto.astype(str).str.lower().map(PROTO).fillna(0).astype(np.int16),
+                       "FLOW_DURATION_MILLISECONDS": dur_ms.astype(np.float32),
+                       "IN_BYTES": ib.astype(np.float32), "OUT_BYTES": ob.astype(np.float32),
+                       "IN_PKTS": ip.astype(np.float32), "OUT_PKTS": op.astype(np.float32)})
+    df["y"] = df["family"] = fam
+    df["src"] = name
+    return df
+
+
+def ctu13():
+    """CTU-13 binetflow: From-Botnet = attack (family by scenario botnet), Normal = Benign; To-Botnet and
+    Background dropped. Host key = scenario:IP. OUT_PKTS is a reply indicator (Argus gives no packet split)."""
+    def build():
+        out = []
+        for d in sorted((RAW / "ctu13" / "CTU-13-Dataset").iterdir(), key=lambda p: int(p.name)):
+            f = next(d.glob("*.binetflow"))
+            x = pd.read_csv(f, dtype=str)
+            lab = x["Label"].str
+            bot, ok = lab.contains("From-Botnet"), lab.contains("Normal")
+            x = x[bot | ok]
+            fam = np.where(bot[bot | ok], CTU_BOTNET[int(d.name)], "Benign")
+            num = lambda c: pd.to_numeric(x[c], errors="coerce").fillna(0)  # noqa: E731
+            ob = num("TotBytes") - num("SrcBytes")
+            t = pd.to_datetime(x["StartTime"], format="%Y/%m/%d %H:%M:%S.%f").astype("datetime64[ms]").astype("int64")
+            out.append(_nf_frame(f"s{d.name}", t, x["SrcAddr"], x["Sport"], x["DstAddr"], x["Dport"], x["Proto"],
+                                 num("Dur") * 1000, num("SrcBytes"), ob, num("TotPkts"), (ob > 0).astype(float),
+                                 fam, "nf_ctu13"))
+        return pd.concat(out, ignore_index=True)
+    return _cached("nf_ctu13", build)
+
+
+def iot23():
+    """IoT-23 conn.log.labeled, first IOT23_ROWS rows per capture; Malicious = the capture's malware family."""
+    names = ["ts", "uid", "oh", "op", "rh", "rp", "proto", "service", "duration", "ob", "rb", "state", "lo", "lr",
+             "missed", "history", "opk", "oipb", "rpk", "ripb", "tunnel", "label", "detail"]
+
+    def build():
+        out = []
+        for f in sorted((RAW / "iot23").rglob("conn.log.labeled")):
+            cap = next(q.name for q in f.parents if "Capture-" in q.name)
+            n = int(re.search(r"Capture-(\d+)-", cap).group(1))
+            x = pd.read_csv(f, sep=r"\s+", comment="#", header=None, names=names, nrows=IOT23_ROWS, dtype=str,
+                            engine="python")
+            mal = x["label"].str.lower().eq("malicious")
+            fam = np.where(mal, IOT23_MALWARE.get(n, "Unknown") if "Honeypot" not in cap else "Benign", "Benign")
+            num = lambda c: pd.to_numeric(x[c], errors="coerce").fillna(0)  # noqa: E731
+            out.append(_nf_frame(f"c{'h' if 'Honeypot' in cap else ''}{n}", num("ts") * 1000, x["oh"], x["op"],
+                                 x["rh"], x["rp"], x["proto"], num("duration") * 1000, num("ob"), num("rb"),
+                                 num("opk"), num("rpk"), fam, "nf_iot23"))
+        return pd.concat(out, ignore_index=True)
+    return _cached("nf_iot23", build)
+
+
 LOADERS = {
+    "nf_ctu13": ctu13, "nf_iot23": iot23,
     "unsw_official": unsw_official, "unsw_raw": unsw_raw, "bot_iot": bot_iot,
     "ciciot_paper": ciciot_paper, "ciciot_csv": ciciot_csv, "ciciot_merged": ciciot_merged,
     **{n: (lambda n=n: _netflow_v3(n)) for n in NF_FILES},

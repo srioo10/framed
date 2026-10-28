@@ -32,10 +32,11 @@ import pyarrow.parquet as pq
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from nids import clean, hostctx, load, mcde, models, split, windows  # noqa: E402
+from nids import clean, hostctx, kitnet, load, mcde, models, split, windows  # noqa: E402
 
 OUT = Path(os.environ.get("NIDS_BANK_DIR", "/home/srioo/Desktop/Projects/root/BigP/runs/bank"))
 EXTRA = {"ciciot_csv": [("Flood", "Mirai"), ("DoS",), ("DDoS",)]}  # joint unseen-family; two attack-type hold-outs
+LEAN = os.environ.get("NIDS_LEAN") == "1"  # skip KD / tail / MCDE extras (not used by DISC)
 SEP = "__"  # family names contain "+", so configs are joined with SEP
 
 
@@ -204,6 +205,7 @@ class Bank:
         dfit = self.frame(fit, role_removal(P, "fit"))
         prep = models.Prep().fit(dfit)
         Xf, yf = prep.transform(dfit), np.array([code[f] for f in self.fam[fit]])
+        es = es[np.isin(self.fam[es], known)]  # a tiny family can land wholly in the early-stop carve (IoT-23 Trojan)
         Xe, ye = prep.transform(self.frame(es, role_removal(P, "es"))), np.array([code[f] for f in self.fam[es]])
         rf = models.rf(seed).fit(Xf, yf)
         xg = models.xgb(seed).fit(Xf, yf)
@@ -216,8 +218,9 @@ class Bank:
         Xb = bprep.transform(dben)
         modes = mcde.BenignModes().fit(Xb, seed)
         iso = models.iforest(Xb, seed)
+        kit = kitnet.KitNET(seed).fit(Xb)
         extra = {}
-        if kind == "outer":
+        if kind == "outer" and not LEAN:
             soft = models.oof_proba(Xf, yf, seed)
             extra["mlp_kd"] = models.train_mlp(Xf, yf, Xe, ye, k, soft=soft, T=4.0, seed=seed)
             extra["xgb_tail"] = models.xgb_tail(Xf, yf, bi, seed)
@@ -225,6 +228,8 @@ class Bank:
         del dben
 
         def score(rows, role, R0=None):
+            if len(rows) == 0:  # a tiny family can have no rows in a role (CTU-13 Sogou)
+                return pd.DataFrame()
             d = self.frame(rows, role_removal(P, role, R0))
             served_fold = SEP.join(R0) if R0 else ""
             X = prep.transform(d)
@@ -236,8 +241,8 @@ class Bank:
                     "rf": 1 - prf[:, bi], "xgb": 1 - pxg[:, bi], "mlp_ce": 1 - pml[:, bi],
                     "mlp_ce_int8": 1 - models.mlp_proba(mlp8, X)[:, bi],
                     "mlp_sn": 1 - models.mlp_proba(snm, X)[:, bi], "mlp_sn_gda": gda.score(snm, X),
-                    "iforest": -iso.score_samples(xb), "clust": dist, "mode": mode}
-            if kind == "outer":
+                    "iforest": -iso.score_samples(xb), "kitnet": kit.score(xb), "clust": dist, "mode": mode}
+            if kind == "outer" and not LEAN:
                 cols["mlp_kd"] = 1 - models.mlp_proba(extra["mlp_kd"], X)[:, bi]
                 cols["xgb_tail"] = 1 - extra["xgb_tail"].predict_proba(X)[:, bi]
                 cols.update(extra["mcde"](d))
@@ -306,7 +311,7 @@ def patch_mcde(bank, run):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("dataset", choices=["unsw_raw", "ciciot_csv", "unsw_official", "nf_unsw", "nf_ton", "nf_bot", "nf_cic"])
+    ap.add_argument("dataset", choices=["unsw_raw", "ciciot_csv", "unsw_official", "nf_unsw", "nf_ton", "nf_bot", "nf_cic", "nf_ctu13", "nf_iot23"])
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--variant", default="ct_causal",
                     choices=["ct_causal", "ct_causal_all", "ct_orig", "ct_drop", "none", "host", "host_iso", "host_perm"])

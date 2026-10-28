@@ -30,16 +30,17 @@ METHODS = ["P", "E", "W", "A"]
 MCDE_COLS = ["mcde_sup", "mcde_dist", "mcde_mode"]
 
 
-def build_meta():
+def build_meta(ds="nf_cic"):
     from nids import clean, load
-    raw = load.LOADERS["nf_cic"]()
+    raw = load.LOADERS[ds]()
     ips, src = np.unique(raw["IPV4_SRC_ADDR"].astype(str).to_numpy().astype("U"), return_inverse=True)
     t = raw["FLOW_START_MILLISECONDS"].to_numpy(np.int64)
-    df, rep = clean.clean(raw, "nf_cic")
+    df, rep = clean.clean(raw, ds)
     k = rep["kept_rows"]
-    np.savez_compressed(META, ips=ips, src=src[k].astype(np.int32), t=t[k],
+    meta = ROOT / "data" / "processed" / f"{ds}_hostmeta.npz"
+    np.savez_compressed(meta, ips=ips, src=src[k].astype(np.int32), t=t[k],
                         fam=df["family"].astype(str).to_numpy().astype("U"))
-    print(f"saved {META}: {len(k)} rows, {len(ips)} source hosts")
+    print(f"saved {meta}: {len(k)} rows, {len(ips)} source hosts")
 
 
 def host_split(ips, seed=0):
@@ -168,7 +169,7 @@ def main():
     ap.add_argument("--out", type=Path)
     a = ap.parse_args()
     if a.meta:
-        return build_meta()
+        return build_meta(a.ds)
     z = np.load(ROOT / "data" / "processed" / f"{a.ds}_hostmeta.npz", allow_pickle=False)
     meta = {"src": z["src"], "t": z["t"], "fam": z["fam"]}
     cal_host = host_split(z["ips"], a.seed)

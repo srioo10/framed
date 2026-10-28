@@ -76,7 +76,8 @@ class FeatureGDA:
         for c in range(k):
             h = H[yt == c]
             mu = h.mean(0)
-            S = torch.cov((h - mu).T) + 1e-4 * torch.eye(H.shape[1], dtype=H.dtype)
+            S = (torch.cov((h - mu).T) if len(h) > 1 else torch.zeros(H.shape[1], H.shape[1], dtype=H.dtype)) \
+                + 1e-4 * torch.eye(H.shape[1], dtype=H.dtype)  # a class with one row (IoT-23 Trojan) has no covariance
             L = torch.linalg.cholesky(S)
             self.mu.append(mu), self.prec.append(torch.cholesky_inverse(L))
             self.logdet.append(2 * torch.log(torch.diagonal(L)).sum()), self.logpi.append(np.log(len(h) / len(H)))
