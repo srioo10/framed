@@ -40,7 +40,7 @@ def hits(ds, seed, tag=""):
         a = np.load(run / "adv_meta.npz", allow_pickle=False)
         assert len(a["t_kept"]) == len(z["t"]), "perturbed bank and host meta disagree on kept rows"
         meta = {"src": np.r_[z["src"], np.searchsorted(z["ips"], a["cover_src"])].astype(np.int32),
-                "t": np.r_[a["t_kept"], a["cover_t"]], "fam": np.r_[z["fam"], a["cover_fam"]]}
+                "t": np.r_[a["t_kept"], a["cover_t"]].astype(np.int64), "fam": np.r_[z["fam"], a["cover_fam"]]}
     cal_host = hs.host_split(z["ips"], seed)
     rows, fprs = [], []
     for p in sorted(run.glob("config=outer_*/part.parquet")):

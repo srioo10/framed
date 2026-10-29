@@ -36,7 +36,8 @@ class Perturbed:
         self.n_kept = len(kept)
         self.src_kept = src[kept]
         self.t_kept = t[kept]
-        self.cover_row = self.cover_fam = self.cover_src = self.cover_t = np.empty(0)
+        self.cover_row, self.cover_t = np.empty(0, np.int64), np.empty(0, np.int64)
+        self.cover_fam = self.cover_src = np.empty(0, str)
         if mode == "cover":
             rng = np.random.default_rng([seed, 7])
             attacker = np.unique(src[att])
