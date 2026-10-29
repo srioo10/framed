@@ -62,10 +62,11 @@ def suggest(trial, roster):
     elif g["family"] == "leafnet":
         g["trees"] = pick("trees", [8, 16, 32])
         g["leaves"] = pick("leaves", [8, 16])
-        g["e"] = pick("e", [4, 8])
-        g["w"] = pick("w", [16, 32])
-    heads = ["nlog", "energy", "maha"] + (["min"] if g.get("members", 1) > 1 else [])
-    g["head"] = pick("head", heads)
+        g["le"] = pick("le", [4, 8])
+        g["lw"] = pick("lw", [16, 32])
+    # Optuna needs one fixed choice set per parameter name, so ensembles get their own head gene
+    g["head"] = pick("head_m", ["nlog", "energy", "maha", "min"]) if g.get("members", 1) > 1 \
+        else pick("head", ["nlog", "energy", "maha"])
     g["kd"] = pick("kd", [0.0, 0.5, 0.9])
     g["ls"] = pick("ls", [0.0, 0.1])
     g["focal"] = pick("focal", [0.0, 2.0])
@@ -80,7 +81,7 @@ def build(g, z, seed):
         return fx.Body(enc, din, k, g["w"], g["depth"], g["members"], bool(g["sn"]), g["act"])
     if g["family"] == "node":
         return fx.NODE(Xf.shape[1], k, g["T"], g["D"])
-    return fx.LeafNet(Xf, yf, k, g["trees"], g["leaves"], g["e"], g["w"], seed)
+    return fx.LeafNet(Xf, yf, k, g["trees"], g["leaves"], g["le"], g["lw"], seed)
 
 
 def run_pair(g, z, device, seed, epochs):

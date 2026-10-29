@@ -77,3 +77,15 @@ def test_mini_bowl_end_to_end(tmp_path, monkeypatch):
     assert 0 <= D["champion"]["fitness"] <= 1 and set(D["bosses"]) == {"rf", "xgb"}
     bowl.autopsy(a)
     assert (rd / "autopsy.md").exists()
+
+
+def test_genome_space_is_static_for_optuna(tmp_path):
+    import optuna
+    roster = json.loads((Path(__file__).resolve().parents[1] / "results/bowl/round1/roster.json").read_text())
+    st = optuna.create_study(storage=f"sqlite:///{tmp_path / 's.db'}", sampler=optuna.samplers.RandomSampler(0))
+    for g in roster["seeds"]:
+        st.enqueue_trial(g)
+    st.optimize(lambda t: float(len(bowl.suggest(t, roster))), n_trials=80)  # raises on a dynamic choice set
+    fams = {t.params["family"] for t in st.trials}
+    assert fams == set(roster["families"])
+    assert all(set(g) <= set(st.trials[i].params) for i, g in enumerate(roster["seeds"]))
