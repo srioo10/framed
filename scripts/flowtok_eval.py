@@ -20,7 +20,8 @@ import score_bank as sb  # noqa: E402
 from nids import load  # noqa: E402
 
 DATASETS = ("nf_ugr16", "nf_ctu13", "nf_iot23")
-ARMS = {"flowtok": ["ft_tree", "ft_order0", "ft_mlp", "ft_hc"], "ple": ["ple_ddu", "ple_ce", "clip_ddu"]}  # primary first
+ARMS = {"flowtok": ["ft_tree", "ft_order0", "ft_mlp", "ft_hc"], "ple": ["ple_ddu", "ple_ce", "clip_ddu"],
+        "tabm": ["tabm", "tabm_min", "tabm_mi", "tabm_raw"]}  # primary first
 FT = ARMS["flowtok"]
 BASE = ["rf", "xgb", "kitnet", "mlp_sn_gda"]
 OUT = ROOT / "results" / "flowtok"
@@ -97,7 +98,7 @@ def main():
     R.to_csv(OUT / "measures.csv", index=False)
     V, ok = gate(R)
     T = R.pivot_table(index="detector", columns=["ds", "method"], values="tpr").round(3)
-    L = [f"# {TAG} prototype gate (PREREG §9 {'TOK' if TAG == 'flowtok' else 'PLE'})\n", f"Seed {a.seed}. Macro host-day TPR over held-out families.\n",
+    L = [f"# {TAG} prototype gate (PREREG §9 {TAG.upper().replace('FLOWTOK', 'TOK')})\n", f"Seed {a.seed}. Macro host-day TPR over held-out families.\n",
          T.to_string(), "\n## Gate\n", V.to_string(index=False),
          f"\n**Gate: {'PASS' if ok else 'FAIL'}** (needs >= 2 of 3 datasets)\n"]
     if "fwd_fpr" in R:

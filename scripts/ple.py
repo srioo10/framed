@@ -60,7 +60,7 @@ def fit_models(Xf, yf, Xe, ye, k, bi, seed):
     return out
 
 
-def run_config(bank, held, base_part):
+def run_config(bank, held, base_part, fit_models=fit_models):
     P = (held,)
     fit, es = bank.fit_rows(P)
     known = sorted(set(bank.fam[fit]))
@@ -89,18 +89,18 @@ def run_config(bank, held, base_part):
     return pd.concat(parts, ignore_index=True)
 
 
-def main():
+def main(tag="ple", fit_models=fit_models):
     ap = argparse.ArgumentParser()
     ap.add_argument("dataset")
     ap.add_argument("--seed", type=int, default=1)
     a = ap.parse_args()
     t0 = time.time()
     base = sb.OUT / f"{a.dataset}_host_cap40000_s{a.seed}"
-    out = sb.OUT / f"{a.dataset}_host_cap40000_s{a.seed}_ple"
+    out = sb.OUT / f"{a.dataset}_host_cap40000_s{a.seed}_{tag}"
     bank = sb.Bank(a.dataset, a.seed, "host", 40000, 200000)
     for p in sorted(base.glob("config=outer_*/part.parquet")):
         held = p.parent.name.removeprefix("config=outer_")
-        df = run_config(bank, held, sb.read_part(p, ["row_id", "role"]))
+        df = run_config(bank, held, sb.read_part(p, ["row_id", "role"]), fit_models)
         dest = out / f"config=outer_{held}"
         dest.mkdir(parents=True, exist_ok=True)
         df.to_parquet(dest / "part.parquet", index=False)

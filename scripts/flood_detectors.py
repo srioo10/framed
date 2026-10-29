@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import engine_flood as ef  # noqa: E402
 import host_stream as hs  # noqa: E402
 import ple  # noqa: E402
+import tabm  # noqa: E402
 import score_bank as sb  # noqa: E402
 from nids import hostctx, kitnet, mcde, models  # noqa: E402
 
@@ -48,6 +49,7 @@ def detectors(bank):
     iso = models.iforest(Xb, SEED)
     kit = kitnet.KitNET(SEED).fit(Xb)
     pl = ple.fit_models(Xf, yf, Xe, ye, k, bi, SEED)  # PREREG §9 PLE: ple_ddu, ple_ce, clip_ddu
+    pl.update({a: f for a, f in tabm.fit_models(Xf, yf, Xe, ye, k, bi, SEED).items() if a in ("tabm", "tabm_raw")})
     return {**{a: (lambda d, f=f: f(prep.transform(d))) for a, f in pl.items()},"mlp_ce": lambda d: 1 - models.mlp_proba(mlp, prep.transform(d))[:, bi],
             "mlp_sn_gda": lambda d: gda.score(snm, prep.transform(d)),
             "rf": lambda d: 1 - rf.predict_proba(prep.transform(d))[:, bi],
