@@ -23,7 +23,7 @@ import score_bank as sb  # noqa: E402
 from nids import load  # noqa: E402
 
 DATASETS = ("nf_ugr16", "nf_cic", "nf_ctu13", "nf_iot23", "nf_ton", "nf_bot")
-CANDS = ["tabm", "tabm_min", "tabm_raw", "ple_ce", "lxgb_hc"]
+CANDS = ["tabm", "tabm_min", "tabm_raw", "ple_ce", "lxgb_hc", "tabm_kd", "tabm_kd_min"]
 BASE = ["rf", "xgb", "kitnet", "mlp_sn_gda"]
 TAG, REPS, POWER, MARGIN = "cand", 2000, 10, 0.05
 MIN_UNK, MIN_BEN_FLOWS, MIN_BEN_HOSTS = 100, 1000, 20  # §9 SEL amendment 2: data-only eligibility

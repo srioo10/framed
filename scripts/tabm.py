@@ -36,17 +36,26 @@ def member_ce(z, y):
     return nn.functional.cross_entropy(z.reshape(-1, z.shape[-1]), y.repeat_interleave(z.shape[1]))
 
 
-def train(Xtr, ytr, Xes, yes, k, seed=0, epochs=30):
-    """As models.train_mlp, with the mean member CE as loss and early-stop criterion."""
+def member_kd(z, soft, T):
+    """As models.train_mlp KD: KL to teacher probabilities re-tempered at T, averaged over members."""
+    t = torch.softmax(torch.log(soft + 1e-8) / T, 1)
+    lp = torch.log_softmax(z / T, -1)
+    return nn.functional.kl_div(lp.reshape(-1, z.shape[-1]), t.repeat_interleave(z.shape[1], 0),
+                                reduction="batchmean") * T * T
+
+
+def train(Xtr, ytr, Xes, yes, k, seed=0, epochs=30, soft=None, T=4.0):
+    """As models.train_mlp, with the mean member CE (or member KD when `soft` is given) as loss; early stop on CE."""
     torch.manual_seed(seed)
     m = TabMMini(Xtr.shape[1], k, seed=seed)
     opt = torch.optim.Adam(m.parameters(), lr=1e-3)
     Xt, yt, Xv, yv = map(torch.from_numpy, (Xtr, ytr, Xes, yes))
+    St = None if soft is None else torch.from_numpy(soft.astype(np.float32))
     best, state, g = np.inf, None, torch.Generator().manual_seed(seed)
     for _ in range(epochs):
         m.train()
         for b in torch.randperm(len(yt), generator=g).split(512):
-            loss = member_ce(m(Xt[b]), yt[b])
+            loss = member_ce(m(Xt[b]), yt[b]) if St is None else member_kd(m(Xt[b]), St[b], T)
             opt.zero_grad()
             loss.backward()
             opt.step()

@@ -36,6 +36,22 @@ class Encoder:
         return E.reshape(len(X), -1).astype(np.float32)
 
 
+class TreeEncoder(Encoder):
+    """Encoder with target-aware edges (Gorishniy et al. NeurIPS'22 PLE-T): per feature, the split thresholds of a
+    16-leaf tree on that feature alone; padded with the feature max (zero-width bins act as steps)."""
+
+    def fit(self, X, y, seed=0):
+        from sklearn.tree import DecisionTreeClassifier
+        b = []
+        for j in range(X.shape[1]):
+            dt = DecisionTreeClassifier(max_leaf_nodes=BINS, min_samples_leaf=max(10, len(X) // 1000), random_state=seed)
+            t = dt.fit(X[:, j:j + 1], y).tree_
+            e = np.r_[X[:, j].min(), np.sort(t.threshold[t.feature >= 0]), X[:, j].max()]
+            b.append(np.pad(e, (0, BINS + 1 - len(e)), mode="edge"))
+        self.b = np.array(b, np.float32)
+        return self
+
+
 class Clip:
     def fit(self, X):
         self.lo, self.hi = np.quantile(X, [0.001, 0.999], axis=0)

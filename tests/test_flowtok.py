@@ -53,3 +53,14 @@ def test_ple_bounded_and_saturating():  # PREREG §9 PLE: encoding stays in [0, 
     E = e.transform(np.r_[X, big])
     assert E.min() >= 0 and E.max() <= 1
     assert np.array_equal(E[-2], E[-1])  # a spoofed huge value encodes like the largest training value
+
+
+def test_tree_encoder_bounded_and_target_aware():  # §9 SEL amendment 3: edges sit at the class boundary
+    from ple import TreeEncoder
+    rng = np.random.default_rng(0)
+    x = rng.uniform(0, 10, (2000, 1)).astype(np.float32)
+    y = (x[:, 0] > 7.3).astype(int)
+    e = TreeEncoder().fit(x, y)
+    assert np.min(np.abs(e.b[0] - 7.3)) < 0.05
+    E = e.transform(np.r_[x, [[1e9]]].astype(np.float32))
+    assert E.min() >= 0 and E.max() <= 1
