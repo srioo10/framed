@@ -42,3 +42,14 @@ def test_spoof_invariance():  # T2: flows from other source keys never change a 
     C0, _ = contexts(tok, src, t, np.ones(len(tok), bool), V)
     C1, _ = contexts(tok2, src2, t2, np.ones(len(tok2), bool), V)
     assert np.array_equal(C0, C1[:len(tok)])
+
+
+def test_ple_bounded_and_saturating():  # PREREG §9 PLE: encoding stays in [0, 1] and saturates past the fit range
+    from ple import Encoder
+    rng = np.random.default_rng(0)
+    X = np.c_[rng.normal(size=500), rng.integers(0, 3, 500)].astype(np.float32)
+    e = Encoder().fit(X)
+    big = np.array([[1e9, 1e9], [X[:, 0].max(), 2]], np.float32)
+    E = e.transform(np.r_[X, big])
+    assert E.min() >= 0 and E.max() <= 1
+    assert np.array_equal(E[-2], E[-1])  # a spoofed huge value encodes like the largest training value

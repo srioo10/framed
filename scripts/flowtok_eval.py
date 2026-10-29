@@ -1,9 +1,9 @@
-"""FlowTok prototype gate (PREREG §9 TOK). Reads FlowTok parts and the base bank parts of the same seed (rows joined by
+"""Prototype gate (PREREG §9 TOK / PLE). Reads prototype parts and the base bank parts of the same seed (rows joined by
 (row_id, role)); no training.
 
 Macro host-day TPR over held-out families (host_stream.fold, 1% budget); per detector the better of P / A. nf_ugr16:
 families with July week 5 and August rows only; forward benign FPR with host-bootstrap CI (forward.py).
-Usage: .venv/bin/python scripts/flowtok_eval.py [--seed 1]
+Usage: .venv/bin/python scripts/flowtok_eval.py [--seed 1] [--tag flowtok|ple]
 """
 import argparse
 import sys
@@ -20,9 +20,11 @@ import score_bank as sb  # noqa: E402
 from nids import load  # noqa: E402
 
 DATASETS = ("nf_ugr16", "nf_ctu13", "nf_iot23")
-FT = ["ft_tree", "ft_order0", "ft_mlp", "ft_hc"]
+ARMS = {"flowtok": ["ft_tree", "ft_order0", "ft_mlp", "ft_hc"], "ple": ["ple_ddu", "ple_ce", "clip_ddu"]}  # primary first
+FT = ARMS["flowtok"]
 BASE = ["rf", "xgb", "kitnet", "mlp_sn_gda"]
 OUT = ROOT / "results" / "flowtok"
+TAG = "flowtok"
 
 
 def evaluate(ds, seed):
@@ -35,7 +37,7 @@ def evaluate(ds, seed):
         both = set(w.family[w.src == "july_week5"]) & set(w.family[w.src.str.startswith("august")])
     run = sb.OUT / f"{ds}_host_cap40000_s{seed}"
     rows, fwd = [], {}
-    for p in sorted((sb.OUT / f"{run.name}_flowtok").glob("config=outer_*/part.parquet")):
+    for p in sorted((sb.OUT / f"{run.name}_{TAG}").glob("config=outer_*/part.parquet")):
         held = p.parent.name.removeprefix("config=outer_")
         if both is not None and held not in both:
             continue
@@ -68,7 +70,7 @@ def gate(R):
     for ds in DATASETS:
         if ds not in best.index.get_level_values(0):
             continue
-        f = best.loc[(ds, "ft_tree")]
+        f = best.loc[(ds, FT[0])]
         mb = max(best.loc[(ds, b)].tpr for b in BASE)
         tpr_ok = f.tpr >= mb - 0.05
         if ds == "nf_ugr16":
@@ -76,7 +78,7 @@ def gate(R):
         else:
             fpr_ok = f.fpr <= R[(R.ds == ds) & R.detector.isin(BASE) & (R.method == f.method)].fpr.max()
         passes += bool(tpr_ok and fpr_ok)
-        verdict.append({"ds": ds, "ft_tree_tpr": f.tpr, "method": f.method, "max_baseline_tpr": mb, "tpr_ok": tpr_ok,
+        verdict.append({"ds": ds, f"{FT[0]}_tpr": f.tpr, "method": f.method, "max_baseline_tpr": mb, "tpr_ok": tpr_ok,
                         "fpr_ok": fpr_ok, **({"fwd_fpr_hi": f.fwd_hi} if ds == "nf_ugr16" else {"fpr": f.fpr})})
     return pd.DataFrame(verdict), passes >= 2
 
@@ -84,15 +86,18 @@ def gate(R):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--tag", default="flowtok", choices=list(ARMS))
     a = ap.parse_args()
+    global FT, TAG, OUT
+    FT, TAG, OUT = ARMS[a.tag], a.tag, ROOT / "results" / a.tag
     OUT.mkdir(parents=True, exist_ok=True)
     R = pd.concat([evaluate(ds, a.seed) for ds in DATASETS
-                   if (sb.OUT / f"{ds}_host_cap40000_s{a.seed}_flowtok" / "manifest_outer.json").exists()],
+                   if (sb.OUT / f"{ds}_host_cap40000_s{a.seed}_{TAG}" / "manifest_outer.json").exists()],
                   ignore_index=True)
     R.to_csv(OUT / "measures.csv", index=False)
     V, ok = gate(R)
     T = R.pivot_table(index="detector", columns=["ds", "method"], values="tpr").round(3)
-    L = ["# FlowTok prototype gate (PREREG §9 TOK)\n", f"Seed {a.seed}. Macro host-day TPR over held-out families.\n",
+    L = [f"# {TAG} prototype gate (PREREG §9 {'TOK' if TAG == 'flowtok' else 'PLE'})\n", f"Seed {a.seed}. Macro host-day TPR over held-out families.\n",
          T.to_string(), "\n## Gate\n", V.to_string(index=False),
          f"\n**Gate: {'PASS' if ok else 'FAIL'}** (needs >= 2 of 3 datasets)\n"]
     if "fwd_fpr" in R:
