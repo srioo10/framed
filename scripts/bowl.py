@@ -230,6 +230,7 @@ def autopsy(a):
 
 
 def main():
+    global OUT
     ap = argparse.ArgumentParser()
     ap.add_argument("cmd", choices=["fight", "death", "autopsy"])
     ap.add_argument("--round", type=int, required=True)
@@ -238,8 +239,11 @@ def main():
     ap.add_argument("--threads", type=int, default=2)
     ap.add_argument("--device", default="auto")
     ap.add_argument("--arena", type=Path, default=ARENA)
-    ap.add_argument("--storage", default=f"sqlite:///{OUT / 'bowl.db'}")
+    ap.add_argument("--out", type=Path, default=OUT)  # noqa: F823
+    ap.add_argument("--storage", default=None)
     a = ap.parse_args()
+    OUT = a.out
+    a.storage = a.storage or f"sqlite:///{OUT / 'bowl.db'}"
     if a.device == "auto":
         import torch
         a.device = "cuda" if torch.cuda.is_available() else "cpu"
