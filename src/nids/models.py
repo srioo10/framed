@@ -149,8 +149,19 @@ def xgb(seed):
 
 
 def oof_proba(X, y, seed):
-    """3-fold out-of-fold XGB probabilities on the training rows (KD soft labels, tail weights)."""
-    return cross_val_predict(xgb(seed), X, y, cv=3, method="predict_proba")
+    """3-fold out-of-fold XGB probabilities on the training rows (KD soft labels, tail weights). When a class is too
+    rare to appear in every fold's training part, each fold is fit on its present classes (relabelled contiguously)
+    and the absent class gets probability 0 there."""
+    k = int(y.max()) + 1
+    if np.bincount(y, minlength=k).min() >= 3:
+        return cross_val_predict(xgb(seed), X, y, cv=3, method="predict_proba")
+    from sklearn.model_selection import StratifiedKFold
+    out = np.zeros((len(y), k))
+    for tr, te in StratifiedKFold(3).split(X, y):
+        present = np.unique(y[tr])
+        m = xgb(seed).fit(X[tr], np.searchsorted(present, y[tr]))
+        out[np.ix_(te, present)] = m.predict_proba(X[te])
+    return out
 
 
 def xgb_tail(X, y, benign, seed, q=0.97, weight=8.0):
