@@ -30,7 +30,7 @@ typedef struct { int64_t id[B10]; float v[B10][NS]; int64_t id2[B120]; float v2[
                  int32_t port[TAB]; uint64_t peer[TAB]; int64_t tport[TAB], tpeer[TAB]; } Side;
 typedef struct { uint64_t key; int64_t last; Side s[2]; double S, Smin; int64_t day; int alarmed, palarm; } Host;
 
-static Host *tab; static size_t cap; static long evictions;
+static Host *tab; static size_t cap; static long evictions; static FILE *evlog;
 
 static uint64_t fnv(const char *p) { uint64_t h = 1469598103934665603ULL; while (*p) h = (h ^ (uint8_t)*p++) * 1099511628211ULL; return h ? h : 1; }
 
@@ -42,6 +42,7 @@ static Host *get(uint64_t key, int64_t t, const Host *keep) { /* keep: an entry 
     if (&tab[i] != keep && (stale == SIZE_MAX || tab[i].last < tab[stale].last)) stale = i;
   }
   evictions++;
+  if (evlog) fprintf(evlog, "%llu %lld\n", (unsigned long long)tab[stale].key, (long long)t);
 fresh:
   memset(&tab[stale], 0, sizeof(Host));
   tab[stale].key = key; tab[stale].last = t; tab[stale].day = -1;
@@ -138,7 +139,8 @@ int main(int argc, char **argv) {
     else if (!strcmp(argv[i], "--hosts") && i + 1 < argc) hosts = atol(argv[++i]);
     else if (!strcmp(argv[i], "--on-alarm") && i + 1 < argc) hook = argv[++i];
     else if (!strcmp(argv[i], "--hc")) dump = 1;
-    else { fprintf(stderr, "usage: onepass [--model F] [--hosts N] [--on-alarm 'cmd %%s'] [--hc] < flows.csv\n"); return 2; }
+    else if (!strcmp(argv[i], "--evict-log") && i + 1 < argc) evlog = fopen(argv[++i], "w");
+    else { fprintf(stderr, "usage: onepass [--model F] [--hosts N] [--on-alarm 'cmd %%s'] [--hc] [--evict-log F] < flows.csv\n"); return 2; }
   }
   load(model);
   for (cap = 1; cap < (size_t)hosts; cap <<= 1) {}
