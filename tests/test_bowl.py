@@ -59,7 +59,6 @@ def test_binmap_and_periodic_shapes():
 
 def test_mini_bowl_end_to_end(tmp_path, monkeypatch):
     fake_arena(tmp_path / "arena")
-    monkeypatch.setattr(bowl, "ARENA", tmp_path / "arena")
     monkeypatch.setattr(bowl, "OUT", tmp_path / "bowl")
     monkeypatch.setattr(bowl, "RATIO_MAX", 1e6)  # toy boss is tiny; the limit itself is tested via set_constraint
     rd = tmp_path / "bowl" / "round1"

@@ -37,7 +37,7 @@ def load_pairs(arena_dir, cheap, seed=0):
             if cheap and len(z["y_fit"]) > 40_000:
                 i = np.sort(np.random.default_rng(seed).choice(len(z["y_fit"]), 40_000, replace=False))
                 z["X_fit"], z["y_fit"], z["teacher"] = z["X_fit"][i], z["y_fit"][i], z["teacher"][i]
-            z["ds"], z["name"], z["bi"] = ds, f.stem, int(z["bi"])
+            z["ds"], z["name"], z["bi"], z["dir"] = ds, f.stem, int(z["bi"]), f.parent
             z["k"] = z["teacher"].shape[1]
             P.append(z)
     return P
@@ -96,7 +96,7 @@ def run_pair(g, z, device, seed, epochs):
 def boss_time(z):
     import xgboost as xgb
     b = xgb.XGBClassifier()
-    b.load_model(ARENA / z["ds"] / "boss_xgb.json")
+    b.load_model(z["dir"] / "boss_xgb.json")
     b.set_params(n_jobs=1)
     return fx.time_per_row(lambda X: b.predict_proba(X), z["X_cal"][:4096])
 

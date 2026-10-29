@@ -23,7 +23,7 @@ shutil.copytree(f"{src}/bowl", "/kaggle/working/bowl", dirs_exist_ok=True)
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", "optuna==5.0.0"], check=True)
 for cmd in ("fight", "death"):
     subprocess.run([sys.executable, "/kaggle/working/code/bowl.py", cmd, "--round", "{r}", "--trials", "{t}",
-                    "--arena", f"{src}/arena", "--out", "/kaggle/working/bowl", "--jobs", "2", "--threads", "2"],
+                    "--arena", f"{src}/arena", "--out", "/kaggle/working/bowl", "--jobs", "1", "--threads", "4"],
                    check=True)
 '''
 
@@ -54,6 +54,7 @@ def push(a):
         sh("datasets", "version", "-p", str(data), "-m", f"round {a.round}", "-r", "zip", "-q")
     else:
         sh("datasets", "create", "-p", str(data), "-r", "zip", "-q")  # private by default
+    time.sleep(90)  # "ready" can still describe the previous version right after `datasets version`
     for _ in range(60):  # a kernel pushed before the dataset is ready gets no data source
         st = subprocess.run([KAGGLE, "datasets", "status", f"{u}/bigp-arena"], capture_output=True, text=True).stdout
         if "ready" in st.lower():
