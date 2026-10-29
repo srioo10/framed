@@ -15,8 +15,6 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
-import score_bank as sb  # noqa: E402
-from nids import models  # noqa: E402
 
 BINS = 16
 
@@ -63,6 +61,7 @@ class Clip:
 
 def fit_models(Xf, yf, Xe, ye, k, bi, seed, **_):
     """{arm: score(X prepped)} for the three arms."""
+    from nids import models
     out = {}
     for name, enc in (("ple", Encoder()), ("clip", Clip())):
         enc.fit(Xf)
@@ -77,6 +76,8 @@ def fit_models(Xf, yf, Xe, ye, k, bi, seed, **_):
 
 
 def run_config(bank, held, base_part, fit_models=fit_models):
+    import score_bank as sb
+    from nids import models
     P = (held,)
     fit, es = bank.fit_rows(P)
     known = sorted(set(bank.fam[fit]))
@@ -108,6 +109,7 @@ def run_config(bank, held, base_part, fit_models=fit_models):
 
 
 def main(tag="ple", fit_models=fit_models):
+    import score_bank as sb
     ap = argparse.ArgumentParser()
     ap.add_argument("dataset")
     ap.add_argument("--seed", type=int, default=1)

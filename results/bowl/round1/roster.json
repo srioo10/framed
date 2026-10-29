@@ -1,0 +1,10 @@
+{"families": ["mlp", "tabm", "node", "leafnet"], "population": 32,
+ "seeds": [
+  {"family": "tabm", "enc": "tree", "e": 4, "w": 64, "depth": 2, "sn": 0, "act": "relu", "members": 4, "head": "min", "kd": 0.9, "ls": 0.0, "focal": 0.0, "lr": 0.001},
+  {"family": "mlp", "enc": "periodic", "e": 4, "w": 64, "depth": 2, "sn": 0, "act": "selu", "head": "nlog", "kd": 0.0, "ls": 0.1, "focal": 0.0, "lr": 0.003},
+  {"family": "node", "T": 32, "D": 4, "head": "nlog", "kd": 0.5, "ls": 0.0, "focal": 0.0, "lr": 0.003},
+  {"family": "leafnet", "trees": 16, "leaves": 16, "e": 8, "w": 32, "head": "nlog", "kd": 0.0, "ls": 0.0, "focal": 0.0, "lr": 0.003},
+  {"family": "mlp", "enc": "raw", "e": 2, "w": 64, "depth": 2, "sn": 1, "act": "relu", "head": "maha", "kd": 0.0, "ls": 0.0, "focal": 0.0, "lr": 0.001},
+  {"family": "mlp", "enc": "quantile", "e": 4, "w": 64, "depth": 2, "sn": 0, "act": "relu", "head": "nlog", "kd": 0.0, "ls": 0.0, "focal": 0.0, "lr": 0.001},
+  {"family": "mlp", "enc": "tree", "e": 4, "w": 32, "depth": 2, "sn": 0, "act": "relu", "head": "nlog", "kd": 0.9, "ls": 0.0, "focal": 0.0, "lr": 0.003}
+ ]}

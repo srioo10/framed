@@ -18,6 +18,7 @@ import pyarrow.parquet as pq
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import discover  # noqa: E402
+from roc import roc_detect  # noqa: E402,F401
 import host_stream as hs  # noqa: E402
 import score_bank as sb  # noqa: E402
 from nids import load  # noqa: E402
@@ -34,12 +35,6 @@ def flow_threshold(s, cal_benign):
     return np.quantile(s[cal_benign], 0.99)
 
 
-def roc_detect(s, benign, fpr=0.01):
-    """Per-flow detection weight at exactly `fpr` on the benign flows: 1 above the threshold, a shared fraction on
-    ties at it (randomised-threshold ROC point), 0 below."""
-    q = np.quantile(s[benign], 1 - fpr)
-    above, tie = (s[benign] > q).mean(), (s[benign] == q).mean()
-    return (s > q) + (s == q) * (max(fpr - above, 0) / tie if tie > 0 else 0)
 
 
 def per_host(ds, seed, dets):
