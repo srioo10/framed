@@ -107,9 +107,10 @@ def fold(part, s, meta, cal_host, held, unit="day"):
     st_cal = stats(key[m_cal], t[rid][m_cal], s[m_cal], ref)
     th = {m: threshold(day_max(ukey[m_cal], st_cal[m])) for m in METHODS}
     # test streams: all test rows; benign host-days of test hosts and attacker host-days of the held-out family
-    m_te = np.isin(role, ["test_benign", "test_known", "test_unknown"])
+    m_te = np.isin(role, ["test_benign", "test_known", "test_unknown", "test_cover"])
     st = stats(key[m_te], t[rid][m_te], s[m_te], ref)
     k_te, unk = ukey[m_te], role[m_te] == "test_unknown"
+    att = unk | (role[m_te] == "test_cover")  # ADV cover flows from the attacker count for its host-day
     bt = (role[m_te] == "test_benign") & ~cal_host[h[m_te]] & benign_host[h[m_te]]
     res = {"fold": held, "n_ref": int(len(ref)), "n_cal_days": int(len(np.unique(ukey[m_cal])))}
     bkeys = np.unique(k_te[bt])
@@ -129,7 +130,7 @@ def fold(part, s, meta, cal_host, held, unit="day"):
         alarm = v > th[m] if m != "AV" else v > 0
         fp = pd.Series(alarm[bt]).groupby(k_te[bt]).any()
         res[f"fpr_{m}"] = float(fp.mean())
-        hit = pd.Series(alarm[unk]).groupby(k_te[unk]).any().reindex(akeys).to_numpy()
+        hit = pd.Series(alarm[att]).groupby(k_te[att]).any().reindex(akeys).to_numpy()
         det[m] = hit
         res[f"tpr_{m}"] = float(hit.mean())
         res[f"tpr_clean_{m}"] = float(hit[clean_day].mean()) if clean_day.any() else float("nan")

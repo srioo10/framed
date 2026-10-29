@@ -31,17 +31,25 @@ OUT = ROOT / "results" / "discover"
 RELABEL = ROOT / "data" / "processed" / "nf_cic_relabel.npz"
 
 
-def hits(ds, seed):
+def hits(ds, seed, tag=""):
+    """tag: suffix of an ADV perturbed bank (e.g. "_dilate10"); its adv_meta.npz replaces times and adds cover flows."""
     z = np.load(ROOT / "data" / "processed" / f"{ds}_hostmeta.npz", allow_pickle=False)
     meta = {"src": z["src"], "t": z["t"], "fam": z["fam"]}
+    run = sb.OUT / f"{ds}_host_cap40000_s{seed}{tag}"
+    if (run / "adv_meta.npz").exists():
+        a = np.load(run / "adv_meta.npz", allow_pickle=False)
+        assert len(a["t_kept"]) == len(z["t"]), "perturbed bank and host meta disagree on kept rows"
+        meta = {"src": np.r_[z["src"], np.searchsorted(z["ips"], a["cover_src"])].astype(np.int32),
+                "t": np.r_[a["t_kept"], a["cover_t"]], "fam": np.r_[z["fam"], a["cover_fam"]]}
     cal_host = hs.host_split(z["ips"], seed)
     rows, fprs = [], []
-    for p in sorted((sb.OUT / f"{ds}_host_cap40000_s{seed}").glob("config=outer_*/part.parquet")):
+    for p in sorted(run.glob("config=outer_*/part.parquet")):
         held = p.parent.name.removeprefix("config=outer_")
         dets = [d for d in DETECTORS if d in pq.read_schema(p).names]
         part = sb.read_part(p, ["row_id", "role", "family"] + dets)
         if ds == "nf_cic":
-            part = part[~np.load(RELABEL)["drop"][part.row_id.to_numpy()]].reset_index(drop=True)
+            drop, r = np.load(RELABEL)["drop"], part.row_id.to_numpy()
+            part = part[~(r < len(drop)) | ~drop[np.minimum(r, len(drop) - 1)]].reset_index(drop=True)  # ADV cover rows kept
         rid = part.row_id.to_numpy()
         unk = part.role.to_numpy() == "test_unknown"
         if not unk.any():

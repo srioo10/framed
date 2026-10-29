@@ -32,11 +32,12 @@ import pyarrow.parquet as pq
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from nids import clean, hostctx, kitnet, load, mcde, models, split, windows  # noqa: E402
+from nids import adversary, clean, hostctx, kitnet, load, mcde, models, split, windows  # noqa: E402
 
 OUT = Path(os.environ.get("NIDS_BANK_DIR", "/home/srioo/Desktop/Projects/root/BigP/runs/bank"))
 EXTRA = {"ciciot_csv": [("Flood", "Mirai"), ("DoS",), ("DDoS",)]}  # joint unseen-family; two attack-type hold-outs
 LEAN = os.environ.get("NIDS_LEAN") == "1"  # skip KD / tail / MCDE extras (not used by DISC)
+PERTURB = os.environ.get("NIDS_PERTURB")  # PREREG §9 ADV: "dilate:k" or "cover:r", test-time host context only
 SEP = "__"  # family names contain "+", so configs are joined with SEP
 
 
@@ -64,7 +65,7 @@ def role_removal(P, role, R0=None):
     if role == "pseudo":
         assert R0 is not None and set(R0) < set(P)
         return tuple(R0)
-    if role in ("test_benign", "test_unknown", "test_known"):
+    if role in ("test_benign", "test_unknown", "test_known", "test_cover"):
         return ()
     raise ValueError(role)
 
@@ -121,10 +122,11 @@ class Bank:
         if self.flows is not None:
             self.raw_fam = self.flows.family
         df, rep = clean.clean(raw, ds)
-        del raw
         self.kept = rep["kept_rows"]
         if self.host is not None:
             self.host.keep = self.kept
+        self.adv = adversary.Perturbed(raw, PERTURB, seed, self.kept) if PERTURB and self.host is not None else None
+        del raw
         self.df = df
         self.fam = df["family"].astype(str).to_numpy()
         self.fine = fine_family(df, ds)
@@ -148,16 +150,29 @@ class Bank:
     def removed(self, rows, R):
         return np.isin(self.fam[rows], list(R)) | np.isin(self.fine[rows], list(R))
 
-    def frame(self, rows, R):
-        """Feature frame for `rows`, with causal ct_* computed against all flows minus families R."""
-        X = self.df.iloc[rows][self.feats].reset_index(drop=True)
+    def frame(self, rows, R, adv=False, cover=None):
+        """Feature frame for `rows`, with causal ct_* computed against all flows minus families R.
+        adv: host context from the perturbed population (ADV); cover: indices of ADV cover flows instead of rows."""
+        X = self.df.iloc[rows if cover is None else self.adv.cover_row[cover]][self.feats].reset_index(drop=True)
         if self.variant in ("ct_causal", "ct_causal_all"):
             pop = ~np.isin(self.raw_fam, [] if self.variant == "ct_causal_all" else list(R))
             X[list(windows.KEYS)] = self.flows.features(pop, self.kept[rows])
         if self.host is not None:  # host: removal-set population (deployable); host_iso: Benign + own family
-            H = self.host.isolated() if self.variant == "host_iso" else self.host.removal(R)
-            X[hostctx.COLS] = H[rows]  # H is already restricted to the kept rows
+            host = self.adv.host if adv and self.adv is not None else self.host
+            H = host.isolated() if self.variant == "host_iso" else host.removal(R)
+            X[hostctx.COLS] = H[rows] if cover is None else H[self.adv.n_kept + cover]  # H holds kept (+ cover) rows
         return X
+
+    def cover_rows(self, unk, R0):
+        """ADV cover flows of the held-out attackers, kept at each attacker's scored share of its own flows (the test
+        split scores a capped sample of the attack, so cover is thinned the same way)."""
+        a = self.adv
+        held = np.isin(self.fam, list(R0)) | np.isin(self.fine, list(R0))
+        n_all = pd.Series(a.src_kept[held]).value_counts()
+        n_scored = pd.Series(a.src_kept[unk]).value_counts()
+        share = (n_scored / n_all).reindex(a.cover_src).fillna(0).to_numpy()
+        c = np.isin(a.cover_fam, list(R0)) & (np.random.default_rng([self.seed, 11]).random(len(a.cover_src)) < share)
+        return np.flatnonzero(c)
 
     def configs(self, kind, extra):
         outer = [(f,) for f in self.families] + (EXTRA.get(self.ds, []) if extra else [])
@@ -227,17 +242,18 @@ class Bank:
             extra["mcde"] = self.fit_mcde(dfit, yf != bi, dben)
         del dben
 
-        def score(rows, role, R0=None):
+        def score(rows, role, R0=None, cover=False):
             if len(rows) == 0:  # a tiny family can have no rows in a role (CTU-13 Sogou)
                 return pd.DataFrame()
-            d = self.frame(rows, role_removal(P, role, R0))
+            d = self.frame(rows, role_removal(P, role, R0), adv=role.startswith("test"), cover=rows if cover else None)
             served_fold = SEP.join(R0) if R0 else ""
             X = prep.transform(d)
             prf, pxg, pml = rf.predict_proba(X), xg.predict_proba(X), models.mlp_proba(mlp, X)
             xb = bprep.transform(d)
             dist, mode = modes.score(xb)
-            cols = {"row_id": rows.astype(np.int64), "role": role, "served": served_fold,
-                    "family": self.fam[rows], "fine": self.fine[rows],
+            fam = self.adv.cover_fam[rows] if cover else self.fam[rows]
+            cols = {"row_id": (self.adv.n_kept + rows if cover else rows).astype(np.int64), "role": role,
+                    "served": served_fold, "family": fam, "fine": fam if cover else self.fine[rows],
                     "rf": 1 - prf[:, bi], "xgb": 1 - pxg[:, bi], "mlp_ce": 1 - pml[:, bi],
                     "mlp_ce_int8": 1 - models.mlp_proba(mlp8, X)[:, bi],
                     "mlp_sn": 1 - models.mlp_proba(snm, X)[:, bi], "mlp_sn_gda": gda.score(snm, X),
@@ -264,6 +280,8 @@ class Bank:
             unk = np.sort(np.concatenate([r[self.removed(r, R0)] for r in self.test.values()]))
             kn = np.sort(np.concatenate([r[~self.removed(r, R0)] for r in self.test.values()]))
             parts += [score(self.test_benign, "test_benign"), score(unk, "test_unknown"), score(kn, "test_known")]
+            if self.adv is not None and len(self.adv.cover_row):
+                parts.append(score(self.cover_rows(unk, R0), "test_cover", cover=True))
         else:
             for R0, j in served:
                 rows = np.sort(np.concatenate([self.cap[f] for f in self.families] +
@@ -325,10 +343,12 @@ def main():
     variant = a.variant if a.dataset == "unsw_raw" or a.dataset.startswith("nf_") and a.variant.startswith("host") \
         else "none"
     bank = Bank(a.dataset, a.seed, variant, a.cap, a.bcap)
-    run = a.out / f"{a.dataset}_{variant}_cap{a.cap}_s{a.seed}"
+    run = a.out / f"{a.dataset}_{variant}_cap{a.cap}_s{a.seed}{'_' + PERTURB.replace(':', '') if PERTURB else ''}"
     if a.patch_mcde:
         return patch_mcde(bank, run)
     run.mkdir(parents=True, exist_ok=True)
+    if bank.adv is not None:
+        np.savez_compressed(run / "adv_meta.npz", **bank.adv.meta())
     cfgs = bank.configs(a.kind, a.extra)
     n_scored = sum(len(bank.rank) + len(bank.cal) + (len(bank.test_benign) + sum(map(len, bank.test.values()))
                                                      if k == "outer" else 60_000 * len(s)) for k, _, s in cfgs)
