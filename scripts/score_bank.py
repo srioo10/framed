@@ -134,7 +134,7 @@ class Bank:
         self.feats = clean.feature_columns(df)
         if variant == "ct_drop":
             self.feats = [c for c in self.feats if c not in windows.KEYS]
-        tr, va, te = split.grouped_split(df, seed)
+        tr, va, te = split.forward_split(df, seed) if ds == "nf_ugr16" else split.grouped_split(df, seed)
         self.families = sorted(set(self.fam) - {"Benign"})
         b = self.fam == "Benign"
         self.cap = {f: cap_by_block(tr[self.fam[tr] == f], self.groups, cap, rng) for f in ["Benign"] + self.families}
@@ -329,7 +329,7 @@ def patch_mcde(bank, run):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("dataset", choices=["unsw_raw", "ciciot_csv", "unsw_official", "nf_unsw", "nf_ton", "nf_bot", "nf_cic", "nf_ctu13", "nf_iot23"])
+    ap.add_argument("dataset", choices=["unsw_raw", "ciciot_csv", "unsw_official", "nf_unsw", "nf_ton", "nf_bot", "nf_cic", "nf_ctu13", "nf_iot23", "nf_ugr16"])
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--variant", default="ct_causal",
                     choices=["ct_causal", "ct_causal_all", "ct_orig", "ct_drop", "none", "host", "host_iso", "host_perm"])

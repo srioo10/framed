@@ -22,7 +22,7 @@ LEAK_COLS = {
            # of the sending stack (52 B benign Linux TCP with options vs 40 B attack generator in nf_unsw) and the
            # max TCP window is a per-tool constant (16383 for 98% of nf_unsw attacks); alone they give 0.86-0.998
            # TPR@1%FPR for all attacks pooled
-           "MIN_IP_PKT_LEN", "SHORTEST_FLOW_PKT", "TCP_WIN_MAX_IN", "TCP_WIN_MAX_OUT"] for n in ("nf_unsw", "nf_ton", "nf_bot", "nf_cic", "nf_ctu13", "nf_iot23")},
+           "MIN_IP_PKT_LEN", "SHORTEST_FLOW_PKT", "TCP_WIN_MAX_IN", "TCP_WIN_MAX_OUT"] for n in ("nf_unsw", "nf_ton", "nf_bot", "nf_cic", "nf_ctu13", "nf_iot23", "nf_ugr16")},
 }
 
 

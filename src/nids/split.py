@@ -23,6 +23,20 @@ def grouped_split(df, seed):
     return rest[tr], rest[va], te
 
 
+def forward_split(df, seed, train=("june_week3", "june_week4"), attack=("july_week5",),
+                  test=("august_week1", "august_week2")):
+    """PREREG §9 FWD: benign of `train` weeks and attacks of `attack` weeks form train + val (grouped 75/25 as in
+    grouped_split); test = every row of `test` weeks. Other rows (July benign) are unused."""
+    wk, ben = df["src"].astype(str).to_numpy(), df["family"].astype(str).to_numpy() == "Benign"
+    rest = np.flatnonzero((np.isin(wk, train) & ben) | (np.isin(wk, attack) & ~ben))
+    te = np.flatnonzero(np.isin(wk, test))
+    y = pd.factorize(df["y"], sort=True)[0]
+    g = df["group"].to_numpy()
+    tr, va = next(islice(StratifiedGroupKFold(4, shuffle=True, random_state=0).split(rest, y[rest], g[rest]),
+                         seed % 4, None))
+    return rest[tr], rest[va], te
+
+
 def lofo(df, splits, held):
     """Leave-one-family-out: drop `held` from train and val; test is unchanged."""
     if held == "Benign":

@@ -348,8 +348,69 @@ def iot23():
     return _cached("nf_iot23", build)
 
 
+UGR_WEEKS = ("june_week3", "june_week4", "july_week5", "august_week1", "august_week2")
+_UGR_OCT = {"42.219.150": (246, 247, 243, 242, 241), "42.219.156": (30, 31, 29, 28, 27),
+            "42.219.158": (16, 17, 18, 19, 21), "42.219.152": (20, 21, 22, 23, 18), "42.219.154": (69, 68, 70, 71, 66)}
+UGR_KEY = np.array([f"{p}.{o}" for p, os_ in _UGR_OCT.items() for o in os_])  # attackers A1-A5 + victims (Table V)
+UGR_HASH = "ugr16-fwd-0001xx"  # 16-byte key: the seeded source-IP sample of PREREG §9 FWD
+
+
+def _ugr_hash(ips):
+    return pd.util.hash_array(np.asarray(ips, dtype=object), hash_key=UGR_HASH)
+
+
+def ugr16():
+    """UGR'16 forward-time weeks (PREREG §9 FWD): 0.1% hash sample of source IPs, every flow touching an attacker or
+    victim, every flow of a 5% hash sample of sources with a real-anomaly label; blacklist dropped, background =
+    Benign. Unidirectional NetFlow: OUT_BYTES = 0, OUT_PKTS = 1 if TCP ACK is set or not TCP. src = week name."""
+    import pyarrow as pa
+    import pyarrow.compute as pc
+    import pyarrow.parquet as pq
+
+    cols = ["src_ip", "dst_ip", "ts_start", "label_attack", "l4_proto", "src_port", "dst_port", "duration", "packets",
+            "bytes", "tcp_flags"]
+
+    def build():
+        files = {w: pq.ParquetFile(RAW / "ugr16" / f"{w}.parquet") for w in UGR_WEEKS}
+        anom = set()  # pass 1: sources of real-anomaly labels
+        for f in files.values():
+            for i in range(f.num_row_groups):
+                g = f.read_row_group(i, columns=["src_ip", "label_attack"])
+                m = pc.starts_with(pc.fill_null(g["label_attack"], ""), "anomaly")
+                if pc.any(m).as_py():
+                    anom.update(pc.unique(g["src_ip"].filter(m)).to_pylist())
+        anom = np.array(sorted(anom), dtype=object)
+        anom = set(anom[_ugr_hash(anom) % 20 == 0])
+        out = []
+        for w, f in files.items():
+            for i in range(f.num_row_groups):
+                g = f.read_row_group(i, columns=cols)
+                src = g["src_ip"].to_numpy(zero_copy_only=False)
+                dst = g["dst_ip"].to_numpy(zero_copy_only=False)
+                s_, d_ = pd.Series(src), pd.Series(dst)
+                keep = (_ugr_hash(src) % 1000 == 0) | s_.isin(UGR_KEY).to_numpy() | d_.isin(UGR_KEY).to_numpy() \
+                    | s_.isin(anom).to_numpy()
+                x = g.filter(pa.array(keep)).to_pandas()
+                lab = x["label_attack"].fillna("Benign").astype(str)
+                x = x[lab != "blacklist"]
+                lab = lab[lab != "blacklist"].str.removeprefix("anomaly-")
+                tcp = x["l4_proto"].to_numpy() == 6
+                ack = (x["tcp_flags"].fillna(0).to_numpy(np.int64) & 16) > 0
+                df = _nf_frame("u", x["ts_start"] * 1000, x["src_ip"], x["src_port"], x["dst_ip"], x["dst_port"],
+                               x["l4_proto"].map({6: "tcp", 17: "udp", 1: "icmp"}).fillna(""),
+                               x["duration"].fillna(0) * 1000, x["bytes"], np.zeros(len(x)), x["packets"],
+                               (~tcp | ack).astype(np.float32), lab.to_numpy(), w)
+                out.append(df)
+            print(f"ugr16 {w}: {sum(map(len, out))} rows so far", flush=True)
+        df = pd.concat(out, ignore_index=True)
+        df["IPV4_SRC_ADDR"] = df["IPV4_SRC_ADDR"].str.removeprefix("u:")
+        df["IPV4_DST_ADDR"] = df["IPV4_DST_ADDR"].str.removeprefix("u:")
+        return df.sort_values("FLOW_START_MILLISECONDS", kind="stable").reset_index(drop=True)
+    return _cached("nf_ugr16", build)
+
+
 LOADERS = {
-    "nf_ctu13": ctu13, "nf_iot23": iot23,
+    "nf_ctu13": ctu13, "nf_iot23": iot23, "nf_ugr16": ugr16,
     "unsw_official": unsw_official, "unsw_raw": unsw_raw, "bot_iot": bot_iot,
     "ciciot_paper": ciciot_paper, "ciciot_csv": ciciot_csv, "ciciot_merged": ciciot_merged,
     **{n: (lambda n=n: _netflow_v3(n)) for n in NF_FILES},
