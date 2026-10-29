@@ -65,13 +65,18 @@ def member_proba(m, X):
         return torch.softmax(m(torch.from_numpy(X)), -1).numpy()  # (n, K, k)
 
 
+def nlog(q):
+    """-log P(benign): ranks as 1 - P(benign) but does not saturate to 1.0 in float32 (PREREG §9 SEL amendment 2)."""
+    return -np.log(np.maximum(np.asarray(q, np.float64), 1e-45))
+
+
 def scores(p, bi):
     pm = p.mean(1)
     ent = lambda q: -(q * np.log(q + 1e-12)).sum(-1)  # noqa: E731
-    return {"": 1 - pm[:, bi], "_min": 1 - p[:, :, bi].min(1), "_mi": ent(pm) - ent(p).mean(1)}
+    return {"": nlog(pm[:, bi]), "_min": nlog(p[:, :, bi].min(1)), "_mi": ent(pm) - ent(p).mean(1)}
 
 
-def fit_models(Xf, yf, Xe, ye, k, bi, seed):
+def fit_models(Xf, yf, Xe, ye, k, bi, seed, **_):
     out = {}
     for name, enc in (("tabm", ple.Encoder()), ("tabm_raw", None)):
         tf = (lambda X: X) if enc is None else enc.fit(Xf).transform

@@ -45,7 +45,7 @@ class Clip:
         return np.clip(X, self.lo, self.hi).astype(np.float32)
 
 
-def fit_models(Xf, yf, Xe, ye, k, bi, seed):
+def fit_models(Xf, yf, Xe, ye, k, bi, seed, **_):
     """{arm: score(X prepped)} for the three arms."""
     out = {}
     for name, enc in (("ple", Encoder()), ("clip", Clip())):
@@ -70,7 +70,7 @@ def run_config(bank, held, base_part, fit_models=fit_models):
     Xf, yf = prep.transform(dfit), np.array([code[f] for f in bank.fam[fit]])
     es = es[np.isin(bank.fam[es], known)]
     Xe, ye = prep.transform(bank.frame(es, sb.role_removal(P, "es"))), np.array([code[f] for f in bank.fam[es]])
-    arms = fit_models(Xf, yf, Xe, ye, len(known), code["Benign"], bank.seed)
+    arms = fit_models(Xf, yf, Xe, ye, len(known), code["Benign"], bank.seed, bank=bank, P=P)
     roles = {"rank": bank.rank, "cal": bank.cal, "test_benign": bank.test_benign,
              "test_unknown": np.sort(np.concatenate([r[bank.removed(r, P)] for r in bank.test.values()])),
              "test_known": np.sort(np.concatenate([r[~bank.removed(r, P)] for r in bank.test.values()]))}
@@ -78,10 +78,12 @@ def run_config(bank, held, base_part, fit_models=fit_models):
     for role, rows in roles.items():
         if len(rows) == 0:
             continue
-        X = prep.transform(bank.frame(rows, sb.role_removal(P, role)))
+        raw = bank.frame(rows, sb.role_removal(P, role))
+        X = prep.transform(raw)
         d = {"row_id": rows.astype(np.int64), "role": role, "family": bank.fam[rows]}
         for a, f in arms.items():
-            d[a] = np.concatenate([f(X[i:i + 100_000]) for i in range(0, len(X), 100_000)]).astype(np.float32)
+            src = raw if getattr(f, "raw", False) else X  # raw arms (KitNET) take the unprepped frame
+            d[a] = np.concatenate([f(src[i:i + 100_000]) for i in range(0, len(src), 100_000)]).astype(np.float32)
         parts.append(pd.DataFrame(d))
     b = base_part.groupby("role").row_id.apply(np.sort)
     for role, rows in roles.items():
