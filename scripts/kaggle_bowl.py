@@ -1,7 +1,7 @@
 """Run a bowl round on Kaggle GPU (PREREG §9 BOWL compute split). Stages arena arrays + bowl code + the round's
 roster (+ the Optuna db, so a round resumes) as a PRIVATE Kaggle dataset, pushes a private GPU kernel that runs
 fight then death, and pulls its output back into results/bowl/.
-Needs ~/.kaggle/kaggle.json. Usage: .venv/bin/python scripts/kaggle_bowl.py push --round 1 --trials 256
+Needs a Kaggle token (~/.kaggle/access_token or kaggle.json). Usage: .venv/bin/python scripts/kaggle_bowl.py push --round 1 --trials 256
                                    .venv/bin/python scripts/kaggle_bowl.py status | pull --round 1
 """
 import argparse
@@ -28,7 +28,8 @@ for cmd in ("fight", "death"):
 
 
 def user():
-    return json.loads((Path.home() / ".kaggle" / "kaggle.json").read_text())["username"]
+    out = subprocess.run([KAGGLE, "config", "view"], capture_output=True, text=True, check=True).stdout
+    return next(line.split(":", 1)[1].strip() for line in out.splitlines() if line.strip().startswith("- username"))
 
 
 def sh(*a):
