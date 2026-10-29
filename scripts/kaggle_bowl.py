@@ -8,6 +8,7 @@ import argparse
 import json
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -53,7 +54,15 @@ def push(a):
         sh("datasets", "version", "-p", str(data), "-m", f"round {a.round}", "-r", "zip", "-q")
     else:
         sh("datasets", "create", "-p", str(data), "-r", "zip", "-q")  # private by default
+    for _ in range(60):  # a kernel pushed before the dataset is ready gets no data source
+        st = subprocess.run([KAGGLE, "datasets", "status", f"{u}/bigp-arena"], capture_output=True, text=True).stdout
+        if "ready" in st.lower():
+            break
+        time.sleep(20)
+    else:
+        raise SystemExit("dataset not ready after 20 min")
     k = STAGE / "kernel"
+    shutil.rmtree(k, ignore_errors=True)
     k.mkdir()
     (k / "run_bowl.py").write_text(KERNEL.replace("{r}", str(a.round)).replace("{t}", str(a.trials)))
     (k / "kernel-metadata.json").write_text(json.dumps({
