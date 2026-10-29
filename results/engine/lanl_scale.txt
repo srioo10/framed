@@ -1,0 +1,14 @@
+onepass: 1024 host slots x 2176 B = 2.2 MB state, model 4128 int8 weights
+onepass: 129977412 flows in 347.79 s (2.68 us/flow), 34409521 evictions
+table 1024 maxrss_kb 4876 wall_s 394.12
+onepass: 8192 host slots x 2176 B = 17.8 MB state, model 4128 int8 weights
+onepass: 129977412 flows in 359.49 s (2.77 us/flow), 101667 evictions
+table 8192 maxrss_kb 20068 wall_s 488.53
+onepass: 65536 host slots x 2176 B = 142.6 MB state, model 4128 int8 weights
+onepass: 129977412 flows in 343.64 s (2.64 us/flow), 0 evictions
+table 65536 maxrss_kb 58932 wall_s 406.10
+onepass: 262144 host slots x 2176 B = 570.4 MB state, model 4128 int8 weights
+onepass: 129977412 flows in 338.49 s (2.60 us/flow), 0 evictions
+table 262144 maxrss_kb 71244 wall_s 442.37
+distinct src 11154 dst 8711 flows 129977412
+DONE
