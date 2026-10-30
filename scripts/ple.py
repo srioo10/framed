@@ -120,6 +120,8 @@ def main(tag="ple", fit_models=fit_models):
     bank = sb.Bank(a.dataset, a.seed, "host", 40000, 200000)
     for p in sorted(base.glob("config=outer_*/part.parquet")):
         held = p.parent.name.removeprefix("config=outer_")
+        if (out / f"config=outer_{held}" / "part.parquet").exists():  # resume after a stop
+            continue
         df = run_config(bank, held, sb.read_part(p, ["row_id", "role"]), fit_models)
         dest = out / f"config=outer_{held}"
         dest.mkdir(parents=True, exist_ok=True)
