@@ -59,3 +59,37 @@ def test_box_is_tight_on_counts():
     lo, hi = sensitivity.box(X, cols, np.zeros(len(cols)), np.ones(len(cols)), 10)
     j = cols.index("hc_dst_n_10s")
     assert abs(hi[0, j] - np.log1p(10)) < 1e-3 and np.isinf(hi[0, cols.index("hc_dst_bytes_10s")])
+
+
+def test_bounds_are_attained():
+    """Tightness of Theorem 1 per group (src key, 10 s window, m = 2): for a stream consistent with the target flow's own
+    (n, c, S), explicit injections reach every finite bound of the box. Flows: (t, src, dst, port, OUT_PKTS, IN_BYTES)."""
+    cols, m, T = hostctx.COLS, 2, (100_000, "A", "Z", 80, 1, 500)
+    real = [(91_000, "A", "D1", 1001, 1, 300), (93_000, "A", "D2", 1002, 1, 700), (95_000, "A", "D3", 1003, 0, 100),
+            (97_000, "A", "D4", 1004, 1, 900),
+            # older same-pair flows just outside the window, so a killer injection can itself be non-novel
+            (80_500, "A", "X1", 1001, 1, 50), (82_500, "A", "X2", 1002, 1, 50),
+            (80_700, "A", "D1", 3001, 1, 50), (82_700, "A", "D2", 3002, 1, 50)]
+    attacks = {  # name: (injections, {stat: bound attained})
+        "count": ([(98_000, "A", "F1", 5001, 0, 0), (99_000, "A", "F2", 5002, 0, 0)],
+                  {"n": "hi", "fail": "hi", "newport": "hi", "newpeer": "hi", "bytes": "lo"}),
+        "fail_lo": ([(98_000, "A", "F1", 5001, 1, 0), (99_000, "A", "F2", 5002, 1, 0)], {"fail": "lo"}),
+        # same port as r1 / r2: cancels their novelty, non-novel itself thanks to the 80.5 k / 82.5 k flows
+        "newport_lo": ([(90_200, "A", "Y1", 1001, 1, 0), (90_400, "A", "Y2", 1002, 1, 0)], {"newport": "lo"}),
+        "newpeer_lo": ([(90_300, "A", "D1", 6001, 1, 0), (90_500, "A", "D2", 6002, 1, 0)], {"newpeer": "lo"}),
+    }
+    names = ["FLOW_START_MILLISECONDS", "IPV4_SRC_ADDR", "IPV4_DST_ADDR", "L4_DST_PORT", "OUT_PKTS", "IN_BYTES"]
+    frame = lambda rows: pd.DataFrame(sorted(rows), columns=names).assign(family="Benign")  # noqa: E731
+    zero, one = np.zeros(len(cols)), np.ones(len(cols))
+    clean = frame(real + [T])
+    i = int(np.flatnonzero(clean.FLOW_START_MILLISECONDS.to_numpy() == T[0])[0])
+    X = prep(hostctx.HostFlows(clean).features(np.ones(len(clean), bool)), zero, one)
+    lo, hi = sensitivity.box(X[[i]], cols, zero, one, m)
+    for name, (inj, hits) in attacks.items():
+        S = frame(real + [T] + inj)
+        j = int(np.flatnonzero(S.FLOW_START_MILLISECONDS.to_numpy() == T[0])[0])
+        X1 = prep(hostctx.HostFlows(S).features(np.ones(len(S), bool)), zero, one)[j]
+        for stat, side in hits.items():
+            c = cols.index(f"hc_src_{stat}_10s")
+            bound = (lo if side == "lo" else hi)[0, c]
+            assert abs(X1[c] - bound) <= 2 * sensitivity.EPS, f"{name}: {stat} {side} {X1[c]} vs {bound}"

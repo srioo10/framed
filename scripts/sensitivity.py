@@ -6,7 +6,10 @@ flows of the same key in the 240 s before the flow keep
   fail share     in [c / (n+m), (c+m) / (n+m)]           (injections only add flows, failed or not)
   newport/peer   in [(c-m)+ / (n+m), (c+m) / (n+m)]       (each injection adds <= 1 novelty, removes <= 1 real one)
   mean bytes     in [S / (n+m), inf)                      (bounded above only by the cert-mode input clip)
-Each bound is monotone in j, so its value at j = m covers every j <= m. Non-host-context columns are untouched (the
+Each bound is monotone in j, so its value at j = m covers every j <= m. Tight per group: for each (n, c, S) some consistent
+stream and m injections reach every finite bound (the novelty lower bound needs injections that cancel a real flow's
+novelty while being non-novel themselves; tests/test_sensitivity.py::test_bounds_are_attained). The product box over
+groups is not jointly attained: that slack, plus IBP's, is the certificate's looseness. Non-host-context columns are untouched (the
 victim's own flow fields are not attacker-controlled). Works in Prep space (signed log1p, then standardize).
 Usage: lo, hi = box(X, cols, mu, sd, m)
 """
