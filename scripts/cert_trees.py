@@ -1,6 +1,6 @@
 """Box certificate for the tree bosses (PREREG §9 CERT K3): the same Theorem 1 boxes as the networks, bounded per tree.
 
-Per tree, the leaves reachable from a box [lo, hi] (go left if lo_f < thr, right if hi_f >= thr); trees are bounded
+Per tree, the leaves reachable from a box [lo, hi] (XGB: go left if lo_f < thr, right if hi_f >= thr; sklearn: <= / >); trees are bounded
 independently, which is sound (looser than a joint bound). XGB: upper(z_c - z_bi) = sum over class-c trees of the max
 reachable leaf - sum over benign trees of the min. RF: P(benign) >= mean over trees of the min reachable leaf share.
 Both give an upper bound on s = -log P(benign). Bosses are refit per arena pair with arena.py's configs and checked
@@ -24,8 +24,9 @@ MS = (1, 5, 10, 50, 100)
 OUT = ROOT / "results" / "cert"
 
 
-def reach(left, right, feat, thr, leaf_val, lo, hi):
-    """Per row: (min, max) of leaf_val over the leaves reachable from the box. Nodes with left < 0 are leaves."""
+def reach(left, right, feat, thr, leaf_val, lo, hi, le=False):
+    """Per row: (min, max) of leaf_val over the leaves reachable from the box. Nodes with left < 0 are leaves.
+    le: the tree sends x <= thr left (sklearn); otherwise x < thr (XGB)."""
     n = len(lo)
     mn, mx = np.full(n, np.inf), np.full(n, -np.inf)
     stack = [(0, np.arange(n))]
@@ -36,7 +37,7 @@ def reach(left, right, feat, thr, leaf_val, lo, hi):
             mx[r] = np.maximum(mx[r], leaf_val[node])
             continue
         f, t = feat[node], thr[node]
-        a, b = r[lo[r, f] < t], r[hi[r, f] >= t]
+        a, b = (r[lo[r, f] <= t], r[hi[r, f] > t]) if le else (r[lo[r, f] < t], r[hi[r, f] >= t])
         if len(a):
             stack.append((left[node], a))
         if len(b):
@@ -51,7 +52,7 @@ def rf_upper(rf, lo, hi, bi):
         t = est.tree_
         v = t.value[:, 0, :]
         share = v[:, bi] / v.sum(1)
-        pmin += reach(t.children_left, t.children_right, t.feature, t.threshold, share, lo32, hi32)[0]
+        pmin += reach(t.children_left, t.children_right, t.feature, t.threshold, share, lo32, hi32, le=True)[0]
     return -np.log(np.maximum(pmin / len(rf.estimators_), 1e-45))
 
 

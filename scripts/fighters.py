@@ -321,7 +321,8 @@ def train(m, Xf, yf, k, device, seed=0, epochs=20, lr=2e-3, bs=1024, soft=None, 
             if cert > 0:
                 j = torch.randint(len(LC), (len(b),), generator=g).to(device)
                 d = margins_upper(m, LC[j], HC[j], bi).clamp(max=50)
-                loss = loss + cert * torch.logsumexp(d, -1).mean()
+                ramp = min(1.0, (ep + 1) / max(1, epochs // 2))  # IBP warm-up (Gowal et al. 2018)
+                loss = loss + ramp * cert * torch.logsumexp(d, -1).mean()
             opt.zero_grad()
             loss.backward()
             opt.step()

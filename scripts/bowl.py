@@ -173,9 +173,12 @@ def cert_fpr(g, m, h, z, s_cal, device, ms):
     i = np.sort(np.random.default_rng(0).choice(len(s_cal), min(CERT_ROWS, len(s_cal)), replace=False))
     tau = np.sort(s_cal)[::-1][int(np.floor(0.01 * len(s_cal)))]
     out = {}
+    src = np.array([c.startswith("hc_src") for c in z["cols"]])
     for mm in ms:
         lo, hi = box(z, z["X_cal"][i], mm)
         out[mm] = float((fx.score_upper(m, lo, hi, z["bi"], g["head"], device) > tau).mean())
+        lo[:, src], hi[:, src] = z["X_cal"][i][:, src], z["X_cal"][i][:, src]  # destination-side injection only
+        out[f"dst{mm}"] = float((fx.score_upper(m, lo, hi, z["bi"], g["head"], device) > tau).mean())
     return out
 
 
@@ -198,7 +201,7 @@ def evaluate(g, pairs, device, seeds=(0,), epochs=15, keep_scores=False, ms=(CER
     res = {"fitness": float(np.mean(fit)), "unk": float(np.mean(unk)), "known": float(np.mean(kn)),
            "size": int(size), "ratio": float(ratio)}
     if cert:
-        res["cert"] = {str(mm): float(np.mean([c[mm] for c in cert])) for mm in ms}  # macro over pairs and seeds
+        res["cert"] = {str(k): float(np.mean([c[k] for c in cert])) for k in cert[0]}  # macro over pairs and seeds
     return res, scores
 
 
@@ -327,6 +330,11 @@ def death(a):
     finalists = sorted([t for t in done if t.number in front], key=lambda t: -t.values[0])[:10]
     if len(finalists) < 3:  # thin front: top feasible by fitness
         finalists = sorted(done, key=lambda t: -t.values[0])[:10]
+    if not finalists and any(len(t.user_attrs.get("c", [])) == 3 for t in st.trials):
+        # §9 CERT: nobody meets the certified-FPR limit -> least violation among size / speed-feasible (K2 unchanged)
+        ok = [t for t in st.trials if t.state == optuna.trial.TrialState.COMPLETE and "res" in t.user_attrs
+              and max(t.user_attrs["c"][:2]) <= 0]
+        finalists = sorted(ok, key=lambda t: t.user_attrs["c"][2])[:10]
     if not finalists:
         raise SystemExit(f"round {a.round}: no fighter within the size / speed limits")
     pairs = load_pairs(a.arena, cheap=False)

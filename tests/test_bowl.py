@@ -198,4 +198,5 @@ def test_cert_round_constrains_certified_fpr(tmp_path, monkeypatch):
     assert t and all(len(x.user_attrs["c"]) == 3 and 0 <= x.user_attrs["res"]["cert"]["10"] <= 1 for x in t)
     bowl.death(a)
     D = json.loads((rd / "death.json").read_text())
-    assert set(D["champion"]["cert"]) == {"1", "10"} and D["champion"]["cert"]["1"] <= D["champion"]["cert"]["10"]
+    c = D["champion"]["cert"]
+    assert set(c) == {"1", "10", "dst1", "dst10"} and c["1"] <= c["10"] and c["dst10"] <= c["10"]
