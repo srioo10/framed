@@ -175,6 +175,8 @@ def ablate(a):
     import torch
     torch.set_num_threads(a.threads)
     rd = OUT / f"round{a.round}"
+    if (rd / "ablation.json").exists():  # a resumed round keeps its ablation
+        return
     roster = json.loads((rd / "roster.json").read_text())
     base = {k: v for k, v in json.loads((OUT / f"round{a.round - 1}" / "death.json").read_text())["champion"].items()
             if k not in ("trial", "fitness", "unk", "known", "size", "ratio")}
@@ -219,8 +221,10 @@ def fight(a):
     pairs = load_pairs(a.arena, cheap=True)
     st = study(a.round, a.storage, roster)
     if len(st.trials) == 0:
-        for gnm in roster.get("seeds", []):
-            st.enqueue_trial(gnm, skip_if_exists=True)
+        for gnm in roster.get("seeds", []):  # seeds outside the pinned space are dropped, pinned genes stripped
+            if gnm["family"] in roster["families"]:
+                st.enqueue_trial({k: v for k, v in gnm.items() if k not in roster.get("fixed", {})},
+                                 skip_if_exists=True)
 
     def objective(trial):
         g = suggest(trial, roster)

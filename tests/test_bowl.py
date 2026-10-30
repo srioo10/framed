@@ -89,6 +89,16 @@ def test_mini_bowl_end_to_end(tmp_path, monkeypatch):
     assert set(A["kept"]) | set(A["dropped"]) == set(bowl.POWERUPS) and "all" in A["variants"]
     roster = bowl.apply_ablation(json.loads(r2.joinpath("roster.json").read_text()), r2)
     assert ("tabm_node" in roster["families"]) == ("node_branch" in A["kept"])
+    A["dropped"], A["kept"] = list(bowl.POWERUPS), []  # worst case: every power-up pinned off, seeds still enqueue
+    (r2 / "ablation.json").write_text(json.dumps(A))
+    roster = json.loads(r2.joinpath("roster.json").read_text())
+    roster["seeds"] = [{"family": "tabm_node", "enc": "raw", "e": 2, "w": 16, "depth": 1, "sn": 0, "act": "relu",
+                        "members": 2, "head_m": "nlog", "kd": 0.0, "ls": 0.0, "focal": 0.0, "lr": 3e-3,
+                        "teacher": "rf", "syn": 0.5, "T": 8, "D": 3},
+                       {"family": "tabm", "enc": "raw", "e": 2, "w": 16, "depth": 1, "sn": 0, "act": "relu",
+                        "members": 2, "head_m": "nlog", "kd": 0.0, "ls": 0.0, "focal": 0.0, "lr": 3e-3,
+                        "teacher": "rf", "syn": 0.5}]
+    r2.joinpath("roster.json").write_text(json.dumps(roster))
     bowl.fight(a)
 
 
