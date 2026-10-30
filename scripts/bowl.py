@@ -89,12 +89,26 @@ def suggest(trial, roster):
     if roster.get("cert_mode"):  # host-context columns clipped to the fit range, certified FPR constrained
         g["clip"] = 1
         g["cert"] = pick("cert", roster.get("cert_opts", [0.0, 0.25, 0.5, 1.0]))
+    if roster.get("gate"):  # robust-alarm gating: fitness = robust fitness at CERT_M, robust-detection loss gene
+        g["gate"] = 1
+        g["rdet"] = pick("rdet", roster.get("rdet_opts", [2, 4, 8]))
     g["ls"] = pick("ls", [0.0, 0.1])
     g["focal"] = pick("focal", [0.0, 2.0])
     g["lr"] = pick("lr", [1e-3, 3e-3])
     if "bs" in roster:
         g["bs"] = roster["bs"]
     return g
+
+
+def drop_bytes(pairs, roster):
+    """Gate rounds: host-context mean-bytes columns zeroed (unbounded under deletion); the fit-range clip pins them."""
+    if roster.get("drop_bytes"):
+        for z in pairs:
+            j = [i for i, c in enumerate(z["cols"]) if c.startswith("hc_") and "_bytes_" in c]
+            for k in [k for k in z if k.startswith("X_")]:
+                z[k] = z[k].copy()
+                z[k][:, j] = 0
+    return pairs
 
 
 def hc_clip(z):
@@ -205,7 +219,7 @@ def cert_fpr(g, m, h, z, s_cal, device, ms):
 
 
 def evaluate(g, pairs, device, seeds=(0,), epochs=15, keep_scores=False, ms=(CERT_M,)):
-    fit, unk, kn, scores, cert = [], [], [], {}, []
+    fit, unk, kn, scores, cert, rob = [], [], [], {}, [], []
     size = ratio = None
     for z in pairs:
         for sd in seeds:
@@ -214,6 +228,8 @@ def evaluate(g, pairs, device, seeds=(0,), epochs=15, keep_scores=False, ms=(CER
             fit.append(f), unk.append(u), kn.append(k_)
             if g.get("clip"):
                 cert.append(cert_fpr(g, m, h, z, s["cal"], device, ms))
+            if g.get("gate"):
+                rob.append({mm: robust_fitness(g, m, z, s["cal"], device, mm) for mm in sorted({CERT_M, *ms})})
             if keep_scores:
                 scores[f"{z['ds']}/{z['name']}/s{sd}"] = s
             if size is None:
@@ -224,6 +240,11 @@ def evaluate(g, pairs, device, seeds=(0,), epochs=15, keep_scores=False, ms=(CER
            "size": int(size), "ratio": float(ratio)}
     if cert:
         res["cert"] = {str(k): float(np.mean([c[k] for c in cert])) for k in cert[0]}  # macro over pairs and seeds
+    if rob:  # gate: blocked-benign FPR <= 1% by Theorem 1', so the alarm-level certificate is reported, not constrained
+        res["plain"] = {"fitness": res["fitness"], "unk": res["unk"], "known": res["known"]}
+        res["robust"] = {str(mm): [float(np.mean([r[mm][i] for r in rob])) for i in range(3)] for mm in rob[0]}
+        res["fitness"], res["unk"], res["known"] = res["robust"][str(CERT_M)]
+        res["cert_alarm"] = res.pop("cert", None)
     return res, scores
 
 
@@ -302,7 +323,7 @@ def fight(a):
     torch.set_num_threads(a.threads)
     rd = OUT / f"round{a.round}"
     roster = apply_ablation(json.loads((rd / "roster.json").read_text()), rd)
-    pairs = load_pairs(a.arena, cheap=True)
+    pairs = drop_bytes(load_pairs(a.arena, cheap=True), roster)
     st = study(a.round, a.storage, roster)
     if len(st.trials) == 0 and a.part == 0:  # one worker enqueues the seeds
         for gnm in roster.get("seeds", []):  # seeds outside the pinned space are dropped, pinned genes stripped
@@ -346,7 +367,8 @@ def death(a):
     import torch
     torch.set_num_threads(a.threads)
     rd = OUT / f"round{a.round}"
-    st = study(a.round, a.storage, json.loads((rd / "roster.json").read_text()))
+    roster = json.loads((rd / "roster.json").read_text())
+    st = study(a.round, a.storage, roster)
     done = [t for t in st.trials if t.state == optuna.trial.TrialState.COMPLETE and "res" in t.user_attrs
             and max(t.user_attrs["c"]) <= 0]
     front = {t.number for t in st.best_trials}
@@ -360,7 +382,7 @@ def death(a):
         finalists = sorted(ok, key=lambda t: t.user_attrs["c"][2])[:10]
     if not finalists:
         raise SystemExit(f"round {a.round}: no fighter within the size / speed limits")
-    pairs = load_pairs(a.arena, cheap=False)
+    pairs = drop_bytes(load_pairs(a.arena, cheap=False), roster)
     if a.merge:  # parts were evaluated by parallel workers: finalists in fight order, champion = best part's best
         parts = [json.loads((rd / f"death_part{i}.json").read_text()) for i in range(a.parts)]
         rows = sorted([r for p in parts for r in p["rows"]], key=lambda r: [t.number for t in finalists].index(r["trial"]))
