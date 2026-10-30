@@ -312,7 +312,8 @@ def fight(a):
     left = a.trials - len([t for t in st.trials if t.state.name == "COMPLETE"])
     if left > 0:
         stop = optuna.study.MaxTrialsCallback(a.trials, states=(optuna.trial.TrialState.COMPLETE,))  # across workers
-        st.optimize(objective, n_trials=left, n_jobs=a.jobs, gc_after_trial=True, callbacks=[stop])
+        st.optimize(objective, n_trials=left, n_jobs=a.jobs, gc_after_trial=True, callbacks=[stop],
+                    timeout=getattr(a, "hours", 0) * 3600 or None)  # hard wall-clock cap: the round ends on time with what it has
     done = [t for t in st.trials if t.state == optuna.trial.TrialState.COMPLETE and "res" in t.user_attrs]
     feas = [t for t in done if max(t.user_attrs["c"]) <= 0]
     print(f"round {a.round}: {len(done)} fighters, {len(feas)} within limits")
@@ -414,6 +415,7 @@ def main():
     ap.add_argument("--part", type=int, default=0)  # this worker's index (fight: only 0 enqueues; death: finalists i::n)
     ap.add_argument("--parts", type=int, default=1)
     ap.add_argument("--merge", action="store_true")
+    ap.add_argument("--hours", type=float, default=0)  # fight: stop starting trials after this long (0 = no cap)
     a = ap.parse_args()
     OUT = a.out
     a.storage = a.storage or f"sqlite:///{OUT / 'bowl.db'}"
