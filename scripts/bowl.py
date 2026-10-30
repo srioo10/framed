@@ -38,6 +38,9 @@ def load_pairs(arena_dir, cheap, seed=0):
         files = sorted((arena_dir / ds).glob("pair_*.npz"), key=lambda f: int(f.stem.split("_")[1]))
         for f in files[:3] if cheap else files:
             z = dict(np.load(f))
+            u = f.with_name(f"ultra_{f.stem.split('_')[1]}.npz")  # ultra bosses (scripts/ultra_bosses.py), if built
+            if u.exists():
+                z.update(np.load(u))
             if cheap and len(z["y_fit"]) > 40_000:
                 i = np.sort(np.random.default_rng(seed).choice(len(z["y_fit"]), 40_000, replace=False))
                 z["X_fit"], z["y_fit"], z["teacher"] = z["X_fit"][i], z["y_fit"][i], z["teacher"][i]
@@ -159,7 +162,7 @@ def evaluate(g, pairs, device, seeds=(0,), epochs=15, keep_scores=False):
 
 def boss_fitness(pairs):
     out = {}
-    for b in ("rf", "xgb"):
+    for b in sorted(set.intersection(*({k.split("_")[1] for k in z if k.startswith("boss_")} for z in pairs))):
         r = [arena.fitness(z[f"boss_{b}_cal"], z[f"boss_{b}_pseudo"], z[f"boss_{b}_es"], z["y_es"], z["bi"]) for z in pairs]
         out[b] = {"fitness": float(np.mean([x[0] for x in r])), "unk": float(np.mean([x[1] for x in r])),
                   "known": float(np.mean([x[2] for x in r]))}
@@ -313,6 +316,8 @@ def autopsy(a):
     from roc import roc_detect
     rd = OUT / f"round{a.round}"
     D = json.loads((rd / "death.json").read_text())
+    D["bosses"] = boss_fitness(load_pairs(a.arena, False))  # picks up ultra bosses built after the death match
+    (rd / "death.json").write_text(json.dumps(D, indent=1))
     S = np.load(rd / "champion_scores.npz")
     L = [f"# Round {a.round} autopsy\n", f"Champion: {D['champion']}\n", f"Bosses: {D['bosses']}\n"]
     for key in D["pairs"]:

@@ -90,6 +90,30 @@ def push(a):
     sh("kernels", "push", "-p", str(k))
 
 
+def bosses(a):
+    """Ultra bosses as a second private kernel on the staged arena dataset (scripts/ultra_bosses.py)."""
+    u = user()
+    k = STAGE / "bosses"
+    shutil.rmtree(k, ignore_errors=True)
+    k.mkdir(parents=True)
+    shutil.copy(ROOT / "scripts" / "ultra_bosses.py", k / "ultra_bosses.py")
+    (k / "kernel-metadata.json").write_text(json.dumps({
+        "id": f"{u}/bigp-bosses", "title": "bigp-bosses", "code_file": "ultra_bosses.py", "language": "python",
+        "kernel_type": "script", "is_private": True, "enable_gpu": True, "enable_internet": False,
+        "dataset_sources": [f"{u}/bigp-arena"]}))
+    sh("kernels", "push", "-p", str(k))
+
+
+def pull_bosses(a):
+    out = STAGE / "bosses_output"
+    shutil.rmtree(out, ignore_errors=True)
+    out.mkdir(parents=True)
+    sh("kernels", "output", f"{user()}/bigp-bosses", "-p", str(out))
+    for f in sorted(out.glob("ultra/*/ultra_*.npz")):
+        shutil.copy(f, ROOT / "data" / "arena" / f.parent.name / f.name)
+        print("->", f.parent.name, f.name)
+
+
 def status(a):
     sh("kernels", "status", f"{user()}/bigp-bowl")
 
@@ -107,9 +131,9 @@ def pull(a):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["push", "status", "pull"])
+    ap.add_argument("cmd", choices=["push", "status", "pull", "bosses", "pull_bosses"])
     ap.add_argument("--round", type=int, default=1)
     ap.add_argument("--trials", type=int, default=256)
     ap.add_argument("--workers", type=int, default=4)
     a = ap.parse_args()
-    {"push": push, "status": status, "pull": pull}[a.cmd](a)
+    {"push": push, "status": status, "pull": pull, "bosses": bosses, "pull_bosses": pull_bosses}[a.cmd](a)

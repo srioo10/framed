@@ -84,7 +84,13 @@ def test_mini_bowl_end_to_end(tmp_path, monkeypatch):
     nt = lambda r: {k: v for k, v in r.items() if k != "ratio"}  # noqa: E731  ratio is wall-clock timing
     assert nt(D["champion"]) == nt(single["champion"]) and (rd / "champion_scores.npz").exists()
     assert 0 <= D["champion"]["fitness"] <= 1 and set(D["bosses"]) == {"rf", "xgb"}
+    import ultra_bosses as ub
+    big = ub.models
+    monkeypatch.setattr(ub, "models", lambda gpu: {k: m.set_params(**{"iterations" if k == "cat" else "n_estimators": 10})
+                                                   for k, m in big(gpu).items()})
+    ub.run(tmp_path / "arena", tmp_path / "arena", gpu=False)
     bowl.autopsy(a)
+    assert set(json.loads((rd / "death.json").read_text())["bosses"]) == {"rf", "xgb", "cat", "lgbm", "xgbx", "gang"}
     assert (rd / "autopsy.md").exists()
     r2 = tmp_path / "bowl" / "round2"
     r2.mkdir()
