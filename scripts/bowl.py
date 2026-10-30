@@ -2,9 +2,12 @@
 
 fight:   NSGA-II on (arena fitness up, size down, time ratio vs heavy XGB down) under size <= 64 KB and ratio <= 0.5;
          cheap fitness (3 pairs per dataset, 40k fit rows, 15 epochs); Optuna sqlite storage, resumable.
+ablate:  (round >= 2, before fight) previous champion +/- each power-up on the cheap pairs, seeds 0 and 1; a power-up
+         is kept if it raises fitness by more than the champion's seed-to-seed difference, else fight pins it off.
 death:   feasible Pareto front (top 10 by fitness) + bosses on the full arena (all pairs, full rows, 2 seeds, 30 epochs).
 autopsy: where boss XGB catches pseudo-unknown flows the champion misses; a depth-3 tree names the pattern.
-Usage: .venv/bin/python scripts/bowl.py fight --round 1 --trials 256
+Usage: .venv/bin/python scripts/bowl.py ablate --round 2              (round >= 2)
+       .venv/bin/python scripts/bowl.py fight --round 1 --trials 256
        .venv/bin/python scripts/bowl.py death --round 1
        .venv/bin/python scripts/bowl.py autopsy --round 1
 """
@@ -39,6 +42,7 @@ def load_pairs(arena_dir, cheap, seed=0):
                 z["X_fit"], z["y_fit"], z["teacher"] = z["X_fit"][i], z["y_fit"][i], z["teacher"][i]
             z["ds"], z["name"], z["bi"], z["dir"] = ds, f.stem, int(z["bi"]), f.parent
             z["k"] = z["teacher"].shape[1]
+            z["nflow"] = len(json.loads(f.with_suffix(".json").read_text())["feats"])
             P.append(z)
     return P
 
@@ -48,15 +52,15 @@ def suggest(trial, roster):
     fixed = roster.get("fixed", {})
     pick = lambda name, opts: fixed[name] if name in fixed else trial.suggest_categorical(name, opts)  # noqa: E731
     g = {"family": pick("family", roster["families"])}
-    if g["family"] in ("mlp", "tabm"):
+    if g["family"] in ("mlp", "tabm", "tabm_node"):
         g["enc"] = pick("enc", ["raw", "quantile", "tree", "periodic"])
         g["e"] = pick("e", [2, 4])
         g["w"] = pick("w", [16, 32, 64])
         g["depth"] = pick("depth", [1, 2])
         g["sn"] = pick("sn", [0, 1])
         g["act"] = pick("act", ["relu", "selu"])
-        g["members"] = pick("members", [2, 4, 8]) if g["family"] == "tabm" else 1
-    elif g["family"] == "node":
+        g["members"] = pick("members", [2, 4, 8]) if g["family"] != "mlp" else 1
+    if g["family"] in ("node", "tabm_node"):
         g["T"] = pick("T", [8, 16, 32, 64])
         g["D"] = pick("D", [3, 4, 5, 6])
     elif g["family"] == "leafnet":
@@ -68,6 +72,10 @@ def suggest(trial, roster):
     g["head"] = pick("head_m", ["nlog", "energy", "maha", "min"]) if g.get("members", 1) > 1 \
         else pick("head", ["nlog", "energy", "maha"])
     g["kd"] = pick("kd", [0.0, 0.5, 0.9])
+    if "teacher" in roster.get("genes", []):
+        g["teacher"] = pick("teacher", ["xgb", "rf"])
+    if "syn" in roster.get("genes", []):
+        g["syn"] = pick("syn", [0.0, 0.5])
     g["ls"] = pick("ls", [0.0, 0.1])
     g["focal"] = pick("focal", [0.0, 2.0])
     g["lr"] = pick("lr", [1e-3, 3e-3])
@@ -79,15 +87,36 @@ def build(g, z, seed):
     if g["family"] in ("mlp", "tabm"):
         enc, din, _ = fx.encoder(g["enc"], Xf, yf, g["e"], seed)
         return fx.Body(enc, din, k, g["w"], g["depth"], g["members"], bool(g["sn"]), g["act"])
+    if g["family"] == "tabm_node":
+        enc, din, _ = fx.encoder(g["enc"], Xf, yf, g["e"], seed)
+        return fx.Hybrid(fx.Body(enc, din, k, g["w"], g["depth"], g["members"], bool(g["sn"]), g["act"]),
+                         fx.NODE(Xf.shape[1], k, g["T"], g["D"]))
     if g["family"] == "node":
         return fx.NODE(Xf.shape[1], k, g["T"], g["D"])
     return fx.LeafNet(Xf, yf, k, g["trees"], g["leaves"], g["le"], g["lw"], seed)
 
 
+def rf_teacher(z):
+    """Cached per pair: 3-fold OOF RF probabilities on the fit rows, and cross-context synthetic rows (flow features of
+    one fit row + host context of another) labelled by an RF fit on all fit rows. Fit rows only."""
+    if "_rf" not in z:
+        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.model_selection import cross_val_predict
+        X, y, nf = z["X_fit"], z["y_fit"], z["nflow"]
+        rf = lambda: RandomForestClassifier(100, min_samples_leaf=2, max_samples=0.5, n_jobs=-1, random_state=0)  # noqa: E731
+        oof = cross_val_predict(rf(), X, y, cv=3, method="predict_proba")
+        a, b = np.random.default_rng(0).integers(len(y), size=(2, min(len(y) // 2, 50_000)))
+        Xs = np.concatenate([X[a, :nf], X[b, nf:]], 1)
+        z["_rf"] = oof.astype(np.float32), Xs, rf().fit(X, y).predict_proba(Xs).astype(np.float32)
+    return z["_rf"]
+
+
 def run_pair(g, z, device, seed, epochs):
     m = build(g, z, seed)
-    m = fx.train(m, z["X_fit"], z["y_fit"], z["k"], device, seed, epochs, g["lr"], soft=z["teacher"], kd=g["kd"],
-                 ls=g["ls"], focal=g["focal"])
+    rf = rf_teacher(z) if g.get("teacher") == "rf" or g.get("syn", 0) > 0 else (None, None, None)
+    m = fx.train(m, z["X_fit"], z["y_fit"], z["k"], device, seed, epochs, g["lr"],
+                 soft=rf[0] if g.get("teacher") == "rf" else z["teacher"], kd=g["kd"], ls=g["ls"], focal=g["focal"],
+                 Xs=rf[1], Ss=rf[2], syn=g.get("syn", 0.0))
     h = fx.Head(g["head"], z["bi"]).fit(m, z["X_fit"], z["y_fit"], device)
     s = {k: h.score(m, z[f"X_{k}"], device) for k in ("cal", "pseudo", "es")}
     return m, h, s
@@ -135,12 +164,58 @@ def study(r, storage, roster):
                                directions=["maximize", "minimize", "minimize"])
 
 
+POWERUPS = {  # name: (genome edit that switches it on, roster edit that pins it off)
+    "rf_teacher": ({"teacher": "rf"}, {"fixed": {"teacher": "xgb"}}),
+    "syn": ({"syn": 0.5}, {"fixed": {"syn": 0.0}}),
+    "node_branch": ({"family": "tabm_node", "T": 16, "D": 4}, {"drop_family": "tabm_node"}),
+}
+
+
+def ablate(a):
+    import torch
+    torch.set_num_threads(a.threads)
+    rd = OUT / f"round{a.round}"
+    roster = json.loads((rd / "roster.json").read_text())
+    base = {k: v for k, v in json.loads((OUT / f"round{a.round - 1}" / "death.json").read_text())["champion"].items()
+            if k not in ("trial", "fitness", "unk", "known", "size", "ratio")}
+    base.setdefault("teacher", "xgb"), base.setdefault("syn", 0.0)
+    pairs = load_pairs(a.arena, cheap=True)
+    variants = {"base": base, **{n: {**base, **on} for n, (on, _) in POWERUPS.items() if n in roster["powerups"]},
+                "all": {**base, **{k: v for n, (on, _) in POWERUPS.items() if n in roster["powerups"]
+                                   for k, v in on.items()}},
+                "base_nlog_head": {**base, "head": "nlog"}}  # informational: flood-safe head for the same body
+    res = {}
+    for n, g in variants.items():
+        per = [evaluate(g, pairs, a.device, seeds=(s,))[0] for s in (0, 1)]
+        res[n] = {"genome": g, "fitness": [p["fitness"] for p in per], "unk": [p["unk"] for p in per],
+                  "known": [p["known"] for p in per], "size": per[0]["size"], "ratio": per[0]["ratio"]}
+        print(n, res[n], flush=True)
+    noise = abs(res["base"]["fitness"][0] - res["base"]["fitness"][1])
+    m0 = np.mean(res["base"]["fitness"])
+    kept = [n for n in roster["powerups"] if np.mean(res[n]["fitness"]) - m0 > noise
+            and res[n]["size"] <= SIZE_MAX and res[n]["ratio"] <= RATIO_MAX]
+    out = {"noise": noise, "kept": kept, "dropped": [n for n in roster["powerups"] if n not in kept], "variants": res}
+    (rd / "ablation.json").write_text(json.dumps(out, indent=1))
+    print("ABLATION kept", kept, "noise", noise)
+
+
+def apply_ablation(roster, rd):
+    """Pin off every power-up the ablation dropped."""
+    f = rd / "ablation.json"
+    if f.exists():
+        for n in json.loads(f.read_text())["dropped"]:
+            off = POWERUPS[n][1]
+            roster.setdefault("fixed", {}).update(off.get("fixed", {}))
+            roster["families"] = [x for x in roster["families"] if x != off.get("drop_family")]
+    return roster
+
+
 def fight(a):
     import optuna
     import torch
     torch.set_num_threads(a.threads)
     rd = OUT / f"round{a.round}"
-    roster = json.loads((rd / "roster.json").read_text())
+    roster = apply_ablation(json.loads((rd / "roster.json").read_text()), rd)
     pairs = load_pairs(a.arena, cheap=True)
     st = study(a.round, a.storage, roster)
     if len(st.trials) == 0:
@@ -217,10 +292,12 @@ def autopsy(a):
         nc = len(c["cal"])
         isb = np.r_[np.ones(nc, bool), np.zeros(len(c["pseudo"]), bool)]
         wc = roc_detect(np.r_[c["cal"], c["pseudo"]], isb)[nc:]
-        wb = roc_detect(np.r_[z["boss_xgb_cal"], z["boss_xgb_pseudo"]], isb)[nc:]
-        missed = (wb >= 0.5) & (wc < 0.5)
+        wb, wr = (roc_detect(np.r_[z[f"boss_{b}_cal"], z[f"boss_{b}_pseudo"]], isb)[nc:] for b in ("xgb", "rf"))
         L.append(f"\n## {key} (R0={meta['R0']}, unknown={meta['j']}): champion TPR {wc.mean():.3f}, boss XGB "
-                 f"{wb.mean():.3f}, boss-only {missed.mean():.3f}, champion-only {((wc >= 0.5) & (wb < 0.5)).mean():.3f}\n")
+                 f"{wb.mean():.3f}, boss RF {wr.mean():.3f}\n")
+        wb = np.maximum(wb, wr)  # caught by either boss
+        missed = (wb >= 0.5) & (wc < 0.5)
+        L.append(f"boss-only {missed.mean():.3f}, champion-only {((wc >= 0.5) & (wb < 0.5)).mean():.3f}\n")
         if missed.sum() >= 20 and (~missed).sum() >= 20:
             t = DecisionTreeClassifier(max_depth=3, min_samples_leaf=20, random_state=0).fit(z["X_pseudo"], missed)
             L.append("```\n" + export_text(t, feature_names=meta["feats"] + [f"f{i}" for i in range(len(meta["feats"]),
@@ -233,7 +310,7 @@ def autopsy(a):
 def main():
     global OUT
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["fight", "death", "autopsy"])
+    ap.add_argument("cmd", choices=["ablate", "fight", "death", "autopsy"])
     ap.add_argument("--round", type=int, required=True)
     ap.add_argument("--trials", type=int, default=256)
     ap.add_argument("--jobs", type=int, default=2)
@@ -248,7 +325,7 @@ def main():
     if a.device == "auto":
         import torch
         a.device = "cuda" if torch.cuda.is_available() else "cpu"
-    {"fight": fight, "death": death, "autopsy": autopsy}[a.cmd](a)
+    {"ablate": ablate, "fight": fight, "death": death, "autopsy": autopsy}[a.cmd](a)
 
 
 if __name__ == "__main__":

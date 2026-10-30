@@ -135,6 +135,23 @@ class NODE(nn.Module):
         return self.T * (self.D + self.k)
 
 
+class Hybrid(nn.Module):
+    """Body (TabM / MLP) + NODE-lite branch on the prepped features, logits summed: the NODE's hard oblivious splits
+    supply the axis-aligned feature ANDs a smooth body misses (round-1 autopsy)."""
+
+    def __init__(self, body, node):
+        super().__init__()
+        self.body, self.node = body, node
+
+    def forward(self, x):
+        z, h = self.body(x)
+        zn = self.node(x)[0]
+        return (z + zn[:, None] if z.dim() == 3 else z + zn), h
+
+    def ops(self):
+        return self.body.ops() + self.node.ops()
+
+
 class LeafNet(nn.Module):
     """GBDT-leaf -> net (He et al. 2014): a small LightGBM's leaf index per tree -> learned embedding, summed -> MLP."""
 
@@ -171,9 +188,11 @@ def size_bytes(m):
     return n + edges + trees
 
 
-def train(m, Xf, yf, k, device, seed=0, epochs=20, lr=2e-3, bs=1024, soft=None, kd=0.0, ls=0.0, focal=0.0, T=4.0):
-    """Mean-member CE (label smoothing ls, focal gamma) mixed with KD (weight kd) to teacher probabilities `soft`;
-    early stop on CE of a 10% carve of the fit rows; NODE tau anneals 1 -> 0.05."""
+def train(m, Xf, yf, k, device, seed=0, epochs=20, lr=2e-3, bs=1024, soft=None, kd=0.0, ls=0.0, focal=0.0, T=4.0,
+          Xs=None, Ss=None, syn=0.0):
+    """Mean-member CE (label smoothing ls, focal gamma) mixed with KD (weight kd) to teacher probabilities `soft`,
+    plus syn x KD on a batch of synthetic rows Xs labelled by a teacher (Ss); early stop on CE of a 10% carve of the
+    fit rows; NODE tau anneals 1 -> 0.05."""
     g = torch.Generator().manual_seed(seed)
     torch.manual_seed(seed)
     n = len(yf)
@@ -183,6 +202,8 @@ def train(m, Xf, yf, k, device, seed=0, epochs=20, lr=2e-3, bs=1024, soft=None, 
     X = torch.from_numpy(Xf).to(device)
     y = torch.from_numpy(yf).to(device)
     S = None if soft is None or kd == 0 else torch.from_numpy(soft.astype(np.float32)).to(device)
+    if syn > 0:
+        XS, SS = torch.from_numpy(Xs).to(device), torch.from_numpy(Ss.astype(np.float32)).to(device)
     opt = torch.optim.AdamW([p for name, p in m.named_parameters() if not name.startswith("gbm")], lr=lr,
                             weight_decay=1e-4)
     trt = torch.from_numpy(tr).to(device)
@@ -204,6 +225,13 @@ def train(m, Xf, yf, k, device, seed=0, epochs=20, lr=2e-3, bs=1024, soft=None, 
                 t = torch.softmax(torch.log(S[b] + 1e-8) / T, 1).repeat_interleave(zz.shape[1], 0)
                 kl = nn.functional.kl_div(torch.log_softmax(flat / T, 1), t, reduction="batchmean") * T * T
                 loss = (1 - kd) * loss + kd * kl
+            if syn > 0:
+                j = torch.randint(len(XS), (len(b),), generator=g).to(device)
+                zs = m(XS[j])[0]
+                zs = zs if zs.dim() == 3 else zs[:, None]
+                ts = torch.softmax(torch.log(SS[j] + 1e-8) / T, 1).repeat_interleave(zs.shape[1], 0)
+                loss = loss + syn * nn.functional.kl_div(torch.log_softmax(zs.reshape(-1, k) / T, 1), ts,
+                                                         reduction="batchmean") * T * T
             opt.zero_grad()
             loss.backward()
             opt.step()

@@ -21,7 +21,7 @@ src = os.path.dirname(os.path.dirname(glob.glob("/kaggle/input/**/code/bowl.py",
 shutil.copytree(f"{src}/code", "/kaggle/working/code", dirs_exist_ok=True)
 shutil.copytree(f"{src}/bowl", "/kaggle/working/bowl", dirs_exist_ok=True)
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", "optuna==5.0.0"], check=True)
-for cmd in ("fight", "death"):
+for cmd in (("ablate",) if {r} > 1 else ()) + ("fight", "death"):
     subprocess.run([sys.executable, "/kaggle/working/code/bowl.py", cmd, "--round", "{r}", "--trials", "{t}",
                     "--arena", f"{src}/arena", "--out", "/kaggle/working/bowl", "--jobs", "1", "--threads", "4"],
                    check=True)

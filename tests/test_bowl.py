@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
@@ -27,7 +28,7 @@ def fake_arena(root, n=1500, d=6, k=3):
         np.savez(root / ds / "pair_0.npz", X_fit=X, y_fit=y, X_es=X[:200], y_es=y[:200], X_pseudo=ps, X_cal=cal,
                  teacher=b.predict_proba(X).astype(np.float32), bi=0, **bs)
         (root / ds / "pair_0.json").write_text(json.dumps({"R0": ["a"], "j": "b", "known": ["Benign", "x", "y"],
-                                                           "feats": [f"c{i}" for i in range(d)]}))
+                                                           "feats": [f"c{i}" for i in range(d // 2)]}))
 
 
 def test_fitness_perfect_and_null():
@@ -47,6 +48,8 @@ def test_size_and_ops_formulas():
     assert node(torch.randn(5, 10))[0].shape == (5, 3)
     node.eval()
     assert node(torch.randn(5, 10))[0].shape == (5, 3)  # hard (deployed) form
+    hy = fx.Hybrid(fx.Body(torch.nn.Identity(), 10, 3, 8, 1, members=4), fx.NODE(10, 3, T=4, D=3))
+    assert hy(torch.randn(5, 10))[0].shape == (5, 4, 3) and hy.ops() == hy.body.ops() + 4 * (3 + 3)
 
 
 def test_binmap_and_periodic_shapes():
@@ -76,11 +79,23 @@ def test_mini_bowl_end_to_end(tmp_path, monkeypatch):
     assert 0 <= D["champion"]["fitness"] <= 1 and set(D["bosses"]) == {"rf", "xgb"}
     bowl.autopsy(a)
     assert (rd / "autopsy.md").exists()
+    r2 = tmp_path / "bowl" / "round2"
+    r2.mkdir()
+    r2.joinpath("roster.json").write_text(json.dumps({"families": ["tabm", "tabm_node"], "population": 4,
+                                                      "genes": ["teacher", "syn"], "powerups": list(bowl.POWERUPS)}))
+    a.round = 2
+    bowl.ablate(a)
+    A = json.loads((r2 / "ablation.json").read_text())
+    assert set(A["kept"]) | set(A["dropped"]) == set(bowl.POWERUPS) and "all" in A["variants"]
+    roster = bowl.apply_ablation(json.loads(r2.joinpath("roster.json").read_text()), r2)
+    assert ("tabm_node" in roster["families"]) == ("node_branch" in A["kept"])
+    bowl.fight(a)
 
 
-def test_genome_space_is_static_for_optuna(tmp_path):
+@pytest.mark.parametrize("r", [1, 2])
+def test_genome_space_is_static_for_optuna(tmp_path, r):
     import optuna
-    roster = json.loads((Path(__file__).resolve().parents[1] / "results/bowl/round1/roster.json").read_text())
+    roster = json.loads((Path(__file__).resolve().parents[1] / f"results/bowl/round{r}/roster.json").read_text())
     st = optuna.create_study(storage=f"sqlite:///{tmp_path / 's.db'}", sampler=optuna.samplers.RandomSampler(0))
     for g in roster["seeds"]:
         st.enqueue_trial(g)
