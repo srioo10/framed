@@ -16,15 +16,31 @@ STAGE = ROOT / "data" / "kaggle"
 KAGGLE = str(ROOT / ".venv" / "bin" / "kaggle")
 CODE = ["bowl.py", "arena.py", "fighters.py", "ple.py", "roc.py"]
 
-KERNEL = '''import glob, os, shutil, subprocess, sys
+KERNEL = '''import glob, os, shutil, subprocess, sys, time
 src = os.path.dirname(os.path.dirname(glob.glob("/kaggle/input/**/code/bowl.py", recursive=True)[0]))
 shutil.copytree(f"{src}/code", "/kaggle/working/code", dirs_exist_ok=True)
 shutil.copytree(f"{src}/bowl", "/kaggle/working/bowl", dirs_exist_ok=True)
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", "optuna==5.0.0"], check=True)
-for cmd in (("ablate",) if {r} > 1 else ()) + ("fight", "death"):
-    subprocess.run([sys.executable, "/kaggle/working/code/bowl.py", cmd, "--round", "{r}", "--trials", "{t}",
-                    "--arena", f"{src}/arena", "--out", "/kaggle/working/bowl", "--jobs", "1", "--threads", "4"],
-                   check=True)
+W = {w}  # parallel worker processes sharing the GPU and the sqlite study
+
+
+def run(cmd, *extra):
+    return subprocess.Popen([sys.executable, "/kaggle/working/code/bowl.py", cmd, "--round", "{r}", "--trials", "{t}",
+                             "--arena", f"{src}/arena", "--out", "/kaggle/working/bowl", "--jobs", "1",
+                             "--threads", str(max(1, 4 // W)), "--parts", str(W), *extra])
+
+
+def wait(ps):
+    assert all(p.wait() == 0 for p in ps), "a bowl worker failed"
+
+
+if {r} > 1:
+    wait([run("ablate")])
+ps = [run("fight", "--part", "0")]
+time.sleep(60)  # worker 0 enqueues the seed genomes first
+wait(ps + [run("fight", "--part", str(i)) for i in range(1, W)])
+wait([run("death", "--part", str(i)) for i in range(W)])
+wait([run("death", "--merge")])
 '''
 
 
@@ -65,7 +81,8 @@ def push(a):
     k = STAGE / "kernel"
     shutil.rmtree(k, ignore_errors=True)
     k.mkdir()
-    (k / "run_bowl.py").write_text(KERNEL.replace("{r}", str(a.round)).replace("{t}", str(a.trials)))
+    (k / "run_bowl.py").write_text(KERNEL.replace("{r}", str(a.round)).replace("{t}", str(a.trials))
+                                   .replace("{w}", str(a.workers)))
     (k / "kernel-metadata.json").write_text(json.dumps({
         "id": f"{u}/bigp-bowl", "title": "bigp-bowl", "code_file": "run_bowl.py", "language": "python",
         "kernel_type": "script", "is_private": True, "enable_gpu": True, "enable_internet": True,
@@ -93,5 +110,6 @@ if __name__ == "__main__":
     ap.add_argument("cmd", choices=["push", "status", "pull"])
     ap.add_argument("--round", type=int, default=1)
     ap.add_argument("--trials", type=int, default=256)
+    ap.add_argument("--workers", type=int, default=4)
     a = ap.parse_args()
     {"push": push, "status": status, "pull": pull}[a.cmd](a)

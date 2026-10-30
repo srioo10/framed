@@ -79,6 +79,8 @@ def suggest(trial, roster):
     g["ls"] = pick("ls", [0.0, 0.1])
     g["focal"] = pick("focal", [0.0, 2.0])
     g["lr"] = pick("lr", [1e-3, 3e-3])
+    if "bs" in roster:
+        g["bs"] = roster["bs"]
     return g
 
 
@@ -114,7 +116,7 @@ def rf_teacher(z):
 def run_pair(g, z, device, seed, epochs):
     m = build(g, z, seed)
     rf = rf_teacher(z) if g.get("teacher") == "rf" or g.get("syn", 0) > 0 else (None, None, None)
-    m = fx.train(m, z["X_fit"], z["y_fit"], z["k"], device, seed, epochs, g["lr"],
+    m = fx.train(m, z["X_fit"], z["y_fit"], z["k"], device, seed, epochs, g["lr"], bs=g.get("bs", 1024),
                  soft=rf[0] if g.get("teacher") == "rf" else z["teacher"], kd=g["kd"], ls=g["ls"], focal=g["focal"],
                  Xs=rf[1], Ss=rf[2], syn=g.get("syn", 0.0))
     h = fx.Head(g["head"], z["bi"]).fit(m, z["X_fit"], z["y_fit"], device)
@@ -160,6 +162,8 @@ def boss_fitness(pairs):
 def study(r, storage, roster):
     import optuna
     sampler = optuna.samplers.NSGAIISampler(population_size=roster.get("population", 32), seed=r)
+    if storage.startswith("sqlite"):  # parallel worker processes share the file: wait on locks instead of failing
+        storage = optuna.storages.RDBStorage(storage, engine_kwargs={"connect_args": {"timeout": 120}})
     return optuna.create_study(study_name=f"round{r}", storage=storage, load_if_exists=True, sampler=sampler,
                                directions=["maximize", "minimize", "minimize"])
 
@@ -220,7 +224,7 @@ def fight(a):
     roster = apply_ablation(json.loads((rd / "roster.json").read_text()), rd)
     pairs = load_pairs(a.arena, cheap=True)
     st = study(a.round, a.storage, roster)
-    if len(st.trials) == 0:
+    if len(st.trials) == 0 and a.part == 0:  # one worker enqueues the seeds
         for gnm in roster.get("seeds", []):  # seeds outside the pinned space are dropped, pinned genes stripped
             if gnm["family"] in roster["families"]:
                 st.enqueue_trial({k: v for k, v in gnm.items() if k not in roster.get("fixed", {})},
@@ -243,7 +247,8 @@ def fight(a):
 
     left = a.trials - len([t for t in st.trials if t.state.name == "COMPLETE"])
     if left > 0:
-        st.optimize(objective, n_trials=left, n_jobs=a.jobs, gc_after_trial=True)
+        stop = optuna.study.MaxTrialsCallback(a.trials, states=(optuna.trial.TrialState.COMPLETE,))  # across workers
+        st.optimize(objective, n_trials=left, n_jobs=a.jobs, gc_after_trial=True, callbacks=[stop])
     done = [t for t in st.trials if t.state == optuna.trial.TrialState.COMPLETE and "res" in t.user_attrs]
     feas = [t for t in done if max(t.user_attrs["c"]) <= 0]
     print(f"round {a.round}: {len(done)} fighters, {len(feas)} within limits")
@@ -264,16 +269,28 @@ def death(a):
     if not finalists:
         raise SystemExit(f"round {a.round}: no fighter within the size / speed limits")
     pairs = load_pairs(a.arena, cheap=False)
-    rows, best, best_scores = [], None, None
-    for t in finalists:
-        g = t.user_attrs["genome"]
-        res, sc = evaluate(g, pairs, a.device, seeds=(1, 2), epochs=30, keep_scores=True)
-        rows.append({"trial": t.number, **g, **res})
-        print(rows[-1], flush=True)
-        if best is None or res["fitness"] > best["fitness"]:
-            best, best_scores = rows[-1], sc
+    if a.merge:  # parts were evaluated by parallel workers: finalists in fight order, champion = best part's best
+        parts = [json.loads((rd / f"death_part{i}.json").read_text()) for i in range(a.parts)]
+        rows = sorted([r for p in parts for r in p["rows"]], key=lambda r: [t.number for t in finalists].index(r["trial"]))
+        i = max(range(a.parts), key=lambda i: parts[i]["best"]["fitness"] if parts[i]["best"] else -1)
+        best = parts[i]["best"]
+        (rd / f"death_part{i}.npz").replace(rd / "champion_scores.npz")
+    else:
+        rows, best, best_scores = [], None, None
+        for t in finalists[a.part::a.parts]:
+            g = t.user_attrs["genome"]
+            res, sc = evaluate(g, pairs, a.device, seeds=(1, 2), epochs=30, keep_scores=True)
+            rows.append({"trial": t.number, **g, **res})
+            print(rows[-1], flush=True)
+            if best is None or res["fitness"] > best["fitness"]:
+                best, best_scores = rows[-1], sc
+        sc_file = rd / ("champion_scores.npz" if a.parts == 1 else f"death_part{a.part}.npz")
+        if best_scores:
+            np.savez_compressed(sc_file, **{f"{k}/{r}": v for k, s in best_scores.items() for r, v in s.items()})
+        if a.parts > 1:
+            (rd / f"death_part{a.part}.json").write_text(json.dumps({"rows": rows, "best": best}))
+            return
     bosses = boss_fitness(pairs)
-    np.savez_compressed(rd / "champion_scores.npz", **{f"{k}/{r}": v for k, s in best_scores.items() for r, v in s.items()})
     (rd / "death.json").write_text(json.dumps({"finalists": rows, "bosses": bosses, "champion": best,
                                                "pairs": [f"{z['ds']}/{z['name']}" for z in pairs]}, indent=1))
     print("bosses", bosses)
@@ -323,6 +340,9 @@ def main():
     ap.add_argument("--arena", type=Path, default=ARENA)
     ap.add_argument("--out", type=Path, default=OUT)  # noqa: F823
     ap.add_argument("--storage", default=None)
+    ap.add_argument("--part", type=int, default=0)  # this worker's index (fight: only 0 enqueues; death: finalists i::n)
+    ap.add_argument("--parts", type=int, default=1)
+    ap.add_argument("--merge", action="store_true")
     a = ap.parse_args()
     OUT = a.out
     a.storage = a.storage or f"sqlite:///{OUT / 'bowl.db'}"

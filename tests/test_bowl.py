@@ -72,10 +72,17 @@ def test_mini_bowl_end_to_end(tmp_path, monkeypatch):
                                                                  "kd": 0.5, "ls": 0.0, "focal": 0.0, "lr": 3e-3}]}))
     import argparse
     a = argparse.Namespace(round=1, trials=4, jobs=1, threads=1, device="cpu", arena=tmp_path / "arena",
-                           storage=f"sqlite:///{tmp_path / 'b.db'}")
+                           storage=f"sqlite:///{tmp_path / 'b.db'}", part=0, parts=1, merge=False)
     bowl.fight(a)
     bowl.death(a)
+    single = json.loads((rd / "death.json").read_text())
+    for i in (0, 1):  # the same death match split over 2 workers, then merged
+        bowl.death(argparse.Namespace(**{**vars(a), "part": i, "parts": 2}))
+    bowl.death(argparse.Namespace(**{**vars(a), "parts": 2, "merge": True}))
     D = json.loads((rd / "death.json").read_text())
+    assert [r["trial"] for r in D["finalists"]] == [r["trial"] for r in single["finalists"]]
+    nt = lambda r: {k: v for k, v in r.items() if k != "ratio"}  # noqa: E731  ratio is wall-clock timing
+    assert nt(D["champion"]) == nt(single["champion"]) and (rd / "champion_scores.npz").exists()
     assert 0 <= D["champion"]["fitness"] <= 1 and set(D["bosses"]) == {"rf", "xgb"}
     bowl.autopsy(a)
     assert (rd / "autopsy.md").exists()
