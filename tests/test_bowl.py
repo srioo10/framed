@@ -126,3 +126,43 @@ def test_genome_space_is_static_for_optuna(tmp_path, r):
     fams = {t.params["family"] for t in st.trials}
     assert fams == set(roster["families"])
     assert all(set(g) <= set(st.trials[i].params) for i, g in enumerate(roster["seeds"]))
+
+
+@pytest.mark.parametrize("kind,members,ens,head", [("raw", 1, 1, "nlog"), ("quantile", 4, 1, "min"),
+                                                   ("tree", 2, 3, "nlog"), ("raw", 4, 3, "min")])
+def test_interval_bound_is_sound(kind, members, ens, head):
+    """PREREG §9 CERT Theorem 2: the IBP score bound covers the exact score at random points of every box, and equals
+    it on a zero-width box."""
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(400, 6)).astype(np.float32)
+    y = (X[:, 0] > 0).astype(int) + (X[:, 1] > 1)
+    clip = (np.r_[[-np.inf] * 3, [-2.0] * 3], np.r_[[np.inf] * 3, [2.0] * 3])
+
+    def body(s):
+        torch.manual_seed(s)
+        enc, din, _ = fx.encoder(kind, X, y, 4, s)
+        return fx.Body(enc, din, 3, 16, 2, members, act="selu" if s % 2 else "relu", clip=clip)
+    m = (body(0) if ens == 1 else fx.Ensemble([body(i) for i in range(ens)])).eval()
+    lo, hi = X - rng.uniform(0, 0.5, X.shape), X + rng.uniform(0, 0.5, X.shape)
+    hi[:, 5] = np.inf  # an unbounded host-context column (mean bytes) is tamed by the clip
+    up = fx.score_upper(m, lo, hi, 0, head)
+    h = fx.Head(head, 0)
+    for _ in range(20):
+        P = lo + rng.uniform(size=X.shape) * (np.minimum(hi, 10) - lo)
+        assert (h.score(m, P.astype(np.float32), "cpu") <= up + 1e-4).all()
+    assert np.allclose(fx.score_upper(m, X, X, 0, head), h.score(m, X, "cpu"), atol=1e-4)
+
+
+def test_cert_training_lowers_the_bound():
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(2000, 6)).astype(np.float32)
+    y = ((X[:, 0] > 0.5) & (X[:, 3] > 0)).astype(int)
+    lo, hi = X - 0.3, X + 0.3
+    ben = y == 0
+    ups = []
+    for cert in (0.0, 1.0):
+        torch.manual_seed(0)
+        m = fx.Body(torch.nn.Identity(), 6, 2, 16, 2)
+        m = fx.train(m, X, y, 2, "cpu", epochs=8, Lc=lo[ben], Hc=hi[ben], cert=cert, bi=0)
+        ups.append(np.median(fx.score_upper(m, lo[ben], hi[ben], 0, "nlog")))
+    assert ups[1] < ups[0]

@@ -111,6 +111,25 @@ def build(ds):
               flush=True)
 
 
+def prep_only(ds):
+    """PREREG §9 CERT: add each pair's Prep log-space mean / scale and column names to pair_i.json (arrays unchanged;
+    the same deterministic Prep fit as build)."""
+    import score_bank as sb
+    from nids import models
+    bank = sb.Bank(ds, SEED, "host", 40000, 200000)
+    for f in sorted((OUT / ds).glob("pair_*.json")):
+        meta = json.loads(f.read_text())
+        P = tuple(sorted(set(meta["R0"]) | {meta["j"]}))
+        fit, _ = bank.fit_rows(P)
+        dfit = bank.frame(fit, sb.role_removal(P, "fit"))
+        prep = models.Prep().fit(dfit)
+        z = np.load(f.with_suffix(".npz"))
+        assert np.allclose(prep.transform(dfit[:1000]), z["X_fit"][:1000], atol=1e-5), f"{f}: Prep refit differs"
+        meta.update(cols=list(dfit.columns), mu=prep.mu.tolist(), sd=prep.sd.tolist())
+        f.write_text(json.dumps(meta))
+        print(ds, f.stem, "prep saved", flush=True)
+
+
 def fitness(s_cal, s_pseudo, s_es, y_es, bi):
     """Mean of unknown TPR (pseudo) and known-attack TPR (es attacks) at exactly 1% FPR on benign cal rows."""
     s = np.r_[s_cal, s_pseudo, s_es]
@@ -124,4 +143,6 @@ def fitness(s_cal, s_pseudo, s_es, y_es, bi):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("dataset")
-    build(ap.parse_args().dataset)
+    ap.add_argument("--prep-only", action="store_true")
+    a = ap.parse_args()
+    (prep_only if a.prep_only else build)(a.dataset)

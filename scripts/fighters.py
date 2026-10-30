@@ -31,11 +31,14 @@ class BinMap(nn.Module):
         self.W = nn.Parameter(torch.randn(d, b, e) / math.sqrt(b))
         self.b = nn.Parameter(torch.zeros(d, e))
 
-    def forward(self, x):
+    def codes(self, x):
+        """(B, d, bins) in [0, 1], each component non-decreasing in its feature (so a box maps to a box)."""
         x = x[:, :, None]
-        E = torch.where(self.w > 0, ((x - self.lo) / torch.where(self.w > 0, self.w, 1)).clamp(0, 1),
-                        (x >= self.lo + self.w).float())
-        return (torch.einsum("ndb,dbe->nde", E, self.W) + self.b).flatten(1)
+        return torch.where(self.w > 0, ((x - self.lo) / torch.where(self.w > 0, self.w, 1)).clamp(0, 1),
+                           (x >= self.lo + self.w).float())
+
+    def forward(self, x):
+        return (torch.einsum("ndb,dbe->nde", self.codes(x), self.W) + self.b).flatten(1)
 
     def ops(self):
         d, b, e = self.W.shape
@@ -76,9 +79,12 @@ def encoder(kind, Xf, yf, e, seed):
 class Body(nn.Module):
     """enc -> [Linear (+spectral norm) -> act] * depth; TabM members scale the body input by r_m (k heads each)."""
 
-    def __init__(self, enc, din, k, w, depth, members=1, sn=False, act="relu"):
+    def __init__(self, enc, din, k, w, depth, members=1, sn=False, act="relu", clip=None):
         super().__init__()
         self.enc, self.M = enc, members
+        if clip is not None:  # (lo, hi) per input column, +-inf where unclipped
+            self.register_buffer("clo", torch.as_tensor(clip[0], dtype=torch.float32))
+            self.register_buffer("chi", torch.as_tensor(clip[1], dtype=torch.float32))
         lin = (lambda a, b: nn.utils.parametrizations.spectral_norm(nn.Linear(a, b))) if sn else nn.Linear
         A = {"relu": nn.ReLU, "selu": nn.SELU}[act]
         dims = [din] + [w] * depth
@@ -92,6 +98,8 @@ class Body(nn.Module):
         self.din, self.w, self.depth, self.k = din, w, depth, k
 
     def forward(self, x):
+        if hasattr(self, "clo"):
+            x = torch.minimum(torch.maximum(x, self.clo), self.chi)
         z = self.enc(x)
         if self.M > 1:
             h = self.body(z[:, None, :] * self.r[None])
@@ -197,6 +205,64 @@ class LeafNet(nn.Module):
         return 4 * self.nt * math.ceil(math.log2(self.leaves)) + self.nt * self.e + self.e * self.w + self.w * self.k
 
 
+def _affine(mu, r, W, b=None):
+    """Interval through x @ W.T + b in centre / radius form."""
+    out = mu @ W.T + (0 if b is None else b)
+    return out, r @ W.abs().T
+
+
+def _body_margins(body, lo, hi, bi):
+    """Upper bounds (B, M, k) of z_i - z_bi over the input box [lo, hi] for one Body (interval bound propagation)."""
+    if hasattr(body, "clo"):
+        lo, hi = (torch.minimum(torch.maximum(v, body.clo), body.chi) for v in (lo, hi))
+    if isinstance(body.enc, BinMap):
+        El, Eh = body.enc.codes(lo), body.enc.codes(hi)
+        mu = torch.einsum("ndb,dbe->nde", (El + Eh) / 2, body.enc.W).flatten(1) + body.enc.b.flatten()
+        r = torch.einsum("ndb,dbe->nde", (Eh - El) / 2, body.enc.W.abs()).flatten(1)
+    elif isinstance(body.enc, nn.Identity):
+        lo, hi = (v.clamp(-1e30, 1e30) for v in (lo, hi))  # an unclipped +inf column gives an infinite bound below
+        mu, r = (lo + hi) / 2, (hi - lo) / 2
+    else:
+        raise ValueError("no interval bound for this encoder")  # periodic embeddings are not monotone
+    if body.M > 1:
+        mu, r = mu[:, None, :] * body.r, r[:, None, :] * body.r.abs()
+    for layer in body.body:
+        if isinstance(layer, nn.Linear):
+            mu, r = _affine(mu, r, layer.weight, layer.bias)
+        else:  # ReLU / SELU are monotone
+            a, b = layer(mu - r), layer(mu + r)
+            mu, r = (a + b) / 2, (b - a) / 2
+    if body.M > 1:
+        D = body.hw - body.hw[:, :, bi:bi + 1]
+        out = torch.einsum("bmw,mwk->bmk", mu, D) + (body.hb - body.hb[:, bi:bi + 1]) + \
+            torch.einsum("bmw,mwk->bmk", r, D.abs())
+    else:
+        W, b = body.head.weight, body.head.bias
+        dm, dr = _affine(mu, r, W - W[bi], b - b[bi])
+        out = (dm + dr)[:, None]
+    return torch.nan_to_num(out, nan=float("inf"))
+
+
+def margins_upper(m, lo, hi, bi):
+    if isinstance(m, Ensemble):
+        return torch.cat([_body_margins(b, lo, hi, bi) for b in m.bodies], 1)
+    return _body_margins(m, lo, hi, bi)
+
+
+def score_upper(m, lo, hi, bi, head, device="cpu", bs=50_000):
+    """Sound upper bound of the nlog / min head score -log P(benign) over each row's box (PREREG §9 CERT Theorem 2):
+    P_m(benign) >= 1 / sum_i exp(upper(z_i - z_bi))."""
+    out = []
+    with torch.no_grad():
+        for i in range(0, len(lo), bs):
+            d = margins_upper(m, *(torch.as_tensor(v[i:i + bs], dtype=torch.float32, device=device) for v in (lo, hi)),
+                              bi)
+            lp = -torch.logsumexp(d.double(), -1)  # (B, M) lower bound of member log P(benign)
+            s = -(torch.logsumexp(lp, 1) - math.log(lp.shape[1])) if head == "nlog" else -lp.min(1).values
+            out.append(s.cpu().numpy())
+    return np.concatenate(out)
+
+
 def size_bytes(m):
     """int8 parameters (+ tree nodes x 8 B + float32 bin edges)."""
     n = sum(p.numel() for name, p in m.named_parameters() if not name.startswith("gbm"))
@@ -206,9 +272,10 @@ def size_bytes(m):
 
 
 def train(m, Xf, yf, k, device, seed=0, epochs=20, lr=2e-3, bs=1024, soft=None, kd=0.0, ls=0.0, focal=0.0, T=4.0,
-          Xs=None, Ss=None, syn=0.0):
+          Xs=None, Ss=None, syn=0.0, Lc=None, Hc=None, cert=0.0, bi=0):
     """Mean-member CE (label smoothing ls, focal gamma) mixed with KD (weight kd) to teacher probabilities `soft`,
-    plus syn x KD on a batch of synthetic rows Xs labelled by a teacher (Ss); early stop on CE of a 10% carve of the
+    plus syn x KD on a batch of synthetic rows Xs labelled by a teacher (Ss), plus cert x worst-case CE (interval
+    bound) on boxes [Lc, Hc] of benign fit rows (PREREG §9 CERT); early stop on CE of a 10% carve of the
     fit rows; NODE tau anneals 1 -> 0.05."""
     g = torch.Generator().manual_seed(seed)
     torch.manual_seed(seed)
@@ -223,6 +290,8 @@ def train(m, Xf, yf, k, device, seed=0, epochs=20, lr=2e-3, bs=1024, soft=None, 
         XS, SS = torch.from_numpy(Xs).to(device), torch.from_numpy(Ss.astype(np.float32)).to(device)
     opt = torch.optim.AdamW([p for name, p in m.named_parameters() if not name.startswith("gbm")], lr=lr,
                             weight_decay=1e-4)
+    if cert > 0:
+        LC, HC = (torch.from_numpy(np.asarray(v, np.float32)).to(device) for v in (Lc, Hc))
     trt = torch.from_numpy(tr).to(device)
     best, state = np.inf, None
     for ep in range(epochs):
@@ -249,6 +318,10 @@ def train(m, Xf, yf, k, device, seed=0, epochs=20, lr=2e-3, bs=1024, soft=None, 
                 ts = torch.softmax(torch.log(SS[j] + 1e-8) / T, 1).repeat_interleave(zs.shape[1], 0)
                 loss = loss + syn * nn.functional.kl_div(torch.log_softmax(zs.reshape(-1, k) / T, 1), ts,
                                                          reduction="batchmean") * T * T
+            if cert > 0:
+                j = torch.randint(len(LC), (len(b),), generator=g).to(device)
+                d = margins_upper(m, LC[j], HC[j], bi).clamp(max=50)
+                loss = loss + cert * torch.logsumexp(d, -1).mean()
             opt.zero_grad()
             loss.backward()
             opt.step()
