@@ -144,6 +144,21 @@ def box(z, X, m):
     return (v.astype(np.float32) for v in sensitivity.box(X, z["cols"], z["mu"], z["sd"], m))
 
 
+def dbox(z, X, m):
+    import sensitivity
+    return (v.astype(np.float32) for v in sensitivity.deletion_box(X, z["cols"], z["mu"], z["sd"], m))
+
+
+def robust_fitness(g, m, z, s_cal, device, mm):
+    """Robust-alarm gating: (fitness, unk, known) where an alarm counts only if its IBP lower bound over the deletion
+    box at mm clears the clean 1%-FPR threshold. Blocked-benign FPR under <= mm injections is <= 1% by Theorem 1'."""
+    tau = np.sort(s_cal)[::-1][int(np.floor(0.01 * len(s_cal)))]
+    hit = lambda X: fx.score_lower(m, *dbox(z, X, mm), z["bi"], g["head"], device) > tau  # noqa: E731
+    u, a = hit(z["X_pseudo"]).mean(), z["y_es"] != z["bi"]
+    k_ = hit(z["X_es"][a]).mean() if a.any() else u
+    return float((u + k_) / 2), float(u), float(k_)
+
+
 def run_pair(g, z, device, seed, epochs):
     m = build(g, z, seed)
     rf = rf_teacher(z) if g.get("teacher") == "rf" or g.get("syn", 0) > 0 else (None, None, None)
@@ -152,9 +167,16 @@ def run_pair(g, z, device, seed, epochs):
         if "_box_fit" not in z:  # benign fit rows, m_train = CERT_M
             z["_box_fit"] = tuple(box(z, z["X_fit"][z["y_fit"] == z["bi"]], CERT_M))
         Lc, Hc = z["_box_fit"]
+    Ld = Hd = None
+    if g.get("rdet", 0) > 0:
+        if "_dbox_fit" not in z:  # attack fit rows, deletion box at CERT_M (robust-alarm gating)
+            a = z["y_fit"] != z["bi"]
+            z["_dbox_fit"] = tuple(dbox(z, z["X_fit"][a], CERT_M))
+        Ld, Hd = z["_dbox_fit"]
     m = fx.train(m, z["X_fit"], z["y_fit"], z["k"], device, seed, epochs, g["lr"], bs=g.get("bs", 1024),
                  soft=rf[0] if g.get("teacher") == "rf" else z["teacher"], kd=g["kd"], ls=g["ls"], focal=g["focal"],
-                 Xs=rf[1], Ss=rf[2], syn=g.get("syn", 0.0), Lc=Lc, Hc=Hc, cert=g.get("cert", 0.0), bi=z["bi"])
+                 Xs=rf[1], Ss=rf[2], syn=g.get("syn", 0.0), Lc=Lc, Hc=Hc, cert=g.get("cert", 0.0), bi=z["bi"],
+                 Ld=Ld, Hd=Hd, rdet=g.get("rdet", 0.0))
     h = fx.Head(g["head"], z["bi"]).fit(m, z["X_fit"], z["y_fit"], device)
     s = {k: h.score(m, z[f"X_{k}"], device) for k in ("cal", "pseudo", "es")}
     return m, h, s

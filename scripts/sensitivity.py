@@ -40,3 +40,38 @@ def box(X, cols, mu, sd, m):
     lo[:, hc] = np.minimum(lo[:, hc], X[:, hc]) - EPS
     hi[:, hc] = np.maximum(hi[:, hc], X[:, hc]) + EPS
     return lo, hi
+
+
+def deletion_box(X, cols, mu, sd, m):
+    """Theorem 1' (robust-alarm gating): box of every host context reachable from an OBSERVED row by deleting the
+    j <= m injected flows. Observed window: n', c' failed / novel. Deleting j_in <= min(m, n') window flows gives
+      n              in [(n'-m)+, n']
+      fail share     in [(c'-m)+ / (n'-m), c' / (n'-m)]               (deletions only remove failures)
+      newport/peer   in [(c'-m)+ / (n'-m), (c'+m) / (n'-m)]           (a deleted flow ends <= 1 novelty and makes
+                                                                       <= 1 later real flow of its pair novel)
+      mean bytes     in [0, inf)                                      (per-flow bytes are not in the row)
+    shares capped to [0, 1]; when n' <= m every share may be anything in [0, 1]. The clean row of an attacked flow lies
+    in the deletion box of its observed row, so an alarm whose lower bound over this box clears tau would have fired
+    without the injections."""
+    X = np.asarray(X, np.float64)
+    lo, hi = X.copy(), X.copy()
+    raw = lambda j: np.expm1(np.maximum(X[:, j] * sd[j] + mu[j], 0))  # noqa: E731
+    back = lambda j, v: (np.log1p(v) - mu[j]) / sd[j]  # noqa: E731
+    groups = {c.rsplit("_", 2)[0] + "_" + c.rsplit("_", 1)[1] for c in cols if c.startswith("hc_")}
+    for g in groups:
+        key, w = g.rsplit("_", 1)
+        idx = {s: cols.index(f"{key}_{s}_{w}") for s in ("n", "fail", "newport", "newpeer", "bytes")}
+        n = np.rint(raw(idx["n"]))
+        r = np.maximum(n - m, 0)
+        dr, empty = np.maximum(r, 1), r < 1
+        lo[:, idx["n"]] = back(idx["n"], r)
+        for s in ("fail", "newport", "newpeer"):
+            c = raw(idx[s]) * np.maximum(n, 1)
+            s_lo = np.where(empty, 0, np.maximum(c - m, 0) / dr)
+            s_hi = np.where(empty, 1, np.minimum((c if s == "fail" else c + m) / dr, 1))
+            lo[:, idx[s]], hi[:, idx[s]] = back(idx[s], s_lo), back(idx[s], s_hi)
+        lo[:, idx["bytes"]], hi[:, idx["bytes"]] = back(idx["bytes"], 0), np.inf
+    hc = np.array([c.startswith("hc_") for c in cols])
+    lo[:, hc] = np.minimum(lo[:, hc], X[:, hc]) - EPS
+    hi[:, hc] = np.maximum(hi[:, hc], X[:, hc]) + EPS
+    return lo, hi

@@ -211,8 +211,9 @@ def _affine(mu, r, W, b=None):
     return out, r @ W.abs().T
 
 
-def _body_margins(body, lo, hi, bi):
-    """Upper bounds (B, M, k) of z_i - z_bi over the input box [lo, hi] for one Body (interval bound propagation)."""
+def _body_margins(body, lo, hi, bi, lower=False):
+    """Upper (or lower) bounds (B, M, k) of z_i - z_bi over the input box [lo, hi] for one Body (interval bound
+    propagation)."""
     if hasattr(body, "clo"):
         lo, hi = (torch.minimum(torch.maximum(v, body.clo), body.chi) for v in (lo, hi))
     if isinstance(body.enc, BinMap):
@@ -235,18 +236,32 @@ def _body_margins(body, lo, hi, bi):
     if body.M > 1:
         D = body.hw - body.hw[:, :, bi:bi + 1]
         out = torch.einsum("bmw,mwk->bmk", mu, D) + (body.hb - body.hb[:, bi:bi + 1]) + \
-            torch.einsum("bmw,mwk->bmk", r, D.abs())
+            (-1 if lower else 1) * torch.einsum("bmw,mwk->bmk", r, D.abs())
     else:
         W, b = body.head.weight, body.head.bias
         dm, dr = _affine(mu, r, W - W[bi], b - b[bi])
-        out = (dm + dr)[:, None]
+        out = (dm - dr if lower else dm + dr)[:, None]
     return torch.nan_to_num(out, nan=float("inf"))
 
 
-def margins_upper(m, lo, hi, bi):
+def margins_upper(m, lo, hi, bi, lower=False):
     if isinstance(m, Ensemble):
-        return torch.cat([_body_margins(b, lo, hi, bi) for b in m.bodies], 1)
-    return _body_margins(m, lo, hi, bi)
+        return torch.cat([_body_margins(b, lo, hi, bi, lower) for b in m.bodies], 1)
+    return _body_margins(m, lo, hi, bi, lower)
+
+
+def score_lower(m, lo, hi, bi, head, device="cpu", bs=50_000):
+    """Sound lower bound of the nlog / min head score over each row's box (robust-alarm gating, Theorem 1'):
+    member log P(benign) <= -logsumexp_i lower(z_i - z_bi)."""
+    out = []
+    with torch.no_grad():
+        for i in range(0, len(lo), bs):
+            d = margins_upper(m, *(torch.as_tensor(v[i:i + bs], dtype=torch.float32, device=device) for v in (lo, hi)),
+                              bi, lower=True)
+            lp = -torch.logsumexp(d.double(), -1)  # (B, M) upper bound of member log P(benign)
+            s = -(torch.logsumexp(lp, 1) - math.log(lp.shape[1])) if head == "nlog" else -lp.min(1).values
+            out.append(s.cpu().numpy())
+    return np.concatenate(out)
 
 
 def score_upper(m, lo, hi, bi, head, device="cpu", bs=50_000):
@@ -272,10 +287,11 @@ def size_bytes(m):
 
 
 def train(m, Xf, yf, k, device, seed=0, epochs=20, lr=2e-3, bs=1024, soft=None, kd=0.0, ls=0.0, focal=0.0, T=4.0,
-          Xs=None, Ss=None, syn=0.0, Lc=None, Hc=None, cert=0.0, bi=0):
+          Xs=None, Ss=None, syn=0.0, Lc=None, Hc=None, cert=0.0, bi=0, Ld=None, Hd=None, rdet=0.0):
     """Mean-member CE (label smoothing ls, focal gamma) mixed with KD (weight kd) to teacher probabilities `soft`,
     plus syn x KD on a batch of synthetic rows Xs labelled by a teacher (Ss), plus cert x worst-case CE (interval
-    bound) on boxes [Lc, Hc] of benign fit rows (PREREG §9 CERT); early stop on CE of a 10% carve of the
+    bound) on boxes [Lc, Hc] of benign fit rows (PREREG §9 CERT), plus rdet x worst-case "not benign" loss on deletion
+    boxes [Ld, Hd] of attack fit rows (robust-alarm gating); early stop on CE of a 10% carve of the
     fit rows; NODE tau anneals 1 -> 0.05."""
     g = torch.Generator().manual_seed(seed)
     torch.manual_seed(seed)
@@ -292,6 +308,8 @@ def train(m, Xf, yf, k, device, seed=0, epochs=20, lr=2e-3, bs=1024, soft=None, 
                             weight_decay=1e-4)
     if cert > 0:
         LC, HC = (torch.from_numpy(np.asarray(v, np.float32)).to(device) for v in (Lc, Hc))
+    if rdet > 0:
+        LD, HD = (torch.from_numpy(np.asarray(v, np.float32)).to(device) for v in (Ld, Hd))
     trt = torch.from_numpy(tr).to(device)
     best, state = np.inf, None
     for ep in range(epochs):
@@ -323,6 +341,11 @@ def train(m, Xf, yf, k, device, seed=0, epochs=20, lr=2e-3, bs=1024, soft=None, 
                 d = margins_upper(m, LC[j], HC[j], bi).clamp(max=50)
                 ramp = min(1.0, (ep + 1) / max(1, epochs // 2))  # IBP warm-up (Gowal et al. 2018)
                 loss = loss + ramp * cert * torch.logsumexp(d, -1).mean()
+            if rdet > 0:
+                j = torch.randint(len(LD), (len(b),), generator=g).to(device)
+                s = torch.logsumexp(margins_upper(m, LD[j], HD[j], bi, lower=True).clamp(min=-50), -1)  # (B, M) >= 0
+                ramp = min(1.0, (ep + 1) / max(1, epochs // 2))
+                loss = loss - ramp * rdet * torch.log(-torch.expm1(-s.clamp(min=1e-4))).mean()  # -log P_worst(attack)
             opt.zero_grad()
             loss.backward()
             opt.step()

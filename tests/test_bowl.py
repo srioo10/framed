@@ -150,12 +150,14 @@ def test_interval_bound_is_sound(kind, members, ens, head):
     m = (body(0) if ens == 1 else fx.Ensemble([body(i) for i in range(ens)])).eval()
     lo, hi = X - rng.uniform(0, 0.5, X.shape), X + rng.uniform(0, 0.5, X.shape)
     hi[:, 5] = np.inf  # an unbounded host-context column (mean bytes) is tamed by the clip
-    up = fx.score_upper(m, lo, hi, 0, head)
+    up, dn = fx.score_upper(m, lo, hi, 0, head), fx.score_lower(m, lo, hi, 0, head)
     h = fx.Head(head, 0)
     for _ in range(20):
         P = lo + rng.uniform(size=X.shape) * (np.minimum(hi, 10) - lo)
-        assert (h.score(m, P.astype(np.float32), "cpu") <= up + 1e-4).all()
+        s = h.score(m, P.astype(np.float32), "cpu")
+        assert (s <= up + 1e-4).all() and (s >= dn - 1e-4).all()
     assert np.allclose(fx.score_upper(m, X, X, 0, head), h.score(m, X, "cpu"), atol=1e-4)
+    assert np.allclose(fx.score_lower(m, X, X, 0, head), h.score(m, X, "cpu"), atol=1e-4)
 
 
 def test_cert_training_lowers_the_bound():

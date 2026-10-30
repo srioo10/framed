@@ -51,6 +51,8 @@ def test_box_contains_every_injection(m):
         H = hostctx.HostFlows(both.drop(columns="r")).features(np.ones(len(both), bool))[both.r.to_numpy()]
         X1 = prep(H, mu, sd)  # the stable sort keeps real rows in their original order
         assert (X1 >= lo).all() and (X1 <= hi).all(), f"trial {trial}: injection left the box"
+        dlo, dhi = sensitivity.deletion_box(X1, cols, mu, sd, m)  # Theorem 1': the clean row is reachable back
+        assert (X >= dlo).all() and (X <= dhi).all(), f"trial {trial}: clean row outside the deletion box"
 
 
 def test_box_is_tight_on_counts():
