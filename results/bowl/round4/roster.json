@@ -1,0 +1,172 @@
+{
+ "families": [
+  "mlp",
+  "tabm"
+ ],
+ "population": 32,
+ "cert_mode": true,
+ "genes": [
+  "syn"
+ ],
+ "syn_opts": [
+  0.0,
+  0.5,
+  1.0
+ ],
+ "enc_opts": [
+  "raw",
+  "quantile",
+  "tree"
+ ],
+ "head_opts": [
+  "nlog"
+ ],
+ "head_m_opts": [
+  "nlog",
+  "min"
+ ],
+ "cert_opts": [
+  0.5,
+  1,
+  2,
+  4
+ ],
+ "powerups": [],
+ "seeds": [
+  {
+   "family": "mlp",
+   "enc": "raw",
+   "e": 2,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "relu",
+   "members": 1,
+   "head": "nlog",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 2.0,
+   "lr": 0.003,
+   "cert": 2
+  },
+  {
+   "family": "mlp",
+   "enc": "raw",
+   "e": 2,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "relu",
+   "members": 1,
+   "head": "nlog",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 2.0,
+   "lr": 0.003,
+   "cert": 4
+  },
+  {
+   "family": "mlp",
+   "enc": "raw",
+   "e": 4,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "selu",
+   "members": 1,
+   "head": "nlog",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 0.0,
+   "lr": 0.003,
+   "cert": 1
+  },
+  {
+   "family": "mlp",
+   "enc": "raw",
+   "e": 4,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "selu",
+   "members": 1,
+   "head": "nlog",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 0.0,
+   "lr": 0.003,
+   "cert": 2
+  },
+  {
+   "family": "mlp",
+   "enc": "raw",
+   "e": 4,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "selu",
+   "members": 1,
+   "head": "nlog",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 0.0,
+   "lr": 0.003,
+   "cert": 4
+  },
+  {
+   "family": "mlp",
+   "enc": "quantile",
+   "e": 2,
+   "w": 32,
+   "depth": 2,
+   "sn": 0,
+   "act": "relu",
+   "members": 1,
+   "head": "nlog",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 2.0,
+   "lr": 0.003,
+   "cert": 2
+  },
+  {
+   "family": "mlp",
+   "enc": "tree",
+   "e": 4,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "selu",
+   "members": 1,
+   "head": "nlog",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 0.0,
+   "lr": 0.003,
+   "cert": 2
+  },
+  {
+   "family": "tabm",
+   "enc": "quantile",
+   "e": 4,
+   "w": 32,
+   "depth": 1,
+   "sn": 0,
+   "act": "relu",
+   "members": 4,
+   "head": "min",
+   "kd": 0.5,
+   "ls": 0.0,
+   "focal": 0.0,
+   "lr": 0.003,
+   "cert": 2
+  }
+ ]
+}
