@@ -135,6 +135,6 @@ if __name__ == "__main__":
     ap.add_argument("--round", type=int, default=1)
     ap.add_argument("--trials", type=int, default=256)
     ap.add_argument("--workers", type=int, default=4)
-    ap.add_argument("--hours", type=float, default=2.5)  # fight wall-clock cap per worker
+    ap.add_argument("--hours", type=float, default=8)  # emergency brake only (Kaggle kills at 12 h); budget = --trials
     a = ap.parse_args()
     {"push": push, "status": status, "pull": pull, "bosses": bosses, "pull_bosses": pull_bosses}[a.cmd](a)
