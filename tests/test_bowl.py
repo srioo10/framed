@@ -7,12 +7,13 @@ import pytest
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import arena  # noqa: E402
 import bowl  # noqa: E402
 import fighters as fx  # noqa: E402
 
 
-def fake_arena(root, n=1500, d=6, k=3):
+def fake_arena(root, n=1500, d=6, k=3, cert=False):
     import xgboost as xgb
     rng = np.random.default_rng(0)
     for ds in ("nf_ctu13", "nf_ugr16"):
@@ -27,8 +28,12 @@ def fake_arena(root, n=1500, d=6, k=3):
               for m in ("rf", "xgb") for r, v in (("cal", cal), ("pseudo", ps), ("es", X[:200]))}
         np.savez(root / ds / "pair_0.npz", X_fit=X, y_fit=y, X_es=X[:200], y_es=y[:200], X_pseudo=ps, X_cal=cal,
                  teacher=b.predict_proba(X).astype(np.float32), bi=0, **bs)
-        (root / ds / "pair_0.json").write_text(json.dumps({"R0": ["a"], "j": "b", "known": ["Benign", "x", "y"],
-                                                           "feats": [f"c{i}" for i in range(d // 2)]}))
+        meta = {"R0": ["a"], "j": "b", "known": ["Benign", "x", "y"], "feats": [f"c{i}" for i in range(d // 2)]}
+        if cert:  # PREREG §9 CERT: the last 20 columns are host context, identity Prep scale
+            from nids import hostctx
+            meta.update(feats=[f"c{i}" for i in range(d - 20)], mu=[0.0] * d, sd=[1.0] * d,
+                        cols=[f"c{i}" for i in range(d - 20)] + hostctx.COLS)
+        (root / ds / "pair_0.json").write_text(json.dumps(meta))
 
 
 def test_fitness_perfect_and_null():
@@ -166,3 +171,31 @@ def test_cert_training_lowers_the_bound():
         m = fx.train(m, X, y, 2, "cpu", epochs=8, Lc=lo[ben], Hc=hi[ben], cert=cert, bi=0)
         ups.append(np.median(fx.score_upper(m, lo[ben], hi[ben], 0, "nlog")))
     assert ups[1] < ups[0]
+
+
+def test_cert_round_constrains_certified_fpr(tmp_path, monkeypatch):
+    fake_arena(tmp_path / "arena", d=24, cert=True)
+    monkeypatch.setattr(bowl, "OUT", tmp_path / "bowl")
+    monkeypatch.setattr(bowl, "RATIO_MAX", 1e6)
+    rd = tmp_path / "bowl" / "round4"
+    rd.mkdir(parents=True)
+    rd.joinpath("roster.json").write_text(json.dumps({
+        "families": ["mlp", "tabm"], "population": 4, "cert_mode": True, "enc_opts": ["raw", "quantile"],
+        "head_opts": ["nlog"], "head_m_opts": ["nlog", "min"], "powerups": [],
+        "seeds": [{"family": "mlp", "enc": "raw", "e": 4, "w": 16, "depth": 1, "sn": 0, "act": "relu", "head": "nlog",
+                   "kd": 0.5, "ls": 0.0, "focal": 0.0, "lr": 3e-3, "cert": 1.0}]}))
+    import argparse
+    a = argparse.Namespace(round=4, trials=3, jobs=1, threads=1, device="cpu", arena=tmp_path / "arena",
+                           storage=f"sqlite:///{tmp_path / 'b.db'}", part=0, parts=1, merge=False)
+    bowl.ablate(a)  # no power-ups: nothing to do
+    assert not (rd / "ablation.json").exists()
+    monkeypatch.setattr(bowl, "CERT_MAX", 1.01)  # every toy fighter feasible, so the death match runs
+    monkeypatch.setattr(bowl, "CERT_MS", (1, 10))
+    bowl.fight(a)
+    import optuna
+    st = optuna.load_study(study_name="round4", storage=a.storage)
+    t = [t for t in st.trials if "res" in t.user_attrs]
+    assert t and all(len(x.user_attrs["c"]) == 3 and 0 <= x.user_attrs["res"]["cert"]["10"] <= 1 for x in t)
+    bowl.death(a)
+    D = json.loads((rd / "death.json").read_text())
+    assert set(D["champion"]["cert"]) == {"1", "10"} and D["champion"]["cert"]["1"] <= D["champion"]["cert"]["10"]

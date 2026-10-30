@@ -14,7 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 STAGE = ROOT / "data" / "kaggle"
 KAGGLE = str(ROOT / ".venv" / "bin" / "kaggle")
-CODE = ["bowl.py", "arena.py", "fighters.py", "ple.py", "roc.py"]
+CODE = ["bowl.py", "arena.py", "fighters.py", "ple.py", "roc.py", "sensitivity.py"]
 
 KERNEL = '''import glob, os, shutil, subprocess, sys, time
 src = os.path.dirname(os.path.dirname(glob.glob("/kaggle/input/**/code/bowl.py", recursive=True)[0]))

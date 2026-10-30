@@ -29,6 +29,7 @@ ROOT = HERE.parent
 ARENA = ROOT / "data" / "arena"
 OUT = ROOT / "results" / "bowl"
 SIZE_MAX, RATIO_MAX = 65_536, 0.5
+CERT_MAX, CERT_M, CERT_ROWS, CERT_MS = 0.02, 10, 20_000, (1, 5, 10, 50, 100)  # PREREG §9 CERT
 DATASETS = ("nf_ctu13", "nf_ugr16", "nf_cic")
 
 
@@ -46,7 +47,10 @@ def load_pairs(arena_dir, cheap, seed=0):
                 z["X_fit"], z["y_fit"], z["teacher"] = z["X_fit"][i], z["y_fit"][i], z["teacher"][i]
             z["ds"], z["name"], z["bi"], z["dir"] = ds, f.stem, int(z["bi"]), f.parent
             z["k"] = z["teacher"].shape[1]
-            z["nflow"] = len(json.loads(f.with_suffix(".json").read_text())["feats"])
+            meta = json.loads(f.with_suffix(".json").read_text())
+            z["nflow"] = len(meta["feats"])
+            if "mu" in meta:  # Prep parameters for the §9 CERT boxes (arena.py --prep-only)
+                z["cols"], z["mu"], z["sd"] = meta["cols"], np.array(meta["mu"]), np.array(meta["sd"])
             P.append(z)
     return P
 
@@ -57,7 +61,7 @@ def suggest(trial, roster):
     pick = lambda name, opts: fixed[name] if name in fixed else trial.suggest_categorical(name, opts)  # noqa: E731
     g = {"family": pick("family", roster["families"])}
     if g["family"] in ("mlp", "tabm", "tabm_node"):
-        g["enc"] = pick("enc", ["raw", "quantile", "tree", "periodic"])
+        g["enc"] = pick("enc", roster.get("enc_opts", ["raw", "quantile", "tree", "periodic"]))
         g["e"] = pick("e", [2, 4])
         g["w"] = pick("w", [16, 32, 64])
         g["depth"] = pick("depth", [1, 2])
@@ -73,8 +77,8 @@ def suggest(trial, roster):
         g["le"] = pick("le", [4, 8])
         g["lw"] = pick("lw", [16, 32])
     # Optuna needs one fixed choice set per parameter name, so ensembles get their own head gene
-    g["head"] = pick("head_m", ["nlog", "energy", "maha", "min"]) if g.get("members", 1) > 1 \
-        else pick("head", ["nlog", "energy", "maha"])
+    g["head"] = pick("head_m", roster.get("head_m_opts", ["nlog", "energy", "maha", "min"])) \
+        if g.get("members", 1) > 1 else pick("head", roster.get("head_opts", ["nlog", "energy", "maha"]))
     g["kd"] = pick("kd", [0.0, 0.5, 0.9])
     if "teacher" in roster.get("genes", []):
         g["teacher"] = pick("teacher", ["xgb", "rf"])
@@ -82,6 +86,9 @@ def suggest(trial, roster):
         g["syn"] = pick("syn", roster.get("syn_opts", [0.0, 0.5]))
     if "ens" in roster.get("genes", []) and g["family"] in ("mlp", "tabm"):
         g["ens"] = pick("ens", [1, 3])
+    if roster.get("cert_mode"):  # host-context columns clipped to the fit range, certified FPR constrained
+        g["clip"] = 1
+        g["cert"] = pick("cert", roster.get("cert_opts", [0.0, 0.25, 0.5, 1.0]))
     g["ls"] = pick("ls", [0.0, 0.1])
     g["focal"] = pick("focal", [0.0, 2.0])
     g["lr"] = pick("lr", [1e-3, 3e-3])
@@ -90,13 +97,22 @@ def suggest(trial, roster):
     return g
 
 
+def hc_clip(z):
+    """Fit-range clip [q0.001, q0.999] of the host-context columns, +-inf elsewhere (PREREG §9 CERT)."""
+    hc = np.array([c.startswith("hc_") for c in z["cols"]])
+    q = np.quantile(z["X_fit"], [0.001, 0.999], axis=0)
+    return np.where(hc, q[0], -np.inf), np.where(hc, q[1], np.inf)
+
+
 def build(g, z, seed):
     Xf, yf, k = z["X_fit"], z["y_fit"], z["k"]
     if g["family"] in ("mlp", "tabm"):
+        clip = hc_clip(z) if g.get("clip") else None
+
         def body(s):
             torch.manual_seed(s)  # independent initialisation per ensemble member
             enc, din, _ = fx.encoder(g["enc"], Xf, yf, g["e"], s)
-            return fx.Body(enc, din, k, g["w"], g["depth"], g["members"], bool(g["sn"]), g["act"])
+            return fx.Body(enc, din, k, g["w"], g["depth"], g["members"], bool(g["sn"]), g["act"], clip=clip)
         n = g.get("ens", 1)
         return body(seed) if n == 1 else fx.Ensemble([body(1000 * seed + i) for i in range(n)])
     if g["family"] == "tabm_node":
@@ -123,12 +139,22 @@ def rf_teacher(z):
     return z["_rf"]
 
 
+def box(z, X, m):
+    import sensitivity
+    return (v.astype(np.float32) for v in sensitivity.box(X, z["cols"], z["mu"], z["sd"], m))
+
+
 def run_pair(g, z, device, seed, epochs):
     m = build(g, z, seed)
     rf = rf_teacher(z) if g.get("teacher") == "rf" or g.get("syn", 0) > 0 else (None, None, None)
+    Lc = Hc = None
+    if g.get("cert", 0) > 0:
+        if "_box_fit" not in z:  # benign fit rows, m_train = CERT_M
+            z["_box_fit"] = tuple(box(z, z["X_fit"][z["y_fit"] == z["bi"]], CERT_M))
+        Lc, Hc = z["_box_fit"]
     m = fx.train(m, z["X_fit"], z["y_fit"], z["k"], device, seed, epochs, g["lr"], bs=g.get("bs", 1024),
                  soft=rf[0] if g.get("teacher") == "rf" else z["teacher"], kd=g["kd"], ls=g["ls"], focal=g["focal"],
-                 Xs=rf[1], Ss=rf[2], syn=g.get("syn", 0.0))
+                 Xs=rf[1], Ss=rf[2], syn=g.get("syn", 0.0), Lc=Lc, Hc=Hc, cert=g.get("cert", 0.0), bi=z["bi"])
     h = fx.Head(g["head"], z["bi"]).fit(m, z["X_fit"], z["y_fit"], device)
     s = {k: h.score(m, z[f"X_{k}"], device) for k in ("cal", "pseudo", "es")}
     return m, h, s
@@ -142,22 +168,38 @@ def boss_time(z):
     return fx.time_per_row(lambda X: b.predict_proba(X), z["X_cal"][:4096])
 
 
-def evaluate(g, pairs, device, seeds=(0,), epochs=15, keep_scores=False):
-    fit, unk, kn, scores = [], [], [], {}
+def cert_fpr(g, m, h, z, s_cal, device, ms):
+    """{m: certified FPR} on a fixed sample of cal rows; threshold from the clean scores of all cal rows."""
+    i = np.sort(np.random.default_rng(0).choice(len(s_cal), min(CERT_ROWS, len(s_cal)), replace=False))
+    tau = np.sort(s_cal)[::-1][int(np.floor(0.01 * len(s_cal)))]
+    out = {}
+    for mm in ms:
+        lo, hi = box(z, z["X_cal"][i], mm)
+        out[mm] = float((fx.score_upper(m, lo, hi, z["bi"], g["head"], device) > tau).mean())
+    return out
+
+
+def evaluate(g, pairs, device, seeds=(0,), epochs=15, keep_scores=False, ms=(CERT_M,)):
+    fit, unk, kn, scores, cert = [], [], [], {}, []
     size = ratio = None
     for z in pairs:
         for sd in seeds:
             m, h, s = run_pair(g, z, device, sd, epochs)
             f, u, k_ = arena.fitness(s["cal"], s["pseudo"], s["es"], z["y_es"], z["bi"])
             fit.append(f), unk.append(u), kn.append(k_)
+            if g.get("clip"):
+                cert.append(cert_fpr(g, m, h, z, s["cal"], device, ms))
             if keep_scores:
                 scores[f"{z['ds']}/{z['name']}/s{sd}"] = s
             if size is None:
                 mc = copy.deepcopy(m).cpu()
                 size = fx.size_bytes(mc)
                 ratio = fx.time_per_row(lambda X: h.score(mc, X, "cpu"), z["X_cal"][:4096]) / boss_time(z)
-    return {"fitness": float(np.mean(fit)), "unk": float(np.mean(unk)), "known": float(np.mean(kn)),
-            "size": int(size), "ratio": float(ratio)}, scores
+    res = {"fitness": float(np.mean(fit)), "unk": float(np.mean(unk)), "known": float(np.mean(kn)),
+           "size": int(size), "ratio": float(ratio)}
+    if cert:
+        res["cert"] = {str(mm): float(np.mean([c[mm] for c in cert])) for mm in ms}  # macro over pairs and seeds
+    return res, scores
 
 
 def boss_fitness(pairs):
@@ -190,9 +232,9 @@ def ablate(a):
     import torch
     torch.set_num_threads(a.threads)
     rd = OUT / f"round{a.round}"
-    if (rd / "ablation.json").exists():  # a resumed round keeps its ablation
-        return
     roster = json.loads((rd / "roster.json").read_text())
+    if (rd / "ablation.json").exists() or not roster.get("powerups"):  # resumed round, or nothing to ablate
+        return
     base = {k: v for k, v in json.loads((OUT / f"round{a.round - 1}" / "death.json").read_text())["champion"].items()
             if k not in ("trial", "fitness", "unk", "known", "size", "ratio")}
     base.setdefault("teacher", "xgb"), base.setdefault("syn", 0.0), base.setdefault("ens", 1)
@@ -249,13 +291,19 @@ def fight(a):
             res, _ = evaluate(g, pairs, a.device)
         except Exception as e:  # a genome that cannot train is a dead fighter, not a crashed bowl
             trial.set_user_attr("error", repr(e)[:300])
-            trial.set_user_attr("c", [1.0, 1.0])
-            trial.set_constraint("size", 1.0), trial.set_constraint("ratio", 1.0)
+            names = ["size", "ratio"] + (["cert"] if roster.get("cert_mode") else [])
+            trial.set_user_attr("c", [1.0] * len(names))
+            for n in names:
+                trial.set_constraint(n, 1.0)
             return 0.0, 1e9, 1e9
         trial.set_user_attr("res", res)
         trial.set_user_attr("genome", g)
-        trial.set_user_attr("c", [res["size"] - SIZE_MAX, res["ratio"] - RATIO_MAX])
-        trial.set_constraint("size", res["size"] - SIZE_MAX), trial.set_constraint("ratio", res["ratio"] - RATIO_MAX)
+        c = [res["size"] - SIZE_MAX, res["ratio"] - RATIO_MAX]
+        trial.set_constraint("size", c[0]), trial.set_constraint("ratio", c[1])
+        if "cert" in res:  # PREREG §9 CERT: certified FPR(10) on arena cal rows <= 2%
+            c.append(res["cert"][str(CERT_M)] - CERT_MAX)
+            trial.set_constraint("cert", c[2])
+        trial.set_user_attr("c", c)
         return res["fitness"], res["size"], res["ratio"]
 
     left = a.trials - len([t for t in st.trials if t.state.name == "COMPLETE"])
@@ -292,7 +340,7 @@ def death(a):
         rows, best, best_scores = [], None, None
         for t in finalists[a.part::a.parts]:
             g = t.user_attrs["genome"]
-            res, sc = evaluate(g, pairs, a.device, seeds=(1, 2), epochs=30, keep_scores=True)
+            res, sc = evaluate(g, pairs, a.device, seeds=(1, 2), epochs=30, keep_scores=True, ms=CERT_MS)
             rows.append({"trial": t.number, **g, **res})
             print(rows[-1], flush=True)
             if best is None or res["fitness"] > best["fitness"]:
