@@ -1,0 +1,187 @@
+{
+ "families": [
+  "mlp",
+  "tabm"
+ ],
+ "population": 32,
+ "cert_mode": true,
+ "genes": [
+  "syn"
+ ],
+ "syn_opts": [
+  0.0,
+  0.5,
+  1.0
+ ],
+ "enc_opts": [
+  "raw",
+  "quantile",
+  "tree"
+ ],
+ "head_opts": [
+  "nlog"
+ ],
+ "head_m_opts": [
+  "nlog",
+  "min"
+ ],
+ "cert_opts": [
+  2,
+  4,
+  8
+ ],
+ "powerups": [],
+ "seeds": [
+  {
+   "family": "mlp",
+   "enc": "raw",
+   "e": 2,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "relu",
+   "members": 1,
+   "head": "nlog",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 2.0,
+   "lr": 0.003,
+   "cert": 4,
+   "rdet": 4
+  },
+  {
+   "family": "mlp",
+   "enc": "raw",
+   "e": 2,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "relu",
+   "members": 1,
+   "head": "nlog",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 2.0,
+   "lr": 0.003,
+   "cert": 8,
+   "rdet": 4
+  },
+  {
+   "family": "mlp",
+   "enc": "raw",
+   "e": 2,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "relu",
+   "members": 1,
+   "head": "nlog",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 2.0,
+   "lr": 0.003,
+   "cert": 2,
+   "rdet": 2
+  },
+  {
+   "family": "mlp",
+   "enc": "raw",
+   "e": 2,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "relu",
+   "members": 1,
+   "head": "nlog",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 2.0,
+   "lr": 0.003,
+   "cert": 8,
+   "rdet": 8
+  },
+  {
+   "family": "mlp",
+   "enc": "raw",
+   "e": 4,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "selu",
+   "members": 1,
+   "head": "nlog",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 0.0,
+   "lr": 0.003,
+   "cert": 4,
+   "rdet": 4
+  },
+  {
+   "family": "tabm",
+   "enc": "tree",
+   "e": 2,
+   "w": 16,
+   "depth": 2,
+   "sn": 1,
+   "act": "selu",
+   "members": 4,
+   "head_m": "min",
+   "kd": 0.0,
+   "syn": 0.0,
+   "ls": 0.1,
+   "focal": 2.0,
+   "lr": 0.001,
+   "cert": 4,
+   "rdet": 4
+  },
+  {
+   "family": "tabm",
+   "enc": "tree",
+   "e": 4,
+   "w": 16,
+   "depth": 2,
+   "sn": 1,
+   "act": "selu",
+   "members": 8,
+   "head_m": "nlog",
+   "kd": 0.0,
+   "syn": 0.0,
+   "ls": 0.1,
+   "focal": 0.0,
+   "lr": 0.003,
+   "cert": 4,
+   "rdet": 4
+  },
+  {
+   "family": "tabm",
+   "enc": "tree",
+   "e": 2,
+   "w": 16,
+   "depth": 2,
+   "sn": 1,
+   "act": "selu",
+   "members": 4,
+   "head_m": "min",
+   "kd": 0.0,
+   "syn": 0.0,
+   "ls": 0.1,
+   "focal": 2.0,
+   "lr": 0.001,
+   "cert": 8,
+   "rdet": 4
+  }
+ ],
+ "gate": 1,
+ "drop_bytes": 1,
+ "rdet_opts": [
+  2,
+  4,
+  8
+ ]
+}
