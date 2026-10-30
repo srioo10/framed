@@ -135,6 +135,23 @@ class NODE(nn.Module):
         return self.T * (self.D + self.k)
 
 
+class Ensemble(nn.Module):
+    """Deep ensemble (Lakshminarayanan et al. NeurIPS'17): independently initialised bodies trained side by side;
+    member logits stacked (B, sum of members, k) so every head averages / mins over all of them."""
+
+    def __init__(self, bodies):
+        super().__init__()
+        self.bodies = nn.ModuleList(bodies)
+
+    def forward(self, x):
+        out = [b(x) for b in self.bodies]
+        z = torch.cat([o[0] if o[0].dim() == 3 else o[0][:, None] for o in out], 1)
+        return z, torch.stack([o[1] for o in out]).mean(0)
+
+    def ops(self):
+        return sum(b.ops() for b in self.bodies)
+
+
 class Hybrid(nn.Module):
     """Body (TabM / MLP) + NODE-lite branch on the prepped features, logits summed: the NODE's hard oblivious splits
     supply the axis-aligned feature ANDs a smooth body misses (round-1 autopsy)."""

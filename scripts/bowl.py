@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import torch
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -75,7 +76,9 @@ def suggest(trial, roster):
     if "teacher" in roster.get("genes", []):
         g["teacher"] = pick("teacher", ["xgb", "rf"])
     if "syn" in roster.get("genes", []):
-        g["syn"] = pick("syn", [0.0, 0.5])
+        g["syn"] = pick("syn", roster.get("syn_opts", [0.0, 0.5]))
+    if "ens" in roster.get("genes", []) and g["family"] in ("mlp", "tabm"):
+        g["ens"] = pick("ens", [1, 3])
     g["ls"] = pick("ls", [0.0, 0.1])
     g["focal"] = pick("focal", [0.0, 2.0])
     g["lr"] = pick("lr", [1e-3, 3e-3])
@@ -87,8 +90,12 @@ def suggest(trial, roster):
 def build(g, z, seed):
     Xf, yf, k = z["X_fit"], z["y_fit"], z["k"]
     if g["family"] in ("mlp", "tabm"):
-        enc, din, _ = fx.encoder(g["enc"], Xf, yf, g["e"], seed)
-        return fx.Body(enc, din, k, g["w"], g["depth"], g["members"], bool(g["sn"]), g["act"])
+        def body(s):
+            torch.manual_seed(s)  # independent initialisation per ensemble member
+            enc, din, _ = fx.encoder(g["enc"], Xf, yf, g["e"], s)
+            return fx.Body(enc, din, k, g["w"], g["depth"], g["members"], bool(g["sn"]), g["act"])
+        n = g.get("ens", 1)
+        return body(seed) if n == 1 else fx.Ensemble([body(1000 * seed + i) for i in range(n)])
     if g["family"] == "tabm_node":
         enc, din, _ = fx.encoder(g["enc"], Xf, yf, g["e"], seed)
         return fx.Hybrid(fx.Body(enc, din, k, g["w"], g["depth"], g["members"], bool(g["sn"]), g["act"]),
@@ -172,6 +179,7 @@ POWERUPS = {  # name: (genome edit that switches it on, roster edit that pins it
     "rf_teacher": ({"teacher": "rf"}, {"fixed": {"teacher": "xgb"}}),
     "syn": ({"syn": 0.5}, {"fixed": {"syn": 0.0}}),
     "node_branch": ({"family": "tabm_node", "T": 16, "D": 4}, {"drop_family": "tabm_node"}),
+    "ensemble": ({"ens": 3}, {"fixed": {"ens": 1}}),
 }
 
 
@@ -184,7 +192,9 @@ def ablate(a):
     roster = json.loads((rd / "roster.json").read_text())
     base = {k: v for k, v in json.loads((OUT / f"round{a.round - 1}" / "death.json").read_text())["champion"].items()
             if k not in ("trial", "fitness", "unk", "known", "size", "ratio")}
-    base.setdefault("teacher", "xgb"), base.setdefault("syn", 0.0)
+    base.setdefault("teacher", "xgb"), base.setdefault("syn", 0.0), base.setdefault("ens", 1)
+    if "bs" in roster:
+        base["bs"] = roster["bs"]
     pairs = load_pairs(a.arena, cheap=True)
     variants = {"base": base, **{n: {**base, **on} for n, (on, _) in POWERUPS.items() if n in roster["powerups"]},
                 "all": {**base, **{k: v for n, (on, _) in POWERUPS.items() if n in roster["powerups"]

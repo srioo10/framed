@@ -109,7 +109,7 @@ def test_mini_bowl_end_to_end(tmp_path, monkeypatch):
     bowl.fight(a)
 
 
-@pytest.mark.parametrize("r", [1, 2])
+@pytest.mark.parametrize("r", [1, 2, 3])
 def test_genome_space_is_static_for_optuna(tmp_path, r):
     import optuna
     roster = json.loads((Path(__file__).resolve().parents[1] / f"results/bowl/round{r}/roster.json").read_text())

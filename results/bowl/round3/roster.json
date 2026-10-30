@@ -1,0 +1,150 @@
+{
+ "families": [
+  "mlp",
+  "tabm"
+ ],
+ "population": 32,
+ "genes": [
+  "syn",
+  "ens"
+ ],
+ "syn_opts": [
+  0.0,
+  0.5,
+  1.0
+ ],
+ "powerups": [
+  "ensemble"
+ ],
+ "seeds": [
+  {
+   "family": "mlp",
+   "enc": "raw",
+   "e": 4,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "selu",
+   "head": "nlog",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 0.0,
+   "lr": 0.003,
+   "ens": 1
+  },
+  {
+   "family": "mlp",
+   "enc": "raw",
+   "e": 4,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "selu",
+   "head": "nlog",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 0.0,
+   "lr": 0.003,
+   "ens": 3
+  },
+  {
+   "family": "mlp",
+   "enc": "raw",
+   "e": 4,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "selu",
+   "head": "nlog",
+   "kd": 0.5,
+   "syn": 1.0,
+   "ls": 0.0,
+   "focal": 0.0,
+   "lr": 0.003,
+   "ens": 3
+  },
+  {
+   "family": "mlp",
+   "enc": "raw",
+   "e": 4,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "selu",
+   "head": "nlog",
+   "kd": 0.5,
+   "syn": 1.0,
+   "ls": 0.0,
+   "focal": 0.0,
+   "lr": 0.003,
+   "ens": 1
+  },
+  {
+   "family": "mlp",
+   "enc": "quantile",
+   "e": 2,
+   "w": 32,
+   "depth": 2,
+   "sn": 0,
+   "act": "relu",
+   "head": "nlog",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 2.0,
+   "lr": 0.003,
+   "ens": 3
+  },
+  {
+   "family": "tabm",
+   "enc": "periodic",
+   "e": 4,
+   "w": 32,
+   "depth": 2,
+   "sn": 1,
+   "act": "relu",
+   "members": 2,
+   "kd": 0.9,
+   "syn": 0.5,
+   "ls": 0.1,
+   "focal": 2.0,
+   "lr": 0.003,
+   "head_m": "min",
+   "ens": 3
+  },
+  {
+   "family": "mlp",
+   "enc": "raw",
+   "e": 2,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "relu",
+   "head": "energy",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 2.0,
+   "lr": 0.003,
+   "ens": 3
+  },
+  {
+   "family": "mlp",
+   "enc": "quantile",
+   "e": 4,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "selu",
+   "head": "nlog",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 0.0,
+   "lr": 0.003,
+   "ens": 3
+  }
+ ]
+}
