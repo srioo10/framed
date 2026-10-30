@@ -20,6 +20,7 @@ KERNEL = '''import glob, os, shutil, subprocess, sys, time
 src = os.path.dirname(os.path.dirname(glob.glob("/kaggle/input/**/code/bowl.py", recursive=True)[0]))
 shutil.copytree(f"{src}/code", "/kaggle/working/code", dirs_exist_ok=True)
 shutil.copytree(f"{src}/bowl", "/kaggle/working/bowl", dirs_exist_ok=True)
+T0 = time.time()  # Kaggle kills the session at 12 h and drops its output: the death match must end well before
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", "optuna==5.0.0"], check=True)
 W = {w}  # parallel worker processes sharing the GPU and the sqlite study
 
@@ -39,7 +40,7 @@ if {r} > 1:
 ps = [run("fight", "--part", "0", "--hours", "{h}")]
 time.sleep(60)  # worker 0 enqueues the seed genomes first
 wait(ps + [run("fight", "--part", str(i), "--hours", "{h}") for i in range(1, W)])
-wait([run("death", "--part", str(i)) for i in range(W)])
+wait([run("death", "--part", str(i), "--until", str(T0 + {d} * 3600)) for i in range(W)])
 wait([run("death", "--merge")])
 '''
 
@@ -82,7 +83,8 @@ def push(a):
     shutil.rmtree(k, ignore_errors=True)
     k.mkdir()
     (k / "run_bowl.py").write_text(KERNEL.replace("{r}", str(a.round)).replace("{t}", str(a.trials))
-                                   .replace("{w}", str(a.workers)).replace("{h}", str(a.hours)))
+                                   .replace("{w}", str(a.workers)).replace("{h}", str(a.hours))
+                                   .replace("{d}", str(a.death_until)))
     (k / "kernel-metadata.json").write_text(json.dumps({
         "id": f"{u}/bigp-bowl", "title": "bigp-bowl", "code_file": "run_bowl.py", "language": "python",
         "kernel_type": "script", "is_private": True, "enable_gpu": True, "enable_internet": True,
@@ -135,6 +137,7 @@ if __name__ == "__main__":
     ap.add_argument("--round", type=int, default=1)
     ap.add_argument("--trials", type=int, default=256)
     ap.add_argument("--workers", type=int, default=4)
-    ap.add_argument("--hours", type=float, default=8)  # emergency brake only (Kaggle kills at 12 h); budget = --trials
+    ap.add_argument("--hours", type=float, default=7)  # emergency brake only (Kaggle kills at 12 h); budget = --trials
+    ap.add_argument("--death-until", type=float, default=10.0)  # no new finalist starts after this many session hours
     a = ap.parse_args()
     {"push": push, "status": status, "pull": pull, "bosses": bosses, "pull_bosses": pull_bosses}[a.cmd](a)

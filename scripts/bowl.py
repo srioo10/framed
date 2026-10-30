@@ -14,6 +14,7 @@ Usage: .venv/bin/python scripts/bowl.py ablate --round 2              (round >= 
 import argparse
 import copy
 import json
+import time
 import sys
 from pathlib import Path
 
@@ -391,7 +392,10 @@ def death(a):
         (rd / f"death_part{i}.npz").replace(rd / "champion_scores.npz")
     else:
         rows, best, best_scores = [], None, None
-        for t in finalists[a.part::a.parts]:
+        for t in finalists[a.part::a.parts]:  # best cheap fitness first, so a deadline cuts the weakest
+            if getattr(a, "until", 0) and time.time() > a.until:
+                print(f"deadline: {len(rows)} finalists evaluated by this worker, rest skipped", flush=True)
+                break
             g = t.user_attrs["genome"]
             res, sc = evaluate(g, pairs, a.device, seeds=(1, 2), epochs=30, keep_scores=True, ms=CERT_MS)
             rows.append({"trial": t.number, **g, **res})
@@ -460,6 +464,7 @@ def main():
     ap.add_argument("--parts", type=int, default=1)
     ap.add_argument("--merge", action="store_true")
     ap.add_argument("--hours", type=float, default=0)  # fight: stop starting trials after this long (0 = no cap)
+    ap.add_argument("--until", type=float, default=0)  # death: unix time after which no new finalist starts (0 = none)
     a = ap.parse_args()
     OUT = a.out
     a.storage = a.storage or f"sqlite:///{OUT / 'bowl.db'}"
