@@ -56,7 +56,19 @@ def rf_upper(rf, lo, hi, bi):
     return -np.log(np.maximum(pmin / len(rf.estimators_), 1e-45))
 
 
-def xgb_upper(xg, lo, hi, bi, k):
+def rf_lower(rf, lo, hi, bi):
+    """Lower bound of s: P(benign) <= mean over trees of the max reachable leaf share (robust-alarm gating)."""
+    lo32, hi32 = lo.astype(np.float32), hi.astype(np.float32)
+    pmax = np.zeros(len(lo))
+    for est in rf.estimators_:
+        t = est.tree_
+        v = t.value[:, 0, :]
+        pmax += reach(t.children_left, t.children_right, t.feature, t.threshold, v[:, bi] / v.sum(1), lo32, hi32,
+                      le=True)[1]
+    return -np.log(np.maximum(pmax / len(rf.estimators_), 1e-45))
+
+
+def xgb_upper(xg, lo, hi, bi, k, lower=False):
     df = xg.get_booster().trees_to_dataframe()
     lo32, hi32 = lo.astype(np.float32), hi.astype(np.float32)
     lo_m, hi_m = np.zeros((len(lo), k)), np.zeros((len(lo), k))
@@ -76,8 +88,10 @@ def xgb_upper(xg, lo, hi, bi, k):
     off = np.atleast_1d(xg.predict(x0, output_margin=True)[0]) - leaf_sums(df, x0, k)  # per-class base margins
     if len(off) == 1:  # binary: one margin m for class 1, P(1) = sigmoid(m)
         mn, mx = lo_m.sum(1) + off[0], hi_m.sum(1) + off[0]  # trees were spread over columns tid % k
+        if lower:
+            return np.logaddexp(0, mn) if bi == 0 else np.logaddexp(0, -mx)
         return np.logaddexp(0, mx) if bi == 0 else np.logaddexp(0, -mn)
-    d = hi_m + off - (lo_m[:, [bi]] + off[bi])
+    d = (lo_m + off - (hi_m[:, [bi]] + off[bi])) if lower else (hi_m + off - (lo_m[:, [bi]] + off[bi]))
     d[:, bi] = 0
     return np.logaddexp.reduce(d, axis=1)  # -log P_lo(benign) = log sum_c exp(upper(z_c - z_bi))
 
