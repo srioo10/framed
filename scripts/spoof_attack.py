@@ -8,7 +8,10 @@ the injected flows. Pattern grid per m: side {dst, src, both} x new peer per flo
 failed {0, 1} x IN_BYTES {0, 1e3, 1e9}. Detectors: RF, XGB (arena configs) and the latest bowl champion. Benign
 host-day alarm rate with the P and A host-day methods (thresholds from calibration hosts, as flood_detectors.py).
 K1 decision (method P): the best pattern at m <= 50 reaches >= 10% and >= 5 x clean for some detector.
-Usage: .venv/bin/python scripts/spoof_attack.py nf_ctu13 [--m 10,50]
+--blind (PREREG §9 AUDIT F4): the attacker does not know victim flow times, only which 10-min bins a targeted key is
+active in; it injects on a fixed lattice (spacing ceil(240 s / m), random phase) through every active bin, so the
+budget still holds. Same grid; champion = round 3 (A). Writes k1_blind_{ds}.csv.
+Usage: .venv/bin/python scripts/spoof_attack.py nf_ctu13 [--m 10,50] [--blind]
 """
 import argparse
 import itertools
@@ -33,8 +36,8 @@ COLS = ["FLOW_START_MILLISECONDS", "IPV4_SRC_ADDR", "IPV4_DST_ADDR", "L4_DST_POR
 OUT = ROOT / "results" / "cert"
 
 
-def champion():
-    r = max(int(p.parent.name[5:]) for p in (ROOT / "results" / "bowl").glob("round*/death.json"))
+def champion(r=None):
+    r = r or max(int(p.parent.name[5:]) for p in (ROOT / "results" / "bowl").glob("round*/death.json"))
     return r, json.loads((ROOT / "results" / "bowl" / f"round{r}" / "death.json").read_text())["champion"]
 
 
@@ -47,7 +50,7 @@ def setup(ds):
     return light, bank
 
 
-def detectors(bank, held):
+def detectors(bank, held, rnd=None):
     """{name: score(prepped X)} + prep, trained on the outer config's fit rows like score_bank / arena."""
     import bowl
     P = (held,)
@@ -59,7 +62,7 @@ def detectors(bank, held):
     prep = models.Prep().fit(dfit)
     Xf, yf = prep.transform(dfit), np.array([code[f] for f in bank.fam[fit]])
     rf, xg = models.rf(SEED).fit(Xf, yf), models.xgb(SEED).fit(Xf, yf)
-    r, g = champion()
+    r, g = champion(rnd)
     z = {"X_fit": Xf, "y_fit": yf, "k": len(known), "bi": bi, "nflow": len(bank.feats),
          "teacher": models.oof_proba(Xf, yf, SEED).astype(np.float32)}
     for k in ("cal", "pseudo", "es"):
@@ -120,6 +123,23 @@ def inject(V, side, m, peer, port, fail, nbytes):
     return pd.DataFrame(out, columns=COLS)
 
 
+def inject_blind(V, side, m, peer, port, fail, nbytes, bin_ms=600_000):
+    """Lattice injection without victim flow times: per targeted key, every ceil(BUDGET_MS / m) ms (random phase)
+    inside each bin_ms bin that holds a victim flow of that key. Any 240 s interval holds <= m injected flows."""
+    out, rng, d = [], np.random.default_rng(0), -(-BUDGET_MS // m)
+    for col in {"dst": ["IPV4_DST_ADDR"], "src": ["IPV4_SRC_ADDR"], "both": ["IPV4_DST_ADDR", "IPV4_SRC_ADDR"]}[side]:
+        for kv, grp in V.groupby(col, sort=False):
+            phase, vport = int(rng.integers(d)), int(grp.L4_DST_PORT.iloc[0])
+            for b in np.unique(grp.FLOW_START_MILLISECONDS.to_numpy() // bin_ms):
+                lo = b * bin_ms
+                for tau in range(lo + (phase - lo) % d, lo + bin_ms, d):
+                    other = f"6.6.{rng.integers(256)}.{rng.integers(256)}" if peer else "6.6.6.6"
+                    s, dd = (other, kv) if col == "IPV4_DST_ADDR" else (kv, other)
+                    out.append((tau, s, dd, int(rng.integers(40000, 65000)) if port else vport, 0 if fail else 1,
+                                nbytes))
+    return pd.DataFrame(out, columns=COLS)
+
+
 def host_context(S, inj, vmask):
     both = pd.concat([S.assign(v=vmask), inj.assign(v=False)], ignore_index=True)
     both = both.sort_values("FLOW_START_MILLISECONDS", kind="stable")
@@ -134,11 +154,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("dataset")
     ap.add_argument("--m", default="10,50")
+    ap.add_argument("--blind", action="store_true")
     a = ap.parse_args()
     t0 = time.time()
     light, bank = setup(a.dataset)
     held = bank.families[0]
-    dets, prep, _ = detectors(bank, held)
+    dets, prep, _ = detectors(bank, held, 3 if a.blind else None)
     cal, z = calibrate(bank, held, dets, prep)
     rows, key = victims(bank, z)
     raw_rows = bank.kept[rows]
@@ -157,7 +178,7 @@ def main():
     grid = list(itertools.product(("dst", "src", "both"), (0, 1), (0, 1), (0, 1), (0, 1_000, 10**9)))
     for m in [0] + list(map(int, a.m.split(","))):
         for side, peer, port, fail, nb in grid if m else [("none", 0, 0, 0, 0)]:
-            inj = inject(Vs, side, m, peer, port, fail, nb) if m else light.iloc[:0]
+            inj = (inject_blind if a.blind else inject)(Vs, side, m, peer, port, fail, nb) if m else light.iloc[:0]
             X = base.copy()
             X[hostctx.COLS] = host_context(S, inj, vmask) if m else H0
             Xp = prep.transform(X)
@@ -173,7 +194,7 @@ def main():
                   f"{time.time() - t0:.0f}s", flush=True)
     OUT.mkdir(parents=True, exist_ok=True)
     R = pd.DataFrame(res)
-    R.to_csv(OUT / f"k1_{a.dataset}.csv", index=False)
+    R.to_csv(OUT / f"k1_{'blind_' if a.blind else ''}{a.dataset}.csv", index=False)
     clean = R[R.m == 0].set_index("detector").ben_P
     best = R[R.m > 0].groupby("detector").ben_P.max()
     k1 = {d: bool(best[d] >= 0.10 and best[d] >= 5 * max(clean[d], 1e-9)) for d in best.index}
