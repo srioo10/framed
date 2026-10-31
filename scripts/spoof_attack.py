@@ -34,6 +34,7 @@ from nids import hostctx, load, models  # noqa: E402
 SEED, N_DAYS, BUDGET_MS = 1, 300, 240_000
 COLS = ["FLOW_START_MILLISECONDS", "IPV4_SRC_ADDR", "IPV4_DST_ADDR", "L4_DST_PORT", "OUT_PKTS", "IN_BYTES"]
 OUT = ROOT / "results" / "cert"
+PUB = ["kitnet", "iforest", "horuseye", "deep_sad", "cade", "kitnet_online", "horuseye_online"]  # PREREG §9 BSAN
 
 
 def champion(r=None):
@@ -72,9 +73,9 @@ def detectors(bank, held, rnd=None, baselines=False):
     nl = lambda p: -np.log(np.maximum(p, 1e-45))  # noqa: E731
     dets = {"rf": lambda X: nl(rf.predict_proba(X)[:, bi]), "xgb": lambda X: nl(xg.predict_proba(X)[:, bi]),
             f"champion_r{r}": lambda X: h.score(m, X.astype(np.float32), "cpu")}
-    if baselines:  # PREREG §9 K14: the published-IDS baselines, fitted as in CONF amendment 4
+    if baselines:  # PREREG §9 K14: the published-IDS baselines, fitted as in CONF amendment 4 (+ BSAN online variants)
         import conf_baselines
-        for b in conf_baselines.MODELS:
+        for b in (PUB if baselines is True else baselines):
             dets[b] = conf_baselines.fit(b, z, SEED)
     return dets, prep, (m, h, bi)
 
@@ -160,12 +161,13 @@ def main():
     ap.add_argument("dataset")
     ap.add_argument("--m", default="10,50")
     ap.add_argument("--blind", action="store_true")
-    ap.add_argument("--baselines", action="store_true")
+    ap.add_argument("--baselines", nargs="*")  # no names: all of PUB
     a = ap.parse_args()
     t0 = time.time()
     light, bank = setup(a.dataset)
     held = bank.families[0]
-    dets, prep, _ = detectors(bank, held, 3 if a.blind else None, a.baselines)
+    pub = None if a.baselines is None else (a.baselines or True)
+    dets, prep, _ = detectors(bank, held, 3 if a.blind else None, pub)
     cal, z = calibrate(bank, held, dets, prep)
     rows, key = victims(bank, z)
     raw_rows = bank.kept[rows]
@@ -200,7 +202,7 @@ def main():
                   f"{time.time() - t0:.0f}s", flush=True)
     OUT.mkdir(parents=True, exist_ok=True)
     R = pd.DataFrame(res)
-    R.to_csv(OUT / f"k1_{'blind_' if a.blind else ''}{'pub_' if a.baselines else ''}{a.dataset}.csv", index=False)
+    R.to_csv(OUT / f"k1_{'blind_' if a.blind else ''}{'' if pub is None else 'pub_' if pub is True else 'pub_' + '+'.join(pub) + '_'}{a.dataset}.csv", index=False)
     clean = R[R.m == 0].set_index("detector").ben_P
     best = R[R.m > 0].groupby("detector").ben_P.max()
     k1 = {d: bool(best[d] >= 0.10 and best[d] >= 5 * max(clean[d], 1e-9)) for d in best.index}

@@ -2,7 +2,7 @@
 
 Same fitted detectors as `spoof_attack.py --baselines`; tau = clean 1%-FPR quantile on calibration-host benign flows;
 macro TPR over the held-out family's test rows (unknown) and the other families' (known), 5,000 rows per family (RNG 0).
-Writes results/cert/ips_tpr_{ds}.csv. Usage: .venv/bin/python scripts/ips_point.py nf_ctu13
+Writes results/cert/ips_tpr_{ds}.csv. Usage: .venv/bin/python scripts/ips_point.py nf_ctu13 [baseline names; default all of spoof_attack.PUB]
 """
 import sys
 
@@ -17,7 +17,7 @@ def main():
     ds = sys.argv[1]
     _, bank = sa.setup(ds)
     held = bank.families[0]
-    dets, prep, _ = sa.detectors(bank, held, None, True)
+    dets, prep, _ = sa.detectors(bank, held, None, sys.argv[2:] or True)
     z = np.load(sa.ROOT / "data" / "processed" / f"{bank.ds}_hostmeta.npz", allow_pickle=False)
     cal_host = hs.host_split(z["ips"], sa.SEED)
     benign_host = ~np.isin(np.arange(len(cal_host)), np.unique(z["src"][z["fam"] != "Benign"]))
@@ -36,7 +36,8 @@ def main():
         assert 0 <= r["tpr_macro"] <= 1
         res.append(r)
         print(r, flush=True)
-    pd.DataFrame(res).to_csv(sa.OUT / f"ips_tpr_{ds}.csv", index=False)
+    tag = "_" + "+".join(sys.argv[2:]) if sys.argv[2:] else ""
+    pd.DataFrame(res).to_csv(sa.OUT / f"ips_tpr_{ds}{tag}.csv", index=False)
 
 
 if __name__ == "__main__":
