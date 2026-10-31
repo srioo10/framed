@@ -5,6 +5,7 @@ Encoders: "raw" (prepped features), "quantile" / "tree" bin edges (ple.Encoder /
 learned per-feature map 16 bins -> e. That map is a 1-D piecewise-linear function of each feature, so on device it is
 a per-feature lookup (~4 comparisons + 2e MACs), not a d*16-wide input layer.
 """
+import copy
 import math
 import sys
 import time
@@ -250,14 +251,17 @@ def margins_upper(m, lo, hi, bi, lower=False, raw=False):
     return _body_margins(m, lo, hi, bi, lower, raw)
 
 
-def score_lower(m, lo, hi, bi, head, device="cpu", bs=50_000):
+def score_lower(m, lo, hi, bi, head, device="cpu", bs=50_000, f64=True):
     """Sound lower bound of the nlog / min / energy head score over each row's box (robust-alarm gating, Theorem 1'):
     member log P(benign) <= -logsumexp_i lower(z_i - z_bi). energy = nlog - logsumexp(mean z): minus the logsumexp
     of the mean upper logits; one member: the score is exactly -z_bi, so also -upper(z_bi)."""
+    if f64:  # PREREG §9 AUDIT F1: float64 copy, outward margin below
+        m = copy.deepcopy(m).double()
     out = []
     with torch.no_grad():
         for i in range(0, len(lo), bs):
-            box = [torch.as_tensor(v[i:i + bs], dtype=torch.float32, device=device) for v in (lo, hi)]
+            box = [torch.as_tensor(v[i:i + bs], dtype=torch.float64 if f64 else torch.float32, device=device)
+                   for v in (lo, hi)]
             d = margins_upper(m, *box, bi, lower=True)
             lp = -torch.logsumexp(d.double(), -1)  # (B, M) upper bound of member log P(benign)
             s = -(torch.logsumexp(lp, 1) - math.log(lp.shape[1])) if head != "min" else -lp.min(1).values
@@ -266,17 +270,20 @@ def score_lower(m, lo, hi, bi, head, device="cpu", bs=50_000):
                 s = s - torch.logsumexp(zu, -1)
                 if lp.shape[1] == 1:
                     s = torch.maximum(s, -zu[:, bi])
-            out.append(s.cpu().numpy())
+            out.append((s - 1e-6 if f64 else s).cpu().numpy())
     return np.concatenate(out)
 
 
-def score_upper(m, lo, hi, bi, head, device="cpu", bs=50_000):
+def score_upper(m, lo, hi, bi, head, device="cpu", bs=50_000, f64=True):
     """Sound upper bound of the nlog / min / energy head score over each row's box (PREREG §9 CERT Theorem 2):
     P_m(benign) >= 1 / sum_i exp(upper(z_i - z_bi)); energy as in score_lower with the bounds swapped."""
+    if f64:  # PREREG §9 AUDIT F1: float64 copy, outward margin below
+        m = copy.deepcopy(m).double()
     out = []
     with torch.no_grad():
         for i in range(0, len(lo), bs):
-            box = [torch.as_tensor(v[i:i + bs], dtype=torch.float32, device=device) for v in (lo, hi)]
+            box = [torch.as_tensor(v[i:i + bs], dtype=torch.float64 if f64 else torch.float32, device=device)
+                   for v in (lo, hi)]
             d = margins_upper(m, *box, bi)
             lp = -torch.logsumexp(d.double(), -1)  # (B, M) lower bound of member log P(benign)
             s = -(torch.logsumexp(lp, 1) - math.log(lp.shape[1])) if head != "min" else -lp.min(1).values
@@ -285,7 +292,7 @@ def score_upper(m, lo, hi, bi, head, device="cpu", bs=50_000):
                 s = s - torch.logsumexp(zl, -1)
                 if lp.shape[1] == 1:
                     s = torch.minimum(s, -zl[:, bi])
-            out.append(s.cpu().numpy())
+            out.append((s + 1e-6 if f64 else s).cpu().numpy())
     return np.concatenate(out)
 
 
