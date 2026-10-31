@@ -16,6 +16,8 @@ import pandas as pd
 WINDOWS_MS = (10_000, 120_000)
 STATS = ("n", "fail", "newport", "newpeer", "bytes")
 COLS = [f"hc_{k}_{s}_{w // 1000}s" for w in WINDOWS_MS for k in ("src", "dst") for s in STATS]
+LONG_MS = (3_600_000, 86_400_000)  # PREREG §9 K7 long-memory host profile
+LONG_COLS = [f"hl_{k}_{s}_{w // 1000}s" for w in LONG_MS for k in ("src", "dst") for s in STATS]
 
 
 def _codes(*cols):
@@ -29,7 +31,7 @@ class HostFlows:
         (host identity destroyed, traffic volume per block kept)."""
         self.t = raw["FLOW_START_MILLISECONDS"].to_numpy(np.int64)
         self.t = self.t - self.t.min()
-        self.span = int(self.t.max()) + max(WINDOWS_MS) + 1
+        self.span = int(self.t.max()) + max(WINDOWS_MS + LONG_MS) + 1
         self.family = raw["family"].astype(str).to_numpy()
         src, dst = raw["IPV4_SRC_ADDR"].astype(str).to_numpy(), raw["IPV4_DST_ADDR"].astype(str).to_numpy()
         port = raw["L4_DST_PORT"].to_numpy()
@@ -70,11 +72,11 @@ class HostFlows:
             out.append(cs[hi] - cs[lo])
         return out
 
-    def features(self, pop):
-        """float32 (n_flows, len(COLS)) for every raw flow against population mask `pop`."""
+    def features(self, pop, windows=WINDOWS_MS):
+        """float32 (n_flows, 10 * len(windows)) for every raw flow against population mask `pop`."""
         cols = []
         ones = np.ones(len(self.t))
-        for w in WINDOWS_MS:
+        for w in windows:
             for k in ("src", "dst"):
                 newport = self._novel(self.pair_port[k], pop, w).astype(np.float64)
                 newpeer = self._novel(self.pair_peer[k], pop, w).astype(np.float64)

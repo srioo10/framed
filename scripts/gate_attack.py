@@ -2,7 +2,9 @@
 a gated net. Per victim flow, a block under attack (IBP lower bound over the Theorem 1' deletion box of the attacked
 row clears tau) must imply an alarm on the clean row; any violation is a bug. Reports flow and host-day rates of
 alarms and blocks, clean vs the worst pattern. tau = clean 1%-FPR threshold on benign flows of calibration hosts.
-Usage: .venv/bin/python scripts/gate_attack.py nf_ctu13 [--m 10] [--genome '{"cert": 4, "rdet": 4}']
+--clean-only (PREREG §9 item 3): clean victim alarms with the global tau vs per-host-group taus (quartiles of
+hc_src_n_120s on calibration-host benign flows, each group its own 1% quantile); writes gate_calib_{ds}.csv.
+Usage: .venv/bin/python scripts/gate_attack.py nf_ctu13 [--m 10] [--genome '{"cert": 4, "rdet": 4}'] [--clean-only]
 """
 import argparse
 import itertools
@@ -34,6 +36,7 @@ def main():
     ap.add_argument("dataset")
     ap.add_argument("--m", type=int, default=10)
     ap.add_argument("--genome", default="{}")
+    ap.add_argument("--clean-only", action="store_true")
     a = ap.parse_args()
     g = G | json.loads(a.genome)
     t0 = time.time()
@@ -83,6 +86,21 @@ def main():
     assert np.allclose(H0, base[hostctx.COLS].to_numpy(), rtol=1e-4, atol=1e-3), "subset host context != bank"
     X0 = tx(base)
     day = lambda w: float(pd.Series(w).groupby(key).any().mean())  # noqa: E731
+    if a.clean_only:
+        c = cols.index("hc_src_n_120s")
+        edges = np.quantile(Xcal[:, c], [0.25, 0.5, 0.75])
+        gc, g0 = np.searchsorted(edges, Xcal[:, c], "right"), np.searchsorted(edges, X0[:, c], "right")
+        res = []
+        for n, (f, _) in dets.items():
+            sc, s0 = f(Xcal), f(X0)
+            tg = np.array([np.quantile(sc[gc == q], 0.99) if (gc == q).any() else tau[n] for q in range(4)])  # tied edges can empty a group
+            for mode, al in (("global", s0 > tau[n]), ("group", s0 > tg[g0])):
+                res.append({"detector": n, "tau": mode, "alarm": al.mean(), "alarm_day": day(al),
+                            **{f"alarm_g{q}": al[g0 == q].mean() if (g0 == q).any() else np.nan for q in range(4)},
+                            **{f"share_g{q}": (g0 == q).mean() for q in range(4)}})
+                print(json.dumps({k: round(v, 4) if isinstance(v, float) else v for k, v in res[-1].items()}), flush=True)
+        pd.DataFrame(res).to_csv(sa.OUT / f"gate_calib_{a.dataset}.csv", index=False)
+        return
     alarm0, res = {}, []
     for n, (f, b) in dets.items():
         alarm0[n], b0 = f(X0) > tau[n], b(X0) > tau[n]
