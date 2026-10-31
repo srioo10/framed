@@ -134,7 +134,8 @@ def test_genome_space_is_static_for_optuna(tmp_path, r):
 
 
 @pytest.mark.parametrize("kind,members,ens,head", [("raw", 1, 1, "nlog"), ("quantile", 4, 1, "min"),
-                                                   ("tree", 2, 3, "nlog"), ("raw", 4, 3, "min")])
+                                                   ("tree", 2, 3, "nlog"), ("raw", 4, 3, "min"),
+                                                   ("raw", 1, 1, "energy"), ("quantile", 4, 1, "energy")])
 def test_interval_bound_is_sound(kind, members, ens, head):
     """PREREG §9 CERT Theorem 2: the IBP score bound covers the exact score at random points of every box, and equals
     it on a zero-width box."""

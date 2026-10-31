@@ -211,9 +211,9 @@ def _affine(mu, r, W, b=None):
     return out, r @ W.abs().T
 
 
-def _body_margins(body, lo, hi, bi, lower=False):
-    """Upper (or lower) bounds (B, M, k) of z_i - z_bi over the input box [lo, hi] for one Body (interval bound
-    propagation)."""
+def _body_margins(body, lo, hi, bi, lower=False, raw=False):
+    """Upper (or lower) bounds (B, M, k) of z_i - z_bi (raw: of z_i) over the input box [lo, hi] for one Body
+    (interval bound propagation)."""
     if hasattr(body, "clo"):
         lo, hi = (torch.minimum(torch.maximum(v, body.clo), body.chi) for v in (lo, hi))
     if isinstance(body.enc, BinMap):
@@ -234,46 +234,57 @@ def _body_margins(body, lo, hi, bi, lower=False):
             a, b = layer(mu - r), layer(mu + r)
             mu, r = (a + b) / 2, (b - a) / 2
     if body.M > 1:
-        D = body.hw - body.hw[:, :, bi:bi + 1]
-        out = torch.einsum("bmw,mwk->bmk", mu, D) + (body.hb - body.hb[:, bi:bi + 1]) + \
+        D = body.hw if raw else body.hw - body.hw[:, :, bi:bi + 1]
+        out = torch.einsum("bmw,mwk->bmk", mu, D) + (body.hb if raw else body.hb - body.hb[:, bi:bi + 1]) + \
             (-1 if lower else 1) * torch.einsum("bmw,mwk->bmk", r, D.abs())
     else:
         W, b = body.head.weight, body.head.bias
-        dm, dr = _affine(mu, r, W - W[bi], b - b[bi])
+        dm, dr = _affine(mu, r, W, b) if raw else _affine(mu, r, W - W[bi], b - b[bi])
         out = (dm - dr if lower else dm + dr)[:, None]
-    return torch.nan_to_num(out, nan=float("inf"))
+    return torch.nan_to_num(out, nan=-float("inf") if lower else float("inf"))  # unbounded stays sound either side
 
 
-def margins_upper(m, lo, hi, bi, lower=False):
+def margins_upper(m, lo, hi, bi, lower=False, raw=False):
     if isinstance(m, Ensemble):
-        return torch.cat([_body_margins(b, lo, hi, bi, lower) for b in m.bodies], 1)
-    return _body_margins(m, lo, hi, bi, lower)
+        return torch.cat([_body_margins(b, lo, hi, bi, lower, raw) for b in m.bodies], 1)
+    return _body_margins(m, lo, hi, bi, lower, raw)
 
 
 def score_lower(m, lo, hi, bi, head, device="cpu", bs=50_000):
-    """Sound lower bound of the nlog / min head score over each row's box (robust-alarm gating, Theorem 1'):
-    member log P(benign) <= -logsumexp_i lower(z_i - z_bi)."""
+    """Sound lower bound of the nlog / min / energy head score over each row's box (robust-alarm gating, Theorem 1'):
+    member log P(benign) <= -logsumexp_i lower(z_i - z_bi). energy = nlog - logsumexp(mean z): minus the logsumexp
+    of the mean upper logits; one member: the score is exactly -z_bi, so also -upper(z_bi)."""
     out = []
     with torch.no_grad():
         for i in range(0, len(lo), bs):
-            d = margins_upper(m, *(torch.as_tensor(v[i:i + bs], dtype=torch.float32, device=device) for v in (lo, hi)),
-                              bi, lower=True)
+            box = [torch.as_tensor(v[i:i + bs], dtype=torch.float32, device=device) for v in (lo, hi)]
+            d = margins_upper(m, *box, bi, lower=True)
             lp = -torch.logsumexp(d.double(), -1)  # (B, M) upper bound of member log P(benign)
-            s = -(torch.logsumexp(lp, 1) - math.log(lp.shape[1])) if head == "nlog" else -lp.min(1).values
+            s = -(torch.logsumexp(lp, 1) - math.log(lp.shape[1])) if head != "min" else -lp.min(1).values
+            if head == "energy":
+                zu = torch.nan_to_num(margins_upper(m, *box, bi, raw=True).double(), nan=float("inf")).mean(1)
+                s = s - torch.logsumexp(zu, -1)
+                if lp.shape[1] == 1:
+                    s = torch.maximum(s, -zu[:, bi])
             out.append(s.cpu().numpy())
     return np.concatenate(out)
 
 
 def score_upper(m, lo, hi, bi, head, device="cpu", bs=50_000):
-    """Sound upper bound of the nlog / min head score -log P(benign) over each row's box (PREREG §9 CERT Theorem 2):
-    P_m(benign) >= 1 / sum_i exp(upper(z_i - z_bi))."""
+    """Sound upper bound of the nlog / min / energy head score over each row's box (PREREG §9 CERT Theorem 2):
+    P_m(benign) >= 1 / sum_i exp(upper(z_i - z_bi)); energy as in score_lower with the bounds swapped."""
     out = []
     with torch.no_grad():
         for i in range(0, len(lo), bs):
-            d = margins_upper(m, *(torch.as_tensor(v[i:i + bs], dtype=torch.float32, device=device) for v in (lo, hi)),
-                              bi)
+            box = [torch.as_tensor(v[i:i + bs], dtype=torch.float32, device=device) for v in (lo, hi)]
+            d = margins_upper(m, *box, bi)
             lp = -torch.logsumexp(d.double(), -1)  # (B, M) lower bound of member log P(benign)
-            s = -(torch.logsumexp(lp, 1) - math.log(lp.shape[1])) if head == "nlog" else -lp.min(1).values
+            s = -(torch.logsumexp(lp, 1) - math.log(lp.shape[1])) if head != "min" else -lp.min(1).values
+            if head == "energy":
+                zl = torch.nan_to_num(margins_upper(m, *box, bi, lower=True, raw=True).double(), nan=-float("inf")).mean(1)
+                s = s - torch.logsumexp(zl, -1)
+                if lp.shape[1] == 1:
+                    s = torch.minimum(s, -zl[:, bi])
             out.append(s.cpu().numpy())
     return np.concatenate(out)
 
