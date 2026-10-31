@@ -82,7 +82,7 @@ static inline void cb_margins(const CertB *c, int m, const double *lo, const dou
 
 /* lower bound of s over the box [lo, hi] (s itself when lo == hi): member log P(benign) <= -lse_i lower(z_i - z_bi) */
 static inline double cb_score_lower(const CertB *c, const double *lo, const double *hi) {
-  double lp[CB_MAXM], d[CB_MAXK];
+  double lp[CB_MAXM] = {0}, d[CB_MAXK];
   for (int m = 0; m < c->M; m++) { cb_margins(c, m, lo, hi, d); lp[m] = -cb_lse(d, c->K); }
   double s = -(cb_lse(lp, c->M) - log((double)c->M));
   return isnan(s) ? -INFINITY : s;

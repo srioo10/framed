@@ -9,7 +9,10 @@
  * --prepped: stdin rows are D Prep-space values (parity test against Python); prints score,lower.
  * The bucketed windows span at most w + one bucket (<= 130 s < 240 s), so the injection budget per window is still m,
  * and an LRU eviction caused by an injection at tau can only make a real flow novel within [tau, tau + w): the
- * Theorem 1' box (a = b = m) covers the engine's own features. */
+ * Theorem 1' box (a = b = m) covers the engine's own features. Bounded memory: an evicted host entry loses real history,
+ * which Theorem 1' does not cover (PREREG §9 K11), so a flow is blocked only when its source and destination entries
+ * have been tracked continuously for >= AGE_MS (the longest bucketed window span); younger entries can alarm but
+ * abstain from blocking (--no-age disables this, for the K11 comparison only). */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,10 +25,11 @@
 #define B120 12
 #define TAB 16
 #define PROBE 8
+#define AGE_MS 130000
 
 typedef struct { int64_t id[B10]; float v[B10][NS]; int64_t id2[B120]; float v2[B120][NS];
                  int32_t port[TAB]; uint64_t peer[TAB]; int64_t tport[TAB], tpeer[TAB]; } Side;
-typedef struct { uint64_t key; int64_t last, blocked_until; Side s[2]; } Host;
+typedef struct { uint64_t key; int64_t last, created, blocked_until; Side s[2]; } Host;
 
 static Host *tab; static size_t cap; static long evictions;
 static CertB M_;
@@ -42,7 +46,7 @@ static Host *get(uint64_t key, int64_t t, const Host *keep) {
   evictions++;
 fresh:
   memset(&tab[stale], 0, sizeof(Host));
-  tab[stale].key = key; tab[stale].last = t;
+  tab[stale].key = key; tab[stale].last = tab[stale].created = t;
   for (int b = 0; b < B10; b++) tab[stale].s[0].id[b] = tab[stale].s[1].id[b] = -1;
   for (int b = 0; b < B120; b++) tab[stale].s[0].id2[b] = tab[stale].s[1].id2[b] = -1;
   return &tab[stale];
@@ -107,18 +111,19 @@ static void load(const char *path) {
 }
 
 int main(int argc, char **argv) {
-  const char *model = "model_b.txt", *hook = NULL; long hosts = 4096; int prepped = 0; double ttl = 300;
+  const char *model = "model_b.txt", *hook = NULL; long hosts = 4096; int prepped = 0, age = 1; double ttl = 300;
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--model") && i + 1 < argc) model = argv[++i];
     else if (!strcmp(argv[i], "--hosts") && i + 1 < argc) hosts = atol(argv[++i]);
     else if (!strcmp(argv[i], "--on-block") && i + 1 < argc) hook = argv[++i];
     else if (!strcmp(argv[i], "--ttl") && i + 1 < argc) ttl = atof(argv[++i]);
     else if (!strcmp(argv[i], "--prepped")) prepped = 1;
-    else { fprintf(stderr, "usage: certids [--model F] [--hosts N] [--on-block 'cmd %%s'] [--ttl S] [--prepped] < flows.csv\n"); return 2; }
+    else if (!strcmp(argv[i], "--no-age")) age = 0;
+    else { fprintf(stderr, "usage: certids [--model F] [--hosts N] [--on-block 'cmd %%s'] [--ttl S] [--prepped] [--no-age] < flows.csv\n"); return 2; }
   }
   load(model);
   const CertB *c = &M_;
-  char line[4096], src[256], dst[256]; long n = 0, nal = 0, nbl = 0; clock_t c0 = clock();
+  char line[4096], src[256], dst[256]; long n = 0, nal = 0, nbl = 0, nab = 0; clock_t c0 = clock();
   double x[CB_MAXD], raw[CB_MAXD];
   if (prepped) {
     while (fgets(line, sizeof line, stdin)) {
@@ -162,7 +167,10 @@ int main(int argc, char **argv) {
     cb_prep(c, raw, x);
     double s = cb_score(c, x), lower = -INFINITY;
     int alarm = s > c->tau, block = 0;
-    if (alarm) { lower = cb_block_lower(c, x); block = lower > c->tau; nal++; }
+    if (alarm) {
+      lower = cb_block_lower(c, x); block = lower > c->tau; nal++;
+      if (block && age && (t - hs->created < AGE_MS || t - hd->created < AGE_MS)) { block = 0; nab++; }  /* abstain */
+    }
     if (block) {
       nbl++;
       if (hook && t >= hs->blocked_until) {
@@ -174,7 +182,7 @@ int main(int argc, char **argv) {
     printf("%.7g,%d,%.7g,%d\n", s, alarm, lower, block); n++;
   }
   double sec = (double)(clock() - c0) / CLOCKS_PER_SEC;
-  fprintf(stderr, "certids: %ld flows in %.2f s (%.2f us/flow), %ld alarms, %ld certified blocks, %ld evictions\n",
-          n, sec, 1e6 * sec / (n ? n : 1), nal, nbl, evictions);
+  fprintf(stderr, "certids: %ld flows in %.2f s (%.2f us/flow), %ld alarms, %ld certified blocks, %ld abstentions "
+          "(entry < %d s old), %ld evictions\n", n, sec, 1e6 * sec / (n ? n : 1), nal, nbl, nab, AGE_MS / 1000, evictions);
   return 0;
 }
