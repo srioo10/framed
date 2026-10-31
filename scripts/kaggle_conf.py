@@ -90,8 +90,9 @@ def data(a):
     (d / "dataset-metadata.json").write_text(json.dumps({"title": slug, "id": f"{u}/{slug}",
                                                          "licenses": [{"name": "other"}]}))
     exists = subprocess.run([KAGGLE, "datasets", "status", f"{u}/{slug}"], capture_output=True).returncode == 0
-    sh("datasets", "version" if exists else "create", "-p", str(d), *(["-m", "conf"] if exists else []), "-r", "zip", "-q")
-    wait_ready(f"{u}/{slug}")
+    if not (exists and a.no_upload):
+        sh("datasets", "version" if exists else "create", "-p", str(d), *(["-m", "conf"] if exists else []), "-r", "zip", "-q")
+        wait_ready(f"{u}/{slug}")
     for kind in a.kinds:
         k = STAGE / f"conf_{ds}_{kind}"
         shutil.rmtree(k, ignore_errors=True)
@@ -103,7 +104,8 @@ def data(a):
             "is_private": True, "enable_gpu": kind in a.gpu, "enable_internet": False,
             "dataset_sources": [f"{u}/{slug}", f"{u}/bigp-k5code"]}))
         for _ in range(144):  # a full concurrent-session quota refuses the push: retry every 10 min for 24 h
-            r = subprocess.run([KAGGLE, "kernels", "push", "-p", str(k)], capture_output=True, text=True)
+            acc = ["--accelerator", "NvidiaTeslaT4"] if kind in a.gpu else []  # enable_gpu alone runs on CPU
+            r = subprocess.run([KAGGLE, "kernels", "push", "-p", str(k), *acc], capture_output=True, text=True)
             print(ks, r.stdout.strip()[-200:], r.stderr.strip()[-200:], flush=True)
             if r.returncode == 0 and "error" not in (r.stdout + r.stderr).lower():
                 break
@@ -139,5 +141,6 @@ if __name__ == "__main__":
     ap.add_argument("ds", nargs="?")
     ap.add_argument("--kinds", nargs="+", default=KINDS)
     ap.add_argument("--gpu", nargs="*", default=[])  # kinds to run on GPU sessions (as extra CPU slots)
+    ap.add_argument("--no-upload", action="store_true")  # dataset already up: only (re)start kernels
     a = ap.parse_args()
     {"push": push, "data": data, "status": status, "pull": pull}[a.cmd](a)
