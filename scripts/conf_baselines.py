@@ -27,18 +27,19 @@ MODELS = ["kitnet", "iforest", "horuseye", "deep_sad", "cade"]
 def fit(model, z, seed):
     Xf, yf, bi = z["X_fit"].astype(np.float32), z["y_fit"], z["bi"]
     ben = Xf[yf == bi]
-    if model == "kitnet":
-        return kitnet.KitNET(seed).fit(ben).score
+    online = model.endswith("_online")  # PREREG §9 BSAN: original per-sample SGD autoencoders
+    if model.startswith("kitnet"):
+        return kitnet.KitNET(seed, online=online).fit(ben).score
     if model == "iforest":
         f = models.iforest(ben, seed)
         return lambda X: -f.score_samples(X)
-    if model == "horuseye":
+    if model.startswith("horuseye"):
         f = models.iforest(ben, seed)
         ref = np.sort(-f.score_samples(ben))
         q = ref[int(0.9 * len(ref))]
         rng = np.random.default_rng(seed)
         sub = ben[rng.choice(len(ben), min(len(ben), 200_000), replace=False)].astype(np.float64)
-        ae = kitnet._AE(sub.shape[1], rng).fit(sub, rng)
+        ae = kitnet._AE(sub.shape[1], rng).fit(sub, rng, **({"epochs": 1, "batch": 1} if online else {}))
 
         def score(X):
             s = -f.score_samples(X)

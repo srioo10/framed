@@ -38,7 +38,7 @@ class _AE:
         Z = self._norm(X)
         sig = lambda v: 1 / (1 + np.exp(-v))  # noqa: E731
         for _ in range(epochs):
-            for i in np.array_split(rng.permutation(len(Z)), max(1, len(Z) // batch)):
+            for i in np.array_split(rng.permutation(len(Z)), max(1, len(Z) // batch)):  # batch=1: online
                 x = Z[i]
                 y = sig(x @ self.W + self.bh)
                 z = sig(y @ self.W.T + self.bv)
@@ -57,16 +57,17 @@ class _AE:
 
 
 class KitNET:
-    def __init__(self, seed=0, max_ae=10, n_fit=200_000):
+    def __init__(self, seed=0, max_ae=10, n_fit=200_000, online=False):
         self.rng, self.m, self.n = np.random.default_rng(seed), max_ae, n_fit
+        self.kw = {"epochs": 1, "batch": 1} if online else {}  # online = the original one-pass per-sample SGD
 
     def fit(self, X):
         X = np.asarray(X, np.float64)
         if len(X) > self.n:
             X = X[self.rng.choice(len(X), self.n, replace=False)]
         self.groups = _clusters(X, self.m)
-        self.ens = [_AE(len(g), self.rng).fit(X[:, g], self.rng) for g in self.groups]
-        self.out = _AE(len(self.ens), self.rng).fit(self._layer(X), self.rng)
+        self.ens = [_AE(len(g), self.rng).fit(X[:, g], self.rng, **self.kw) for g in self.groups]
+        self.out = _AE(len(self.ens), self.rng).fit(self._layer(X), self.rng, **self.kw)
         return self
 
     def _layer(self, X):
