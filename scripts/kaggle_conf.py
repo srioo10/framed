@@ -52,13 +52,17 @@ def cmds(kind, ds):
     if kind.startswith("groot"):  # groot = seeds 2-4 in one kernel; groot2 / groot3 / groot4 = one seed each
         return [["k5_trees.py", "--workers", "4", "--models", "groot", "--seed", str(s), "--out",
                  f"conf_groot_{ds}_s{s}.csv"] for s in (SEEDS if kind == "groot" else (int(kind[-1]),))]
-    if kind == "attack":
+    if kind == "attack":  # ToN: CONF C4 + C3
         return [["spoof_attack.py", ds], ["gate_attack.py", ds, "--tau-day", "--genome", B]]
+    if kind == "c3":
+        return [["gate_attack.py", ds, "--tau-day", "--genome", B]]
+    if kind == "k14":  # PREREG §9 K14 + K15
+        return [["spoof_attack.py", ds, "--baselines"], ["ips_point.py", ds]]
     s = int(kind[-1])  # trees2 / trees3 / trees4
     return [["k5_trees.py", "--workers", "4", "--seed", str(s), "--out", f"conf_trees_{ds}_s{s}.csv"]]
 
 
-KINDS = ["clean", "baselines", "k5b", "trees2", "trees3", "trees4", "groot", "groot2", "groot3", "groot4", "attack"]
+KINDS = ["clean", "baselines", "k5b", "trees2", "trees3", "trees4", "groot", "groot2", "groot3", "groot4", "attack", "c3", "k14"]
 B = ('{"family": "tabm", "enc": "raw", "e": 4, "w": 32, "depth": 2, "sn": 0, "act": "relu", "members": 8, "head": "nlog", '
      '"kd": 0.9, "syn": 0.5, "clip": 1, "cert": 4, "gate": 1, "rdet": 2, "ls": 0.0, "focal": 0.0, "lr": 0.003}')
 # CONF C4 (K1 on ToN) and C3 on ToN (B, K4 at tau_day): need data/processed and the bowl champions, not the arena
@@ -124,14 +128,14 @@ def data(a):
         k = STAGE / f"conf_{ds}_{kind}"
         shutil.rmtree(k, ignore_errors=True)
         k.mkdir()
-        (k / "run.py").write_text((ATTACK if kind == "attack" else KERNEL).replace("{ds}", ds)
+        (k / "run.py").write_text((ATTACK if kind in ("attack", "c3", "k14") else KERNEL).replace("{ds}", ds)
                                   .replace("{cmds}", repr(cmds(kind, ds))))
         ks = f"bigp-conf-{ds.replace('_', '-')}-{kind}"
         (k / "kernel-metadata.json").write_text(json.dumps({
             "id": f"{u}/{ks}", "title": ks, "code_file": "run.py", "language": "python", "kernel_type": "script",
             "is_private": True, "enable_gpu": kind in a.gpu, "enable_internet": False,
             "dataset_sources": [f"{u}/{slug}", f"{u}/bigp-k5code"] + ([f"{u}/bigp-proc-{ds.replace('_', '-')}"]
-                                                                      if kind == "attack" else [])}))
+                                                                      if kind in ("attack", "c3", "k14") else [])}))
         for _ in range(144):  # a full concurrent-session quota refuses the push: retry every 10 min for 24 h
             acc = ["--accelerator", "NvidiaTeslaT4"] if kind in a.gpu else []  # enable_gpu alone runs on CPU
             r = subprocess.run([KAGGLE, "kernels", "push", "-p", str(k), *acc], capture_output=True, text=True)
