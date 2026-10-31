@@ -230,3 +230,28 @@ def test_gate_round_scores_robust_fitness(tmp_path, monkeypatch):
     c = json.loads((rd / "death.json").read_text())["champion"]
     assert set(c["robust"]) == {"1", "10"} and c["robust"]["10"][0] <= c["robust"]["1"][0] + 1e-9
     assert c["cert_alarm"] is not None
+
+
+def test_dual_round_scores_min_of_alarm_and_block(tmp_path, monkeypatch):
+    """Hybrid round: energy alarms, certified nlog blocks; fitness = min(robust at CERT_M, plain alarm fitness)."""
+    fake_arena(tmp_path / "arena", d=24, cert=True)
+    monkeypatch.setattr(bowl, "OUT", tmp_path / "bowl")
+    monkeypatch.setattr(bowl, "RATIO_MAX", 1e6)
+    monkeypatch.setattr(bowl, "CERT_MS", (1, 10))
+    rd = tmp_path / "bowl" / "round6"
+    rd.mkdir(parents=True)
+    rd.joinpath("roster.json").write_text(json.dumps({
+        "families": ["mlp"], "population": 4, "cert_mode": True, "gate": True, "drop_bytes": True, "dual": True,
+        "enc_opts": ["raw"], "head_opts": ["energy"], "bhead_opts": ["nlog"], "cert_opts": [2], "rdet_opts": [2],
+        "powerups": []}))
+    import argparse
+    a = argparse.Namespace(round=6, trials=2, jobs=1, threads=1, device="cpu", arena=tmp_path / "arena",
+                           storage=f"sqlite:///{tmp_path / 'b.db'}", part=0, parts=1, merge=False)
+    bowl.fight(a)
+    import optuna
+    t = [t for t in optuna.load_study(study_name="round6", storage=a.storage).trials if "res" in t.user_attrs]
+    assert t
+    for x in t:
+        r, g = x.user_attrs["res"], x.user_attrs["genome"]
+        assert g["head"] == "energy" and g["bhead"] == "nlog"
+        assert np.isclose(r["fitness"], min(r["robust"]["10"][0], r["plain"]["fitness"]))

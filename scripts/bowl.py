@@ -93,6 +93,9 @@ def suggest(trial, roster):
     if roster.get("gate"):  # robust-alarm gating: fitness = robust fitness at CERT_M, robust-detection loss gene
         g["gate"] = 1
         g["rdet"] = pick("rdet", roster.get("rdet_opts", [2, 4, 8]))
+    if roster.get("dual"):  # hybrid: alarms from the head gene, blocks from the certified lower bound of the bhead
+        g["bhead"] = pick("bhead_m", roster.get("bhead_m_opts", ["nlog", "min", "energy"])) \
+            if g.get("members", 1) > 1 else pick("bhead", roster.get("bhead_opts", ["nlog", "energy"]))
     g["ls"] = pick("ls", [0.0, 0.1])
     g["focal"] = pick("focal", [0.0, 2.0])
     g["lr"] = pick("lr", [1e-3, 3e-3])
@@ -167,8 +170,11 @@ def dbox(z, X, m):
 def robust_fitness(g, m, z, s_cal, device, mm):
     """Robust-alarm gating: (fitness, unk, known) where an alarm counts only if its IBP lower bound over the deletion
     box at mm clears the clean 1%-FPR threshold. Blocked-benign FPR under <= mm injections is <= 1% by Theorem 1'."""
+    bh = g.get("bhead", g["head"])
+    if bh != g["head"]:  # the block head gets its own clean 1%-FPR threshold
+        s_cal = fx.Head(bh, z["bi"]).score(m, z["X_cal"], device)
     tau = np.sort(s_cal)[::-1][int(np.floor(0.01 * len(s_cal)))]
-    hit = lambda X: fx.score_lower(m, *dbox(z, X, mm), z["bi"], g["head"], device) > tau  # noqa: E731
+    hit = lambda X: fx.score_lower(m, *dbox(z, X, mm), z["bi"], bh, device) > tau  # noqa: E731
     u, a = hit(z["X_pseudo"]).mean(), z["y_es"] != z["bi"]
     k_ = hit(z["X_es"][a]).mean() if a.any() else u
     return float((u + k_) / 2), float(u), float(k_)
@@ -245,6 +251,8 @@ def evaluate(g, pairs, device, seeds=(0,), epochs=15, keep_scores=False, ms=(CER
         res["plain"] = {"fitness": res["fitness"], "unk": res["unk"], "known": res["known"]}
         res["robust"] = {str(mm): [float(np.mean([r[mm][i] for r in rob])) for i in range(3)] for mm in rob[0]}
         res["fitness"], res["unk"], res["known"] = res["robust"][str(CERT_M)]
+        if g.get("bhead"):  # hybrid: good at both or at neither
+            res["fitness"] = min(res["fitness"], res["plain"]["fitness"])
         res["cert_alarm"] = res.pop("cert", None)
     return res, scores
 
@@ -334,6 +342,9 @@ def fight(a):
 
     def objective(trial):
         g = suggest(trial, roster)
+        if roster.get("dedupe") and any(t.params == trial.params for t in trial.study.get_trials(
+                deepcopy=False, states=(optuna.trial.TrialState.COMPLETE,))):
+            raise optuna.TrialPruned("duplicate genome")  # not COMPLETE, so it does not use the trial budget
         try:
             res, _ = evaluate(g, pairs, a.device)
         except Exception as e:  # a genome that cannot train is a dead fighter, not a crashed bowl

@@ -1,0 +1,203 @@
+{
+ "families": [
+  "mlp",
+  "tabm"
+ ],
+ "population": 32,
+ "cert_mode": true,
+ "genes": [
+  "syn"
+ ],
+ "syn_opts": [
+  0.0,
+  0.5,
+  1.0
+ ],
+ "enc_opts": [
+  "raw",
+  "quantile",
+  "tree"
+ ],
+ "head_opts": [
+  "energy",
+  "nlog"
+ ],
+ "head_m_opts": [
+  "energy",
+  "nlog",
+  "min"
+ ],
+ "cert_opts": [
+  2,
+  4,
+  8
+ ],
+ "powerups": [],
+ "seeds": [
+  {
+   "family": "mlp",
+   "enc": "raw",
+   "e": 2,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "relu",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 2.0,
+   "lr": 0.003,
+   "head": "energy",
+   "bhead": "nlog",
+   "cert": 4,
+   "rdet": 4
+  },
+  {
+   "family": "mlp",
+   "enc": "raw",
+   "e": 2,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "relu",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 2.0,
+   "lr": 0.003,
+   "head": "energy",
+   "bhead": "nlog",
+   "cert": 4,
+   "rdet": 2
+  },
+  {
+   "family": "mlp",
+   "enc": "raw",
+   "e": 2,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "relu",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 2.0,
+   "lr": 0.003,
+   "head": "energy",
+   "bhead": "nlog",
+   "cert": 8,
+   "rdet": 4
+  },
+  {
+   "family": "mlp",
+   "enc": "raw",
+   "e": 2,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "relu",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 2.0,
+   "lr": 0.003,
+   "head": "energy",
+   "bhead": "energy",
+   "cert": 4,
+   "rdet": 4
+  },
+  {
+   "family": "tabm",
+   "enc": "raw",
+   "e": 4,
+   "w": 32,
+   "depth": 2,
+   "sn": 0,
+   "act": "relu",
+   "members": 8,
+   "kd": 0.9,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 0.0,
+   "lr": 0.003,
+   "cert": 4,
+   "rdet": 2,
+   "head_m": "energy",
+   "bhead_m": "nlog"
+  },
+  {
+   "family": "tabm",
+   "enc": "raw",
+   "e": 4,
+   "w": 32,
+   "depth": 2,
+   "sn": 0,
+   "act": "relu",
+   "members": 8,
+   "kd": 0.9,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 0.0,
+   "lr": 0.003,
+   "cert": 4,
+   "rdet": 2,
+   "head_m": "nlog",
+   "bhead_m": "nlog"
+  },
+  {
+   "family": "tabm",
+   "enc": "raw",
+   "e": 4,
+   "w": 32,
+   "depth": 2,
+   "sn": 0,
+   "act": "relu",
+   "members": 8,
+   "kd": 0.9,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 0.0,
+   "lr": 0.003,
+   "cert": 4,
+   "rdet": 2,
+   "head_m": "energy",
+   "bhead_m": "min"
+  },
+  {
+   "family": "mlp",
+   "enc": "raw",
+   "e": 2,
+   "w": 64,
+   "depth": 2,
+   "sn": 0,
+   "act": "relu",
+   "kd": 0.5,
+   "syn": 0.5,
+   "ls": 0.0,
+   "focal": 2.0,
+   "lr": 0.003,
+   "cert": 4,
+   "rdet": 2,
+   "head": "nlog",
+   "bhead": "nlog"
+  }
+ ],
+ "gate": 1,
+ "drop_bytes": 1,
+ "rdet_opts": [
+  2,
+  4,
+  8
+ ],
+ "dual": 1,
+ "dedupe": 1,
+ "bhead_opts": [
+  "nlog",
+  "energy"
+ ],
+ "bhead_m_opts": [
+  "nlog",
+  "min",
+  "energy"
+ ]
+}
