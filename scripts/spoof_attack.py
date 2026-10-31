@@ -64,7 +64,8 @@ def detectors(bank, held, rnd=None, baselines=False):
     rf, xg = models.rf(SEED).fit(Xf, yf), models.xgb(SEED).fit(Xf, yf)
     r, g = champion(rnd)
     z = {"X_fit": Xf, "y_fit": yf, "k": len(known), "bi": bi, "nflow": len(bank.feats),
-         "teacher": models.oof_proba(Xf, yf, SEED).astype(np.float32)}
+         "teacher": models.oof_proba(Xf, yf, SEED).astype(np.float32),
+         "cols": list(dfit.columns), "mu": prep.mu, "sd": prep.sd}  # clip / cert genes need the Prep columns
     for k in ("cal", "pseudo", "es"):
         z[f"X_{k}"] = Xf[:10]
     m, h, _ = bowl.run_pair(g, z, "cpu", SEED, 30)
