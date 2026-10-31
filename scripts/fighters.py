@@ -255,7 +255,7 @@ def score_lower(m, lo, hi, bi, head, device="cpu", bs=50_000, f64=True):
     """Sound lower bound of the nlog / min / energy head score over each row's box (robust-alarm gating, Theorem 1'):
     member log P(benign) <= -logsumexp_i lower(z_i - z_bi). energy = nlog - logsumexp(mean z): minus the logsumexp
     of the mean upper logits; one member: the score is exactly -z_bi, so also -upper(z_bi)."""
-    if f64:  # PREREG §9 AUDIT F1: float64 copy, outward margin below
+    if f64 and next(m.parameters()).dtype != torch.float64:  # PREREG §9 AUDIT F1: float64 copy, outward margin below
         m = copy.deepcopy(m).double()
     out = []
     with torch.no_grad():
@@ -272,6 +272,35 @@ def score_lower(m, lo, hi, bi, head, device="cpu", bs=50_000, f64=True):
                     s = torch.maximum(s, -zu[:, bi])
             out.append((s - 1e-6 if f64 else s).cpu().numpy())
     return np.concatenate(out)
+
+
+def bab_block(m, h, lo, hi, bi, head, tau, max_boxes=8192, time_s=20.0, device="cpu"):
+    """PREREG §9 K5b: branch and bound by input splitting over one row's box [lo, hi]. Returns (blocked, decided):
+    blocked only when the float64 IBP lower bound of every sub-box clears tau; a sub-box centre whose real score is
+    <= tau is a realised attack (decided, not blocked); budget out -> (False, False). m64 = float64 copy of m."""
+    t0, m64 = time.time(), copy.deepcopy(m).double()
+    body = m.bodies[0] if isinstance(m, Ensemble) else m
+    L, H = lo[None].astype(np.float64), hi[None].astype(np.float64)
+    if hasattr(body, "clo"):  # the input clip is part of the model: points outside it score as the clipped point
+        c0, c1 = body.clo.cpu().numpy().astype(np.float64), body.chi.cpu().numpy().astype(np.float64)
+        L, H = np.clip(L, c0, c1), np.clip(H, c0, c1)
+    L, H = np.clip(L, -1e6, 1e6), np.clip(H, -1e6, 1e6)  # shortcut: an unclipped infinite column is split at +-1e6
+    n = 0
+    while True:
+        keep = score_lower(m64, L, H, bi, head, device) <= tau
+        L, H = L[keep], H[keep]
+        if not len(L):
+            return True, True
+        c = (L + H) / 2
+        if (h.score(m, c.astype(np.float32), device) <= tau).any():
+            return False, True
+        n += len(L)
+        if n >= max_boxes or time.time() - t0 > time_s:
+            return False, False
+        j, r = (H - L).argmax(1), np.arange(len(L))
+        L2, H1 = L.copy(), H.copy()
+        H1[r, j] = L2[r, j] = c[r, j]
+        L, H = np.concatenate([L, L2]), np.concatenate([H1, H])
 
 
 def score_upper(m, lo, hi, bi, head, device="cpu", bs=50_000, f64=True):

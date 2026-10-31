@@ -255,3 +255,31 @@ def test_dual_round_scores_min_of_alarm_and_block(tmp_path, monkeypatch):
         r, g = x.user_attrs["res"], x.user_attrs["genome"]
         assert g["head"] == "energy" and g["bhead"] == "nlog"
         assert np.isclose(r["fitness"], min(r["robust"]["10"][0], r["plain"]["fitness"]))
+
+
+@pytest.mark.parametrize("members,head", [(1, "nlog"), (4, "nlog"), (4, "min")])
+def test_bab_block_is_sound(members, head):
+    """PREREG §9 K5b: every row the branch and bound blocks scores above tau at random points of its box, and it blocks
+    every row the plain IBP bound blocks."""
+    rng = np.random.default_rng(1)
+    X = rng.normal(size=(300, 6)).astype(np.float32)
+    y = (X[:, 0] > 0).astype(int) + (X[:, 1] > 1)
+    clip = (np.r_[[-np.inf] * 3, [-2.0] * 3], np.r_[[np.inf] * 3, [2.0] * 3])
+    torch.manual_seed(0)
+    enc, din, _ = fx.encoder("raw", X, y, 4, 0)
+    m = fx.Body(enc, din, 3, 16, 2, members, clip=clip).eval()
+    h = fx.Head(head, 0)
+    s0 = h.score(m, X, "cpu")
+    tau = float(np.quantile(s0, 0.5))
+    lo, hi = X - rng.uniform(0, 0.6, X.shape), X + rng.uniform(0, 0.6, X.shape)
+    hi[:, 5] = np.inf
+    ibp = fx.score_lower(m, lo, hi, 0, head) > tau
+    n_bab = 0
+    for i in np.flatnonzero(s0 > tau)[:40]:
+        blocked, decided = fx.bab_block(m, h, lo[i], hi[i], 0, head, tau, max_boxes=4096, time_s=5.0)
+        assert blocked or not ibp[i]
+        if blocked:
+            n_bab += 1
+            P = lo[i] + rng.uniform(size=(1000, 6)) * (np.minimum(hi[i], 10) - lo[i])
+            assert (h.score(m, P.astype(np.float32), "cpu") > tau - 1e-5).all()
+    assert n_bab >= ibp[np.flatnonzero(s0 > tau)[:40]].sum()

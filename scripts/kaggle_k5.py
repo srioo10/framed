@@ -3,7 +3,8 @@ dataset's arena pairs. Code (scripts + src/nids) goes up as a small private data
 private bigp-arena dataset. Library versions are pinned to the local ones. Each kernel prints an md5 of every arena
 pair it reads, to check against the local arena.
 k10: the same code dataset, plus three private CPU kernels running scripts/k10_capacity.py (A configs, B configs).
-Usage: .venv/bin/python scripts/kaggle_k5.py push | kernels [--ds nf_ctu13] | k10 | status | pull (pull overwrites results/cert/k5_*)
+k5b: the same code dataset, plus one private CPU kernel per dataset running scripts/k5b_net.py (PREREG §9 K5b).
+Usage: .venv/bin/python scripts/kaggle_k5.py push | kernels [--ds nf_ctu13] | k10 | k5b | status | pull (pull overwrites results/cert/k5_*)
 """
 import argparse
 import json
@@ -15,7 +16,7 @@ from kaggle_bowl import KAGGLE, ROOT, STAGE, sh, user
 
 DS = ["nf_ctu13", "nf_ugr16", "nf_cic"]
 CODE = ["bowl.py", "arena.py", "fighters.py", "ple.py", "roc.py", "sensitivity.py", "cert_trees.py", "k5_trees.py",
-        "k10_capacity.py"]
+        "k10_capacity.py", "k5b_net.py"]
 K10 = {"a": ["A_w128", "A_w128_d3"], "a2": ["A_w192"], "b": ["B_w64", "B_w128"]}
 KERNEL = '''import glob, hashlib, os, shutil, subprocess, sys
 hits = glob.glob("/kaggle/input/**/k5_trees.py", recursive=True)
@@ -51,6 +52,23 @@ subprocess.run([sys.executable, "/kaggle/working/k10/scripts/k10_capacity.py", "
                 "--out", "k10_{part}.json", "--only", *{only}], check=True, env=env)
 shutil.copy("/kaggle/working/k10/results/bowl/k10_{part}.json", "/kaggle/working/k10_{part}.json")
 '''
+KERNEL5B = '''import glob, hashlib, os, shutil, subprocess, sys
+code = os.path.dirname(glob.glob("/kaggle/input/**/k5b_net.py", recursive=True)[0])
+nids = os.path.dirname(glob.glob("/kaggle/input/**/nids/models.py", recursive=True)[0])
+arena = os.path.dirname(os.path.dirname(glob.glob("/kaggle/input/**/arena/{ds}/pair_0.npz", recursive=True)[0]))
+shutil.copytree(code, "/kaggle/working/k5b/scripts", dirs_exist_ok=True)
+shutil.copytree(nids, "/kaggle/working/k5b/src/nids", dirs_exist_ok=True)
+subprocess.run([sys.executable, "-c", "import torch, sklearn, xgboost; print('versions', torch.__version__, "
+                "sklearn.__version__, xgboost.__version__)"])
+for f in sorted(glob.glob(f"{arena}/{ds}/pair_*.npz")):
+    print("md5", "{ds}/" + os.path.basename(f), hashlib.md5(open(f, "rb").read()).hexdigest(), flush=True)
+pairs = [f"{ds}/" + os.path.basename(f)[:-4] for f in sorted(glob.glob(f"{arena}/{ds}/pair_*.npz"))]
+env = dict(os.environ, PYTHONPATH="/kaggle/working/k5b/src", OMP_NUM_THREADS="1")
+subprocess.run([sys.executable, "/kaggle/working/k5b/scripts/k5b_net.py", "--workers", "4", "--arena", arena,
+                "--out", "k5b_{ds}.csv", "--pairs", *pairs], check=True, env=env)
+for f in glob.glob("/kaggle/working/k5b/results/cert/k5b_*"):
+    shutil.copy(f, "/kaggle/working/")
+'''
 
 
 def push(a):
@@ -76,6 +94,8 @@ def push(a):
         raise SystemExit("code dataset not ready after 20 min")
     if a.cmd == "k10":
         k10_kernels(u)
+    elif a.cmd == "k5b":
+        k5b_kernels(u, a.ds)
     else:
         kernels(u, a.ds)
 
@@ -91,6 +111,20 @@ def k10_kernels(u):
             "id": f"{u}/{slug}", "title": slug, "code_file": "run_k10.py", "language": "python",
             "kernel_type": "script", "is_private": True, "enable_gpu": False, "enable_internet": False,
             "dataset_sources": [f"{u}/bigp-arena", f"{u}/bigp-k5code"]}))  # GPU quota gone: CPU image
+        sh("kernels", "push", "-p", str(k))
+
+
+def k5b_kernels(u, dss=DS):
+    for ds in dss:
+        k = STAGE / f"k5b_{ds}"
+        shutil.rmtree(k, ignore_errors=True)
+        k.mkdir()
+        (k / "run_k5b.py").write_text(KERNEL5B.replace("{ds}", ds))
+        slug = f"bigp-k5b-{ds.replace('_', '-')}"
+        (k / "kernel-metadata.json").write_text(json.dumps({
+            "id": f"{u}/{slug}", "title": slug, "code_file": "run_k5b.py", "language": "python",
+            "kernel_type": "script", "is_private": True, "enable_gpu": False, "enable_internet": False,
+            "dataset_sources": [f"{u}/bigp-arena", f"{u}/bigp-k5code"]}))
         sh("kernels", "push", "-p", str(k))
 
 
@@ -138,7 +172,7 @@ def pull(a):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["push", "kernels", "k10", "status", "pull"])
+    ap.add_argument("cmd", choices=["push", "kernels", "k10", "k5b", "status", "pull"])
     ap.add_argument("--ds", nargs="+", default=DS)  # push/kernels: only these datasets
     a = ap.parse_args()
-    {"push": push, "k10": push, "kernels": lambda a: kernels(user(), a.ds), "status": status, "pull": pull}[a.cmd](a)
+    {"push": push, "k10": push, "k5b": push, "kernels": lambda a: kernels(user(), a.ds), "status": status, "pull": pull}[a.cmd](a)
