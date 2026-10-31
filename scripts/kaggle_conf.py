@@ -1,5 +1,5 @@
 """CONF on Kaggle (PREREG §9 CONF): per dataset, data/conf/{ds} goes up as a private dataset (bigp-conf-{ds}) and its
-kernels start at once: clean (conf_clean.py, A / B / RF / XGB, seeds 2-4), k5b (k5b_net.py, seeds 2-4), trees
+kernels start at once: clean (conf_clean.py, A / B / RF / XGB, seeds 2-4), baselines (conf_baselines.py), k5b (k5b_net.py, seeds 2-4), trees
 (k5_trees.py RF / XGB plain + box-augmented, one kernel per seed), groot (k5_trees.py --models groot, seeds 2-4).
 Code from the bigp-k5code dataset (pushed by `push`). GPU sessions are used as extra CPU slots when --gpu.
 Each kernel prints md5s of its pairs and copies its outputs to /kaggle/working.
@@ -15,7 +15,7 @@ from kaggle_bowl import KAGGLE, ROOT, STAGE, sh, user
 
 DS = ["nf_ctu13", "nf_ugr16", "nf_ton", "nf_cic"]
 CODE = ["bowl.py", "arena.py", "fighters.py", "ple.py", "roc.py", "sensitivity.py", "cert_trees.py", "k5_trees.py",
-        "k5b_net.py", "conf_clean.py"]
+        "k5b_net.py", "conf_clean.py", "conf_baselines.py"]
 SEEDS = (2, 3, 4)
 KERNEL = '''import glob, hashlib, os, shutil, subprocess, sys
 code = os.path.dirname(glob.glob("/kaggle/input/**/conf_clean.py", recursive=True)[0])
@@ -42,6 +42,8 @@ for f in glob.glob("/kaggle/working/w/results/**/*.*", recursive=True):
 def cmds(kind, ds):
     if kind == "clean":
         return [["conf_clean.py", "--workers", "4", "--out", f"clean_{ds}.jsonl"]]
+    if kind == "baselines":
+        return [["conf_baselines.py", "--workers", "4", "--out", f"baselines_{ds}.jsonl"]]
     if kind == "k5b":
         return [["k5b_net.py", "--workers", "4", "--seed", str(s), "--out", f"conf_k5b_{ds}_s{s}.csv"] for s in SEEDS]
     if kind == "groot":
@@ -51,7 +53,7 @@ def cmds(kind, ds):
     return [["k5_trees.py", "--workers", "4", "--seed", str(s), "--out", f"conf_trees_{ds}_s{s}.csv"]]
 
 
-KINDS = ["clean", "k5b", "trees2", "trees3", "trees4", "groot"]
+KINDS = ["clean", "baselines", "k5b", "trees2", "trees3", "trees4", "groot"]
 
 
 def push(a):
