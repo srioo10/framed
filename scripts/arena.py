@@ -5,6 +5,7 @@ attacker hosts are pseudo-unknown (host context with only R0 removed, as score_b
 known-attack validation; cal rows of benign calibration hosts set the 1% threshold. Per pair, saves prepped arrays,
 3-fold OOF XGB teacher probabilities on the fit rows, and the heavy RF / XGB boss scores.
 Usage: .venv/bin/python scripts/arena.py nf_ctu13            (writes data/arena/{ds}/pair_*.npz)
+       NIDS_LONG=1 .venv/bin/python scripts/arena.py nf_ctu13 --out data/arena_hl   (+ hl_* columns, PREREG §9 K7)
 """
 import argparse
 import json
@@ -144,5 +145,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("dataset")
     ap.add_argument("--prep-only", action="store_true")
+    ap.add_argument("--out", type=Path, default=OUT)  # data/arena_hl with NIDS_LONG=1 (PREREG §9 K7)
     a = ap.parse_args()
+    OUT = a.out
     (prep_only if a.prep_only else build)(a.dataset)

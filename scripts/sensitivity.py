@@ -20,6 +20,7 @@ EPS = 1e-4  # widening in standardized units, covers float32 rounding of the rec
 
 def box(X, cols, mu, sd, m):
     """(n, d) prepped rows -> (lo, hi) of the same shape; mu / sd are Prep's per-column log-space mean / scale."""
+    assert not any(c.startswith("hl_") for c in cols), "Theorem 1 not yet extended to long windows (PREREG K7)"
     X = np.asarray(X, np.float64)
     lo, hi = X.copy(), X.copy()
     raw = lambda j: np.expm1(np.maximum(X[:, j] * sd[j] + mu[j], 0))  # noqa: E731  all host-context values are >= 0
@@ -53,6 +54,7 @@ def deletion_box(X, cols, mu, sd, m):
     shares capped to [0, 1]; when n' <= m every share may be anything in [0, 1]. The clean row of an attacked flow lies
     in the deletion box of its observed row, so an alarm whose lower bound over this box clears tau would have fired
     without the injections."""
+    assert not any(c.startswith("hl_") for c in cols), "Theorem 1 not yet extended to long windows (PREREG K7)"
     X = np.asarray(X, np.float64)
     lo, hi = X.copy(), X.copy()
     raw = lambda j: np.expm1(np.maximum(X[:, j] * sd[j] + mu[j], 0))  # noqa: E731

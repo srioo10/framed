@@ -92,6 +92,13 @@ class HostFlows:
             self._cache[R] = self.features(~np.isin(self.family, list(R)))[self.keep]
         return self._cache[R]
 
+    def long(self, R):
+        """PREREG §9 K7: long-window (LONG_MS) features of the kept rows, same population rule as removal."""
+        R = ("long",) + tuple(sorted(R))
+        if R not in self._cache:
+            self._cache[R] = self.features(~np.isin(self.family, list(R[1:])), LONG_MS)[self.keep]
+        return self._cache[R]
+
     def isolated(self):
         """Control: each flow's population is Benign plus its own family."""
         if "iso" not in self._cache:
