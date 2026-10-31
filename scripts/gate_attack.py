@@ -4,6 +4,8 @@ row clears tau) must imply an alarm on the clean row; any violation is a bug. Re
 alarms and blocks, clean vs the worst pattern. tau = clean 1%-FPR threshold on benign flows of calibration hosts.
 --clean-only (PREREG §9 item 3): clean victim alarms with the global tau vs per-host-group taus (quartiles of
 hc_src_n_120s on calibration-host benign flows, each group its own 1% quantile); writes gate_calib_{ds}.csv.
+--clean-only --tau-day (PREREG §9 HOSTDAY): flow tau vs tau_day (<= 1% of calibration-host benign host-days alarmed),
+clean victim alarm / block rates and test attack TPR (plain, gated); writes gate_hostday_{ds}.csv.
 Usage: .venv/bin/python scripts/gate_attack.py nf_ctu13 [--m 10] [--genome '{"cert": 4, "rdet": 4}'] [--clean-only]
 """
 import argparse
@@ -37,6 +39,7 @@ def main():
     ap.add_argument("--m", type=int, default=10)
     ap.add_argument("--genome", default="{}")
     ap.add_argument("--clean-only", action="store_true")
+    ap.add_argument("--tau-day", action="store_true")
     a = ap.parse_args()
     g = G | json.loads(a.genome)
     t0 = time.time()
@@ -86,6 +89,28 @@ def main():
     assert np.allclose(H0, base[hostctx.COLS].to_numpy(), rtol=1e-4, atol=1e-3), "subset host context != bank"
     X0 = tx(base)
     day = lambda w: float(pd.Series(w).groupby(key).any().mean())  # noqa: E731
+    if a.clean_only and a.tau_day:
+        ck = meta["src"][cal].astype(np.int64) * hs.MUL + meta["t"][cal] // hs.DAY_MS
+        rng = np.random.default_rng(0)
+        cap = lambda r: np.sort(rng.permutation(r)[:5000])  # noqa: E731  shortcut: 5k rows per family keeps tree bounds fast
+        T = {"unk": cap(bank.test[held]),
+             "known": np.concatenate([cap(r) for f, r in bank.test.items() if f not in (held, "Benign")])}
+        XT = {k: tx(bank.frame(r, ())) for k, r in T.items()}
+        res = []
+        for n, (f, b) in dets.items():
+            td = float(hs.threshold(hs.day_max(ck, f(Xcal))))
+            s0, b0 = f(X0), b(X0)
+            sT = {k: (f(X), b(X)) for k, X in XT.items()}
+            for mode, t in (("flow", tau[n]), ("day", td)):
+                r = {"detector": n, "tau": mode, "tau_val": float(t), "alarm": (s0 > t).mean(), "block": (b0 > t).mean(),
+                     "alarm_day": day(s0 > t), "block_day": day(b0 > t), "violations": int(((b0 > t) & ~(s0 > t)).sum())}
+                for k, (s, bb) in sT.items():
+                    r[f"tpr_{k}"], r[f"gtpr_{k}"] = (s > t).mean(), (bb > t).mean()
+                r["gtpr_macro"] = (r["gtpr_unk"] + r["gtpr_known"]) / 2
+                res.append(r)
+                print(json.dumps({k: round(v, 4) if isinstance(v, float) else v for k, v in r.items()}), flush=True)
+        pd.DataFrame(res).to_csv(sa.OUT / f"gate_hostday_{a.dataset}.csv", index=False)
+        return
     if a.clean_only:
         c = cols.index("hc_src_n_120s")
         edges = np.quantile(Xcal[:, c], [0.25, 0.5, 0.75])
