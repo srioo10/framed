@@ -5,8 +5,10 @@ tune:  one Optuna TPE study, 256 trials (+256 once if the best rose by > 0.005 i
        cross-context synthetic rows, RF argmax label, sample weight syn) and balance (inverse class-frequency weights).
 death: top 3 per family on the full arena, seeds 1 and 2; the best is the tuned boss (results/bowl/tuned_boss.json).
 No size / speed limit; both reported.
-Usage: .venv/bin/python scripts/boss_bowl.py tune [--trials 256]
-       .venv/bin/python scripts/boss_bowl.py death
+--tiny (PREREG §9 K9): the fighters' caps for the bosses too: size = tree nodes x 8 B <= 64 KB, speed ratio <= 0.5
+(trials over a cap pruned), small search space; study bosses_tiny, results/bowl/tuned_boss_tiny.json.
+Usage: .venv/bin/python scripts/boss_bowl.py tune [--trials 256] [--tiny]
+       .venv/bin/python scripts/boss_bowl.py death [--tiny]
 """
 import argparse
 import json
@@ -24,10 +26,22 @@ import fighters as fx  # noqa: E402
 DB = f"sqlite:///{bowl.OUT / 'bosses.db'}"
 
 
-def suggest(t):
+def suggest(t, tiny=False):
     fam = t.suggest_categorical("family", ["rf", "xgb", "lgbm"])
     g = {"family": fam, "syn": t.suggest_categorical("syn", [0.0, 0.5, 1.0]),
          "balance": t.suggest_categorical("balance", [0, 1])}
+    if tiny:
+        if fam == "rf":
+            return g | {"n": t.suggest_categorical("rf_n", [5, 10, 20, 50]), "depth": t.suggest_int("rf_depth", 4, 12),
+                        "leaf": t.suggest_categorical("rf_leaf", [1, 2, 5, 10]),
+                        "feat": t.suggest_categorical("rf_feat", ["sqrt", 0.3, 0.5]),
+                        "rows": t.suggest_categorical("rf_rows", [0.0, 0.5])}
+        g |= {"n": t.suggest_int(f"{fam}_n", 5, 100, step=5), "lr": t.suggest_float(f"{fam}_lr", 0.02, 0.5, log=True),
+              "sub": t.suggest_float(f"{fam}_sub", 0.5, 1.0), "col": t.suggest_float(f"{fam}_col", 0.5, 1.0),
+              "l2": t.suggest_float(f"{fam}_l2", 0.1, 10, log=True)}
+        return g | ({"depth": t.suggest_int("xgb_depth", 2, 5), "mcw": t.suggest_float("xgb_mcw", 1, 20, log=True)}
+                    if fam == "xgb" else
+                    {"leaves": t.suggest_int("lgbm_leaves", 4, 31, log=True), "mcs": t.suggest_int("lgbm_mcs", 5, 100, log=True)})
     if fam == "rf":
         g |= {"n": t.suggest_categorical("rf_n", [100, 300, 600]),
               "depth": t.suggest_categorical("rf_depth", [0, 12, 20, 30]),
@@ -79,6 +93,15 @@ def fit_pair(g, z, seed):
     return m, {k: nl(z[f"X_{k}"]) for k in ("es", "pseudo", "cal")}
 
 
+def size_bytes(m):
+    """Tree nodes x 8 B, the fighters.size_bytes convention for trees."""
+    if hasattr(m, "estimators_"):
+        return 8 * sum(e.tree_.node_count for e in m.estimators_)
+    if hasattr(m, "get_booster"):
+        return 8 * len(m.get_booster().trees_to_dataframe())
+    return 8 * len(m.booster_.trees_to_dataframe())
+
+
 def evaluate(g, pairs, seeds=(0,)):
     fit, unk, kn = [], [], []
     for z in pairs:
@@ -89,20 +112,22 @@ def evaluate(g, pairs, seeds=(0,)):
     m.set_params(n_jobs=1)
     ratio = fx.time_per_row(lambda X: m.predict_proba(X), z["X_cal"][:4096]) / bowl.boss_time(z)
     return {"fitness": float(np.mean(fit)), "unk": float(np.mean(unk)), "known": float(np.mean(kn)),
-            "ratio": float(ratio)}
+            "ratio": float(ratio), "size": int(size_bytes(m))}
 
 
 def tune(a):
     import optuna
     pairs = bowl.load_pairs(a.arena, cheap=True)
-    st = optuna.create_study(study_name="bosses", storage=DB, load_if_exists=True, direction="maximize",
+    st = optuna.create_study(study_name="bosses_tiny" if a.tiny else "bosses", storage=DB, load_if_exists=True, direction="maximize",
                              sampler=optuna.samplers.TPESampler(seed=0))
 
     def objective(t):
-        g = suggest(t)
+        g = suggest(t, a.tiny)
         res = evaluate(g, pairs)
         t.set_user_attr("genome", g), t.set_user_attr("res", res)
         print(t.number, g, {k: round(v, 4) for k, v in res.items()}, flush=True)
+        if a.tiny and (res["size"] > bowl.SIZE_MAX or res["ratio"] > bowl.RATIO_MAX):
+            raise optuna.TrialPruned()  # over the fighters' caps
         return res["fitness"]
 
     def run(n):
@@ -113,7 +138,7 @@ def tune(a):
     run(a.trials)
     v = [t.value for t in sorted(st.trials, key=lambda t: t.number) if t.state.name == "COMPLETE"]
     q = 3 * a.trials // 4
-    if len(v) <= a.trials and max(v) - max(v[:q]) > 0.005:  # PREREG extension rule, once
+    if v[:q] and len(v) <= a.trials and max(v) - max(v[:q]) > 0.005:  # PREREG extension rule, once
         print("extension: best rose", max(v) - max(v[:q]), flush=True)
         run(2 * a.trials)
     print("best", st.best_trial.number, st.best_value, st.best_trial.user_attrs["genome"])
@@ -121,7 +146,7 @@ def tune(a):
 
 def death(a):
     import optuna
-    st = optuna.load_study(study_name="bosses", storage=DB)
+    st = optuna.load_study(study_name="bosses_tiny" if a.tiny else "bosses", storage=DB)
     done = [t for t in st.trials if t.state.name == "COMPLETE"]
     top = [t for f in ("rf", "xgb", "lgbm")
            for t in sorted([t for t in done if t.user_attrs["genome"]["family"] == f], key=lambda t: -t.value)[:3]]
@@ -131,8 +156,9 @@ def death(a):
         g = t.user_attrs["genome"]
         rows.append({"trial": t.number, "cheap": t.value, **g, **evaluate(g, pairs, seeds=(1, 2))})
         print(rows[-1], flush=True)
-    best = max(rows, key=lambda r: r["fitness"])
-    (bowl.OUT / "tuned_boss.json").write_text(json.dumps({"finalists": rows, "tuned_boss": best,
+    best = max([r for r in rows if not a.tiny or (r["size"] <= bowl.SIZE_MAX and r["ratio"] <= bowl.RATIO_MAX)] or rows,
+               key=lambda r: r["fitness"])  # full-arena caps re-checked for tiny
+    (bowl.OUT / f"tuned_boss{'_tiny' if a.tiny else ''}.json").write_text(json.dumps({"finalists": rows, "tuned_boss": best,
                                                           "trials": len(done)}, indent=1))
     print("TUNED BOSS", best)
 
@@ -142,5 +168,6 @@ if __name__ == "__main__":
     ap.add_argument("cmd", choices=["tune", "death"])
     ap.add_argument("--trials", type=int, default=256)
     ap.add_argument("--arena", type=Path, default=bowl.ARENA)
+    ap.add_argument("--tiny", action="store_true")
     a = ap.parse_args()
     {"tune": tune, "death": death}[a.cmd](a)
