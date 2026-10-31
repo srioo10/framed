@@ -7,11 +7,15 @@ the MILP solution scores <= tau on the real model; otherwise undecided, counted 
 RF and binary XGB: max P(benign) is exact. Multiclass XGB: min over the box of max_c (z_c - z_bi), so
 s >= log1p(exp(.)) (sound, not exact). MILP only where the plain alarm fires and the per-tree bound does not block.
 Writes results/cert/k5_trees.csv.
-Usage: .venv/bin/python scripts/k5_trees.py [--rows 100] [--workers 8] [--pairs nf_ctu13/pair_0 ...]
+--models groot (PREREG §9 AUDIT F6): GROOT robust forest (Vos and Verwer 2021), benign vs attack, trained against the
+attack rows' deletion box (per-feature median down / up widths at M, attack class only); 50 trees, depth 10, fit rows
+subsampled to GROOT_ROWS (stratified, seed 1). Verified like RF (leaf benign share averaged over trees).
+Usage: .venv/bin/python scripts/k5_trees.py [--rows 100] [--workers 8] [--pairs nf_ctu13/pair_0 ...] [--models groot]
 """
 import argparse
 import json
 import sys
+import types
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
@@ -27,6 +31,56 @@ import cert_trees as ct  # noqa: E402
 from nids import models  # noqa: E402
 
 M, SEED, LIMIT = 10, 1, 20.0
+GROOT_ROWS = 10_000
+
+
+class GrootRF:
+    """GROOT forest in the sklearn RF shape the verifiers read (estimators_[i].tree_, classes_ = [bi, -1])."""
+
+    def __init__(self, bi, **kw):
+        sys.modules.setdefault("numpy.lib.function_base", types.SimpleNamespace(iterable=np.iterable))  # GROOT predates numpy 2
+        from groot.model import GrootRandomForestClassifier
+        self.g, self.classes_ = GrootRandomForestClassifier(**kw), np.array([bi, -1])
+
+    def fit(self, X, y_attack, attack_model):
+        from groot.model import node_tree_to_arrays
+        self.g.attack_model = attack_model
+        self.g.fit(X, y_attack)
+        self.estimators_ = []
+        for est in self.g.estimators_:
+            left, right, feat, thr, val = node_tree_to_arrays(est.root_)
+            p = np.where(left < 0, (val + 1) / 2, 0.5)  # leaf value in [-1, 1] -> P(attack)
+            t = types.SimpleNamespace(children_left=left, children_right=right, feature=np.where(left < 0, 0, feat),
+                                      threshold=np.where(left < 0, 0, thr).astype(np.float64),
+                                      value=np.stack([1 - p, p], 1)[:, None, :])
+            self.estimators_.append(types.SimpleNamespace(tree_=t))
+        return self
+
+    def predict_proba(self, X):
+        X32, pb = np.asarray(X, np.float32), np.zeros(len(X))
+        for e in self.estimators_:
+            t, node = e.tree_, np.zeros(len(X), np.int64)
+            for _ in range(64):
+                inner = t.children_left[node] >= 0
+                if not inner.any():
+                    break
+                go = X32[np.arange(len(X)), t.feature[node]] <= t.threshold[node].astype(np.float32)
+                node = np.where(inner, np.where(go, t.children_left[node], t.children_right[node]), node)
+            pb += t.value[node, 0, 0]
+        pb /= len(self.estimators_)
+        return np.stack([pb, 1 - pb], 1)
+
+
+def groot(z):
+    X, y = z["X_fit"], z["y_fit"]
+    att = y != z["bi"]
+    lo, hi = bowl.dbox(z, X[att], M)
+    am = [(float(a), float(b)) for a, b in zip(np.median(X[att] - lo, 0), np.median(hi - X[att], 0))]
+    rng = np.random.default_rng(SEED)
+    idx = np.sort(np.concatenate([rng.choice(np.flatnonzero(c), min(c.sum(), round(GROOT_ROWS * c.mean())), replace=False)
+                                  for c in (att, ~att)]))
+    return GrootRF(z["bi"], n_estimators=50, max_depth=10, one_adversarial_class=True, random_state=SEED,
+                   n_jobs=1).fit(X[idx], att[idx].astype(int), am)
 
 
 def trees(m, k, bi):
@@ -171,12 +225,13 @@ def job(args):
     sub = lambda X: X[np.sort(rng.choice(len(X), min(nrows, len(X)), replace=False))]  # noqa: E731
     Xu, Xk = sub(z["X_pseudo"]), sub(z["X_es"][att]) if att.any() else None
     Xf, yf = augment(z, np.random.default_rng(SEED)) if robust else (z["X_fit"], z["y_fit"])
-    m = (models.rf(SEED) if name == "rf" else models.xgb(SEED)).set_params(n_jobs=1).fit(Xf, yf)
+    m = groot(z) if name == "groot" else \
+        (models.rf(SEED) if name == "rf" else models.xgb(SEED)).set_params(n_jobs=1).fit(Xf, yf)
     col = list(m.classes_).index(bi)
     s = lambda X: -np.log(np.maximum(m.predict_proba(X)[:, col], 1e-45))  # noqa: E731
     s_cal = s(z["X_cal"])
     tau = np.sort(s_cal)[::-1][int(np.floor(0.01 * len(s_cal)))]
-    rf = name == "rf"
+    rf = name in ("rf", "groot")
     low = (lambda lo, hi: ct.rf_lower(m, lo, hi, col)) if rf else \
         (lambda lo, hi: ct.xgb_upper(m, lo, hi, col, k, lower=True))  # noqa: E731
     T, off = trees(m, k, col)
@@ -226,7 +281,7 @@ def main():
     a = ap.parse_args()
     bowl.ARENA = a.arena  # forked workers inherit it
     keys = a.pairs or [f"{p['ds']}/{p['name']}" for p in bowl.load_pairs(bowl.ARENA, cheap=False)]
-    jobs = [(kk, n, r, a.rows) for kk in keys for n in a.models for r in (0, 1)]
+    jobs = [(kk, n, r, a.rows) for kk in keys for n in a.models for r in ((0,) if n == "groot" else (0, 1))]
     out = bowl.ROOT / "results" / "cert"
     out.mkdir(parents=True, exist_ok=True)
     rows = []
