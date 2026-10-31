@@ -12,7 +12,7 @@ Usage: .venv/bin/python scripts/k5_trees.py [--rows 100] [--workers 8] [--pairs 
 import argparse
 import json
 import sys
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import numpy as np
@@ -145,7 +145,7 @@ def milp_bound(T, off, lo, hi, x, bi, k, rf):
     else:
         s_lo = np.logaddexp(0, dual)
     xr = realise(x, preds, r.x[:nP], T[0][6]) if r.x is not None else None
-    return float(s_lo), xr
+    return float(s_lo), xr, r.status == 0  # status 1 = time limit: dual bound sound but may be loose
 
 
 def augment(z, rng):
@@ -188,7 +188,7 @@ def job(args):
         plain, pt = s(X) > tau, low(lo, hi) > tau
         blk, und = pt.copy(), 0
         for i in np.flatnonzero(plain & ~pt):
-            s_lo, xr = milp_bound(T, off, lo[i], hi[i], X[i], col, k, rf)
+            s_lo, xr, _ = milp_bound(T, off, lo[i], hi[i], X[i], col, k, rf)
             if s_lo > tau:
                 blk[i] = True
             elif xr is not None and s(xr[None])[0] <= tau:
@@ -199,11 +199,11 @@ def job(args):
                 f"undecided_{part}": und, f"n_{part}": len(X)}
         if part == "unk":  # soundness check on 20 rows
             for i in range(min(20, len(X))):
-                s_lo, _ = milp_bound(T, off, lo[i], hi[i], X[i], col, k, rf)
+                s_lo, _, opt = milp_bound(T, off, lo[i], hi[i], X[i], col, k, rf)
                 top = np.maximum(np.minimum(hi[i], z["X_fit"].max(0)), lo[i])
                 pts = lo[i] + np.random.default_rng(i).random((200, X.shape[1]), dtype=np.float32) * (top - lo[i])
                 lt = low(lo[i:i + 1], hi[i:i + 1])[0]
-                if rf or k == 2:  # multiclass XGB: the MILP bound is a different sound bound, not a tighter one
+                if (rf or k == 2) and opt:  # timed-out MILP may be looser; multiclass XGB: the MILP bound is a different sound bound, not a tighter one
                     assert s_lo >= lt - 1e-4, f"{key} {name}: MILP bound {s_lo} < per-tree bound {lt}"
                 assert s_lo <= s(pts).min() + 1e-4 and s_lo <= s(X[i:i + 1])[0] + 1e-4, f"{key} {name}: unsound"
     if Xk is None:  # no known attack rows in this pair: known = unknown, as in gate_bosses
@@ -222,12 +222,22 @@ def main():
     ap.add_argument("--pairs", nargs="*")
     ap.add_argument("--models", nargs="+", default=["rf", "xgb"])
     ap.add_argument("--out", default="k5_trees.csv")
+    ap.add_argument("--arena", type=Path, default=bowl.ARENA)
     a = ap.parse_args()
+    bowl.ARENA = a.arena  # forked workers inherit it
     keys = a.pairs or [f"{p['ds']}/{p['name']}" for p in bowl.load_pairs(bowl.ARENA, cheap=False)]
     jobs = [(kk, n, r, a.rows) for kk in keys for n in a.models for r in (0, 1)]
-    with ProcessPoolExecutor(a.workers) as ex:
-        R = pd.DataFrame(list(ex.map(job, jobs)))
-    R.to_csv(bowl.ROOT / "results" / "cert" / a.out, index=False)
+    out = bowl.ROOT / "results" / "cert"
+    out.mkdir(parents=True, exist_ok=True)
+    rows = []
+    with ProcessPoolExecutor(a.workers) as ex, open(out / a.out.replace(".csv", ".jsonl"), "a") as f:
+        for fu in as_completed([ex.submit(job, j) for j in jobs]):  # saved as each job ends: a kill keeps the rest
+            r = fu.result()
+            rows.append(r)
+            f.write(json.dumps(r) + "\n")
+            f.flush()
+    R = pd.DataFrame(rows)
+    R.to_csv(out / a.out, index=False)
     print(R.groupby(["model", "robust_trained"])[["plain", "pertree", "milp", "undecided_unk", "undecided_known"]]
           .mean().round(3).to_string())
 
