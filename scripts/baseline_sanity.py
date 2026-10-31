@@ -5,7 +5,8 @@ calibration FPR, plus the RF / XGB boss AUCs. Writes results/conf/baseline_sanit
 Usage: .venv/bin/python scripts/baseline_sanity.py [--workers 4]
 """
 import argparse
-from concurrent.futures import ProcessPoolExecutor
+import json
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import numpy as np
@@ -53,8 +54,13 @@ def main():
     a = ap.parse_args()
     bowl.ARENA = a.arena
     keys = [f"{p['ds']}/{p['name']}" for p in bowl.load_pairs(bowl.ARENA, cheap=False)]
-    with ProcessPoolExecutor(a.workers) as ex:
-        R = pd.DataFrame([r for rs in ex.map(job, keys) for r in rs])
+    part = bowl.ROOT / "results" / "conf" / "baseline_sanity.jsonl"
+    done = {json.loads(line)["pair"] for line in open(part)} if part.exists() else set()
+    with ProcessPoolExecutor(a.workers) as ex, open(part, "a") as f:
+        for fu in as_completed([ex.submit(job, k) for k in keys if k not in done]):  # saved per pair: resumable
+            f.write("".join(json.dumps(r, default=float) + "\n" for r in fu.result()))
+            f.flush()
+    R = pd.DataFrame([json.loads(line) for line in open(part)])
     assert R[["auc_unk", "auc_known"]].stack().between(0, 1).all()
     R.to_csv(bowl.ROOT / "results" / "conf" / "baseline_sanity.csv", index=False)
     R["ds"] = R.pair.str.split("/").str[0]
