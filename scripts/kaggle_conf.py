@@ -156,7 +156,7 @@ def proc(a):
     (d / "dataset-metadata.json").write_text(json.dumps({"title": slug, "id": f"{u}/{slug}",
                                                          "licenses": [{"name": "other"}]}))
     exists = subprocess.run([KAGGLE, "datasets", "status", f"{u}/{slug}"], capture_output=True).returncode == 0
-    sh("datasets", "version" if exists else "create", "-p", str(d), *(["-m", "proc"] if exists else []), "-q")
+    sh("datasets", "version" if exists else "create", "-p", str(d), *(["-m", "proc"] if exists else []), "-r", "zip", "-q")
     wait_ready(f"{u}/{slug}")
 
 
