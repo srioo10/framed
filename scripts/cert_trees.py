@@ -24,6 +24,9 @@ MS = (1, 5, 10, 50, 100)
 OUT = ROOT / "results" / "cert"
 
 
+VISITS = None  # PREREG §9 K8: set to np.zeros(n_rows) to count node visits per row (one comparison each)
+
+
 def reach(left, right, feat, thr, leaf_val, lo, hi, le=False):
     """Per row: (min, max) of leaf_val over the leaves reachable from the box. Nodes with left < 0 are leaves.
     le: the tree sends x <= thr left (sklearn); otherwise x < thr (XGB)."""
@@ -32,6 +35,8 @@ def reach(left, right, feat, thr, leaf_val, lo, hi, le=False):
     stack = [(0, np.arange(n))]
     while stack:
         node, r = stack.pop()
+        if VISITS is not None:
+            VISITS[r] += 1
         if left[node] < 0:
             mn[r] = np.minimum(mn[r], leaf_val[node])
             mx[r] = np.maximum(mx[r], leaf_val[node])
