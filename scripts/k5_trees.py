@@ -235,7 +235,7 @@ def job(args):
     low = (lambda lo, hi: ct.rf_lower(m, lo, hi, col)) if rf else \
         (lambda lo, hi: ct.xgb_upper(m, lo, hi, col, k, lower=True))  # noqa: E731
     T, off = trees(m, k, col)
-    out = {"pair": key, "model": name, "robust_trained": int(robust), "tau": float(tau)}
+    out = {"pair": key, "model": name, "robust_trained": int(robust), "seed": SEED, "tau": float(tau)}
     for part, X in (("unk", Xu), ("known", Xk)):
         if X is None:
             continue
@@ -271,6 +271,7 @@ def job(args):
 
 
 def main():
+    global SEED
     ap = argparse.ArgumentParser()
     ap.add_argument("--rows", type=int, default=100)
     ap.add_argument("--workers", type=int, default=8)
@@ -278,7 +279,9 @@ def main():
     ap.add_argument("--models", nargs="+", default=["rf", "xgb"])
     ap.add_argument("--out", default="k5_trees.csv")
     ap.add_argument("--arena", type=Path, default=bowl.ARENA)
+    ap.add_argument("--seed", type=int, default=SEED)  # CONF: training seeds 2-4; rows stay RNG seed 0
     a = ap.parse_args()
+    SEED = a.seed
     bowl.ARENA = a.arena  # forked workers inherit it
     keys = a.pairs or [f"{p['ds']}/{p['name']}" for p in bowl.load_pairs(bowl.ARENA, cheap=False)]
     jobs = [(kk, n, r, a.rows) for kk in keys for n in a.models for r in ((0,) if n == "groot" else (0, 1))]

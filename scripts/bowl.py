@@ -14,6 +14,7 @@ Usage: .venv/bin/python scripts/bowl.py ablate --round 2              (round >= 
 import argparse
 import copy
 import json
+import os
 import time
 import sys
 from pathlib import Path
@@ -31,7 +32,7 @@ ARENA = ROOT / "data" / "arena"
 OUT = ROOT / "results" / "bowl"
 SIZE_MAX, RATIO_MAX = 65_536, 0.5
 CERT_MAX, CERT_M, CERT_ROWS, CERT_MS = 0.02, 10, 20_000, (1, 5, 10, 50, 100)  # PREREG §9 CERT
-DATASETS = ("nf_ctu13", "nf_ugr16", "nf_cic")
+DATASETS = tuple(os.environ.get("BOWL_DATASETS", "nf_ctu13,nf_ugr16,nf_cic").split(","))  # CONF adds nf_ton
 
 
 def load_pairs(arena_dir, cheap, seed=0):

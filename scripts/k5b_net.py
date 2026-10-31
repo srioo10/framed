@@ -34,7 +34,7 @@ def job(args):
     m, h, s = bowl.run_pair(B, z, "cpu", SEED, 30)
     m.eval()
     tau = np.sort(s["cal"])[::-1][int(np.floor(0.01 * len(s["cal"])))]
-    out = {"pair": key, "tau": float(tau), "robust_full": bowl.robust_fitness(B, m, z, s["cal"], "cpu", M)[0]}
+    out = {"pair": key, "seed": SEED, "tau": float(tau), "robust_full": bowl.robust_fitness(B, m, z, s["cal"], "cpu", M)[0]}
     for part, X in (("unk", Xu), ("known", Xk)):
         if X is None:
             continue
@@ -57,6 +57,7 @@ def job(args):
 
 
 def main():
+    global SEED
     ap = argparse.ArgumentParser()
     ap.add_argument("--rows", type=int, default=100)
     ap.add_argument("--time", type=float, default=20.0)
@@ -64,7 +65,9 @@ def main():
     ap.add_argument("--pairs", nargs="*")
     ap.add_argument("--out", default="k5b_net.csv")
     ap.add_argument("--arena", type=Path, default=bowl.ARENA)
+    ap.add_argument("--seed", type=int, default=SEED)  # CONF: training seeds 2-4; rows stay RNG seed 0
     a = ap.parse_args()
+    SEED = a.seed
     bowl.ARENA = a.arena  # forked workers inherit it
     keys = a.pairs or [f"{p['ds']}/{p['name']}" for p in bowl.load_pairs(bowl.ARENA, cheap=False)]
     out = bowl.ROOT / "results" / "cert"
