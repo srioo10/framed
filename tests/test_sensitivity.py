@@ -95,3 +95,34 @@ def test_bounds_are_attained():
             c = cols.index(f"hc_src_{stat}_10s")
             bound = (lo if side == "lo" else hi)[0, c]
             assert abs(X1[c] - bound) <= 2 * sensitivity.EPS, f"{name}: {stat} {side} {X1[c]} vs {bound}"
+
+
+@pytest.mark.parametrize("m", [1, 3])
+def test_long_windows_budgeted_injection(m):
+    """hl_* columns (PREREG K7): m injected flows in EVERY 240 s slot over the 2w before a victim flow (the most the
+    budget allows) must stay inside the long-window box, and the clean row inside the observed row's deletion box."""
+    rng = np.random.default_rng(10 + m)
+    hosts = [f"10.0.0.{i}" for i in range(4)]
+    cols, W = hostctx.LONG_COLS, hostctx.LONG_MS
+    for trial in range(6):
+        real = stream(rng, 400, hosts, 3 * W[0])
+        mu, sd = rng.normal(0, 1, len(cols)), rng.uniform(0.5, 2, len(cols))
+        feats = lambda df: hostctx.HostFlows(df).features(np.ones(len(df), bool), W)  # noqa: E731
+        X = prep(feats(real), mu, sd)
+        lo, hi = sensitivity.box(X.astype(np.float32), cols, mu, sd, m)
+        v = real.iloc[rng.integers(len(real) // 2, len(real))]
+        t = int(v.FLOW_START_MILLISECONDS)
+        side = "IPV4_DST_ADDR" if trial % 2 else "IPV4_SRC_ADDR"
+        d = -(-240_000 // m)  # lattice: any 240 s interval holds <= m injected flows
+        times = np.arange(t - 1 - rng.integers(d), max(t - 2 * W[0], 0), -d)[::-1]
+        inj = stream(rng, len(times), ["6.6.6.6"], 1)  # the other end is the attacker's own address
+        inj["FLOW_START_MILLISECONDS"] = times
+        inj[side] = v[side]
+        inj["L4_DST_PORT"] = v.L4_DST_PORT if trial % 3 else rng.choice([22, 80, 31337], len(times))
+        inj["IN_BYTES"] = rng.choice([0, 10**9], len(times))
+        both = pd.concat([real.assign(r=True), inj.assign(r=False)]).sort_values("FLOW_START_MILLISECONDS",
+                                                                                kind="stable")
+        X1 = prep(feats(both.drop(columns="r"))[both.r.to_numpy()], mu, sd)
+        assert (X1 >= lo).all() and (X1 <= hi).all(), f"trial {trial}: long-window injection left the box"
+        dlo, dhi = sensitivity.deletion_box(X1, cols, mu, sd, m)
+        assert (X >= dlo).all() and (X <= dhi).all(), f"trial {trial}: clean row outside the long deletion box"
