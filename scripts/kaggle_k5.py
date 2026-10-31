@@ -2,7 +2,8 @@
 dataset's arena pairs. Code (scripts + src/nids) goes up as a small private dataset; the arena comes from the existing
 private bigp-arena dataset. Library versions are pinned to the local ones. Each kernel prints an md5 of every arena
 pair it reads, to check against the local arena.
-Usage: .venv/bin/python scripts/kaggle_k5.py push | kernels [--ds nf_ctu13] | status | pull (pull overwrites results/cert/k5_*)
+k10: the same code dataset, plus two private GPU kernels running scripts/k10_capacity.py (A configs, B configs).
+Usage: .venv/bin/python scripts/kaggle_k5.py push | kernels [--ds nf_ctu13] | k10 | status | pull (pull overwrites results/cert/k5_*)
 """
 import argparse
 import json
@@ -13,7 +14,9 @@ import time
 from kaggle_bowl import KAGGLE, ROOT, STAGE, sh, user
 
 DS = ["nf_ctu13", "nf_ugr16", "nf_cic"]
-CODE = ["bowl.py", "arena.py", "fighters.py", "ple.py", "roc.py", "sensitivity.py", "cert_trees.py", "k5_trees.py"]
+CODE = ["bowl.py", "arena.py", "fighters.py", "ple.py", "roc.py", "sensitivity.py", "cert_trees.py", "k5_trees.py",
+        "k10_capacity.py"]
+K10 = {"a": ["A_w128", "A_w192", "A_w128_d3"], "b": ["B_w64", "B_w128"]}
 KERNEL = '''import glob, hashlib, os, shutil, subprocess, sys
 hits = glob.glob("/kaggle/input/**/k5_trees.py", recursive=True)
 if not hits:
@@ -34,6 +37,19 @@ pairs = [f"{ds}/" + os.path.basename(f)[:-4] for f in sorted(glob.glob(f"{arena}
 env = dict(os.environ, PYTHONPATH="/kaggle/working/k5/src", OMP_NUM_THREADS="1")
 subprocess.run([sys.executable, "/kaggle/working/k5/scripts/k5_trees.py", "--workers", "4", "--arena", arena,
                 "--out", "k5_{ds}.csv", "--pairs", *pairs], check=True, env=env)
+'''
+KERNEL10 = '''import glob, os, shutil, subprocess, sys
+code = os.path.dirname(glob.glob("/kaggle/input/**/k10_capacity.py", recursive=True)[0])
+nids = os.path.dirname(glob.glob("/kaggle/input/**/nids/models.py", recursive=True)[0])
+arena = os.path.dirname(os.path.dirname(glob.glob("/kaggle/input/**/arena/nf_ctu13/pair_0.npz", recursive=True)[0]))
+shutil.copytree(code, "/kaggle/working/k10/scripts", dirs_exist_ok=True)
+shutil.copytree(nids, "/kaggle/working/k10/src/nids", dirs_exist_ok=True)
+subprocess.run([sys.executable, "-c", "import torch, sklearn, xgboost; print('versions', torch.__version__, "
+                "torch.cuda.is_available(), sklearn.__version__, xgboost.__version__)"])
+env = dict(os.environ, PYTHONPATH="/kaggle/working/k10/src")
+subprocess.run([sys.executable, "/kaggle/working/k10/scripts/k10_capacity.py", "--device", "cuda", "--arena", arena,
+                "--out", "k10_{part}.json", "--only", *{only}], check=True, env=env)
+shutil.copy("/kaggle/working/k10/results/bowl/k10_{part}.json", "/kaggle/working/k10_{part}.json")
 '''
 
 
@@ -58,7 +74,24 @@ def push(a):
         time.sleep(20)
     else:
         raise SystemExit("code dataset not ready after 20 min")
-    kernels(u, a.ds)
+    if a.cmd == "k10":
+        k10_kernels(u)
+    else:
+        kernels(u, a.ds)
+
+
+def k10_kernels(u):
+    for part, only in K10.items():
+        k = STAGE / f"k10_{part}"
+        shutil.rmtree(k, ignore_errors=True)
+        k.mkdir()
+        (k / "run_k10.py").write_text(KERNEL10.replace("{part}", part).replace("{only}", repr(only)))
+        slug = f"bigp-k10-{part}"
+        (k / "kernel-metadata.json").write_text(json.dumps({
+            "id": f"{u}/{slug}", "title": slug, "code_file": "run_k10.py", "language": "python",
+            "kernel_type": "script", "is_private": True, "enable_gpu": True, "enable_internet": False,
+            "dataset_sources": [f"{u}/bigp-arena", f"{u}/bigp-k5code"]}))
+        sh("kernels", "push", "-p", str(k))
 
 
 def kernels(u, dss=DS):
@@ -80,6 +113,8 @@ def kernels(u, dss=DS):
 def status(a):
     for ds in DS:
         sh("kernels", "status", f"{user()}/bigp-k5-{ds.replace('_', '-')}")
+    for part in K10:
+        subprocess.run([KAGGLE, "kernels", "status", f"{user()}/bigp-k10-{part}"])
 
 
 def pull(a):
@@ -91,11 +126,19 @@ def pull(a):
         for f in out.rglob("k5_*"):
             shutil.copy(f, ROOT / "results" / "cert" / f.name)
             print("->", f.name)
+    for part in K10:
+        out = STAGE / f"k10_out_{part}"
+        shutil.rmtree(out, ignore_errors=True)
+        out.mkdir(parents=True)
+        subprocess.run([KAGGLE, "kernels", "output", f"{user()}/bigp-k10-{part}", "-p", str(out)])
+        for f in out.glob("k10_*.json"):
+            shutil.copy(f, ROOT / "results" / "bowl" / f.name)
+            print("->", f.name)
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["push", "kernels", "status", "pull"])
+    ap.add_argument("cmd", choices=["push", "kernels", "k10", "status", "pull"])
     ap.add_argument("--ds", nargs="+", default=DS)  # push/kernels: only these datasets
     a = ap.parse_args()
-    {"push": push, "kernels": lambda a: kernels(user(), a.ds), "status": status, "pull": pull}[a.cmd](a)
+    {"push": push, "k10": push, "kernels": lambda a: kernels(user(), a.ds), "status": status, "pull": pull}[a.cmd](a)

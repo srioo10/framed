@@ -1,10 +1,11 @@
 """K10 (PREREG §9 K10): champions A and B at the widths the bowl never searched (width gene was {16, 32, 64}, size
 cap 64 KB). Fixed configs, full arena, seeds 1-2, 30 epochs; a config over 64 KB is dropped. Appends to
 results/bowl/k10.json after each config.
-Usage: .venv/bin/python scripts/k10_capacity.py [--only A_w128 ...]
+Usage: .venv/bin/python scripts/k10_capacity.py [--only A_w128 ...] [--device cuda] [--arena DIR] [--out k10.json]
 """
 import argparse
 import json
+from pathlib import Path
 
 import bowl
 import fighters as fx
@@ -20,8 +21,13 @@ CONFIGS = {"A_w128": A | {"w": 128}, "A_w192": A | {"w": 192}, "A_w128_d3": A | 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", nargs="*")
+    ap.add_argument("--device", default="cpu")
+    ap.add_argument("--arena", type=Path, default=bowl.ARENA)
+    ap.add_argument("--out", default="k10.json")
     a = ap.parse_args()
-    out = bowl.OUT / "k10.json"
+    bowl.ARENA = a.arena
+    bowl.OUT.mkdir(parents=True, exist_ok=True)
+    out = bowl.OUT / a.out
     done = json.loads(out.read_text()) if out.exists() else {}
     full = bowl.load_pairs(bowl.ARENA, cheap=False)
     gated = bowl.drop_bytes([dict(z) for z in full], {"drop_bytes": 1})
@@ -33,7 +39,7 @@ def main():
         if size > bowl.SIZE_MAX:
             done[name] = {"dropped": f"size {size} B > {bowl.SIZE_MAX}"}
         else:
-            res, _ = bowl.evaluate(g, pairs, "cpu", seeds=(1, 2), epochs=30)
+            res, _ = bowl.evaluate(g, pairs, a.device, seeds=(1, 2), epochs=30)
             done[name] = {"genome": g, **res}
         print(name, json.dumps(done[name]), flush=True)
         out.write_text(json.dumps(done, indent=1))
