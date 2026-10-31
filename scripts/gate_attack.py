@@ -6,6 +6,8 @@ alarms and blocks, clean vs the worst pattern. tau = clean 1%-FPR threshold on b
 hc_src_n_120s on calibration-host benign flows, each group its own 1% quantile); writes gate_calib_{ds}.csv.
 --clean-only --tau-day (PREREG §9 HOSTDAY): flow tau vs tau_day (<= 1% of calibration-host benign host-days alarmed),
 clean victim alarm / block rates and test attack TPR (plain, gated); writes gate_hostday_{ds}.csv.
+--tau-day without --clean-only: the full K4 run at tau_day (CONF C3); --champion-a: champion A (bytes kept, cert-mode
+host-context clip at inference only, CONF amendment 1); output gate_k4_{ds}[_A][_day].csv.
 Usage: .venv/bin/python scripts/gate_attack.py nf_ctu13 [--m 10] [--genome '{"cert": 4, "rdet": 4}'] [--clean-only]
 """
 import argparse
@@ -22,6 +24,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 import bowl  # noqa: E402
+import conf_clean  # noqa: E402
+import torch  # noqa: E402
 import cert_trees as ct  # noqa: E402
 import fighters as fx  # noqa: E402
 import host_stream as hs  # noqa: E402
@@ -40,8 +44,9 @@ def main():
     ap.add_argument("--genome", default="{}")
     ap.add_argument("--clean-only", action="store_true")
     ap.add_argument("--tau-day", action="store_true")
+    ap.add_argument("--champion-a", action="store_true")  # CONF amendment 1: A keeps bytes, inference-only hc clip
     a = ap.parse_args()
-    g = G | json.loads(a.genome)
+    g = (conf_clean.A if a.champion_a else G) | json.loads(a.genome)
     t0 = time.time()
     light, bank = sa.setup(a.dataset)
     held = bank.families[0]
@@ -52,7 +57,7 @@ def main():
     dfit = bank.frame(fit, sb.role_removal(P, "fit"))
     prep = models.Prep().fit(dfit)
     cols = list(dfit.columns)
-    nb = [i for i, c in enumerate(cols) if c.startswith("hc_") and "_bytes_" in c]
+    nb = [] if a.champion_a else [i for i, c in enumerate(cols) if c.startswith("hc_") and "_bytes_" in c]
 
     def tx(df):  # prepped, host-context bytes zeroed like the gated bowl
         X = prep.transform(df)
@@ -64,6 +69,10 @@ def main():
     for k in ("cal", "pseudo", "es"):
         z[f"X_{k}"] = Xf[:10]
     m, h, _ = bowl.run_pair(g, z, "cpu", sa.SEED, 30)
+    if a.champion_a:
+        lo, hi = bowl.hc_clip(z)
+        m.register_buffer("clo", torch.as_tensor(lo, dtype=torch.float32))
+        m.register_buffer("chi", torch.as_tensor(hi, dtype=torch.float32))
     bi, nl = z["bi"], (lambda p: -np.log(np.maximum(p, 1e-45)))
     rf, xg = models.rf(sa.SEED).fit(Xf, yf), models.xgb(sa.SEED).fit(Xf, yf)
     dets = {"gated_net": (lambda X: h.score(m, X, "cpu"),
@@ -77,6 +86,9 @@ def main():
     cal = bank.cal[cal_host[meta["src"][bank.cal]] & benign_host[meta["src"][bank.cal]]]
     Xcal = tx(bank.frame(cal, P))
     tau = {n: np.quantile(f(Xcal), 0.99) for n, (f, _) in dets.items()}
+    if a.tau_day and not a.clean_only:  # CONF C3: block tau per the HOSTDAY outcome
+        ck = meta["src"][cal].astype(np.int64) * hs.MUL + meta["t"][cal] // hs.DAY_MS
+        tau = {n: float(hs.threshold(hs.day_max(ck, f(Xcal)))) for n, (f, _) in dets.items()}
     rows, key = sa.victims(bank, meta)
     raw_rows = bank.kept[rows]
     V = light.iloc[raw_rows]
@@ -146,7 +158,7 @@ def main():
         print(json.dumps({r["detector"]: [round(r["alarm_day"], 3), round(r["block_day"], 3)] for r in res[-3:]}),
               f"{side}/{peer}/{port}/{fail}/{nbytes}", f"{time.time() - t0:.0f}s", flush=True)
     R = pd.DataFrame(res)
-    R.to_csv(sa.OUT / f"gate_k4_{a.dataset}.csv", index=False)
+    R.to_csv(sa.OUT / f"gate_k4_{a.dataset}{'_A' if a.champion_a else ''}{'_day' if a.tau_day else ''}.csv", index=False)
     print(f"{a.dataset} m={a.m} victims={len(rows)} flows / {len(np.unique(key))} host-days")
     for n, D in R.groupby("detector", sort=False):
         c, w = D.iloc[0], D.iloc[1:]
