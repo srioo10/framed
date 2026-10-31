@@ -2,7 +2,7 @@
 dataset's arena pairs. Code (scripts + src/nids) goes up as a small private dataset; the arena comes from the existing
 private bigp-arena dataset. Library versions are pinned to the local ones. Each kernel prints an md5 of every arena
 pair it reads, to check against the local arena.
-k10: the same code dataset, plus two private GPU kernels running scripts/k10_capacity.py (A configs, B configs).
+k10: the same code dataset, plus three private CPU kernels running scripts/k10_capacity.py (A configs, B configs).
 Usage: .venv/bin/python scripts/kaggle_k5.py push | kernels [--ds nf_ctu13] | k10 | status | pull (pull overwrites results/cert/k5_*)
 """
 import argparse
@@ -16,7 +16,7 @@ from kaggle_bowl import KAGGLE, ROOT, STAGE, sh, user
 DS = ["nf_ctu13", "nf_ugr16", "nf_cic"]
 CODE = ["bowl.py", "arena.py", "fighters.py", "ple.py", "roc.py", "sensitivity.py", "cert_trees.py", "k5_trees.py",
         "k10_capacity.py"]
-K10 = {"a": ["A_w128", "A_w192", "A_w128_d3"], "b": ["B_w64", "B_w128"]}
+K10 = {"a": ["A_w128", "A_w128_d3"], "a2": ["A_w192"], "b": ["B_w64", "B_w128"]}
 KERNEL = '''import glob, hashlib, os, shutil, subprocess, sys
 hits = glob.glob("/kaggle/input/**/k5_trees.py", recursive=True)
 if not hits:
@@ -47,7 +47,7 @@ shutil.copytree(nids, "/kaggle/working/k10/src/nids", dirs_exist_ok=True)
 subprocess.run([sys.executable, "-c", "import torch, sklearn, xgboost; print('versions', torch.__version__, "
                 "torch.cuda.is_available(), sklearn.__version__, xgboost.__version__)"])
 env = dict(os.environ, PYTHONPATH="/kaggle/working/k10/src")
-subprocess.run([sys.executable, "/kaggle/working/k10/scripts/k10_capacity.py", "--device", "cuda", "--arena", arena,
+subprocess.run([sys.executable, "/kaggle/working/k10/scripts/k10_capacity.py", "--device", "cpu", "--arena", arena,
                 "--out", "k10_{part}.json", "--only", *{only}], check=True, env=env)
 shutil.copy("/kaggle/working/k10/results/bowl/k10_{part}.json", "/kaggle/working/k10_{part}.json")
 '''
@@ -89,8 +89,8 @@ def k10_kernels(u):
         slug = f"bigp-k10-{part}"
         (k / "kernel-metadata.json").write_text(json.dumps({
             "id": f"{u}/{slug}", "title": slug, "code_file": "run_k10.py", "language": "python",
-            "kernel_type": "script", "is_private": True, "enable_gpu": True, "enable_internet": False,
-            "dataset_sources": [f"{u}/bigp-arena", f"{u}/bigp-k5code"]}))
+            "kernel_type": "script", "is_private": True, "enable_gpu": False, "enable_internet": False,
+            "dataset_sources": [f"{u}/bigp-arena", f"{u}/bigp-k5code"]}))  # GPU quota gone: CPU image
         sh("kernels", "push", "-p", str(k))
 
 
