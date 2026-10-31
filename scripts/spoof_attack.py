@@ -50,7 +50,7 @@ def setup(ds):
     return light, bank
 
 
-def detectors(bank, held, rnd=None):
+def detectors(bank, held, rnd=None, baselines=False):
     """{name: score(prepped X)} + prep, trained on the outer config's fit rows like score_bank / arena."""
     import bowl
     P = (held,)
@@ -71,6 +71,10 @@ def detectors(bank, held, rnd=None):
     nl = lambda p: -np.log(np.maximum(p, 1e-45))  # noqa: E731
     dets = {"rf": lambda X: nl(rf.predict_proba(X)[:, bi]), "xgb": lambda X: nl(xg.predict_proba(X)[:, bi]),
             f"champion_r{r}": lambda X: h.score(m, X.astype(np.float32), "cpu")}
+    if baselines:  # PREREG §9 K14: the published-IDS baselines, fitted as in CONF amendment 4
+        import conf_baselines
+        for b in conf_baselines.MODELS:
+            dets[b] = conf_baselines.fit(b, z, SEED)
     return dets, prep, (m, h, bi)
 
 
@@ -155,11 +159,12 @@ def main():
     ap.add_argument("dataset")
     ap.add_argument("--m", default="10,50")
     ap.add_argument("--blind", action="store_true")
+    ap.add_argument("--baselines", action="store_true")
     a = ap.parse_args()
     t0 = time.time()
     light, bank = setup(a.dataset)
     held = bank.families[0]
-    dets, prep, _ = detectors(bank, held, 3 if a.blind else None)
+    dets, prep, _ = detectors(bank, held, 3 if a.blind else None, a.baselines)
     cal, z = calibrate(bank, held, dets, prep)
     rows, key = victims(bank, z)
     raw_rows = bank.kept[rows]
@@ -194,7 +199,7 @@ def main():
                   f"{time.time() - t0:.0f}s", flush=True)
     OUT.mkdir(parents=True, exist_ok=True)
     R = pd.DataFrame(res)
-    R.to_csv(OUT / f"k1_{'blind_' if a.blind else ''}{a.dataset}.csv", index=False)
+    R.to_csv(OUT / f"k1_{'blind_' if a.blind else ''}{'pub_' if a.baselines else ''}{a.dataset}.csv", index=False)
     clean = R[R.m == 0].set_index("detector").ben_P
     best = R[R.m > 0].groupby("detector").ben_P.max()
     k1 = {d: bool(best[d] >= 0.10 and best[d] >= 5 * max(clean[d], 1e-9)) for d in best.index}
