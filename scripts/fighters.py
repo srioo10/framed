@@ -353,13 +353,14 @@ def size_bytes(m):
 
 
 def train(m, Xf, yf, k, device, seed=0, epochs=20, lr=2e-3, bs=1024, soft=None, kd=0.0, ls=0.0, focal=0.0, T=4.0,
-          Xs=None, Ss=None, syn=0.0, Lc=None, Hc=None, cert=0.0, bi=0, Ld=None, Hd=None, rdet=0.0, adv=0.0, advd=0.0):
+          Xs=None, Ss=None, syn=0.0, Lc=None, Hc=None, cert=0.0, bi=0, Ld=None, Hd=None, rdet=0.0, adv=0.0, advd=0.0, tail=0.0, tailq=0.05):
     """Mean-member CE (label smoothing ls, focal gamma) mixed with KD (weight kd) to teacher probabilities `soft`,
     plus syn x KD on a batch of synthetic rows Xs labelled by a teacher (Ss), plus cert x worst-case CE (interval
     bound) on boxes [Lc, Hc] of benign fit rows (PREREG §9 CERT), plus rdet x worst-case "not benign" loss on deletion
     boxes [Ld, Hd] of attack fit rows (robust-alarm gating); adv / advd: the same two terms at PGD points in the same
     boxes instead of interval bounds (PREREG §9 K18 adversarial-training baseline); early stop on CE of a 10% carve of the
-    fit rows; NODE tau anneals 1 -> 0.05."""
+    fit rows; NODE tau anneals 1 -> 0.05. tail: K19' benign-tail loss, + tail x mean of the top tailq share of benign
+    scores (-log P(benign)) in the batch (CVaR), aimed at the per-host-day-max threshold."""
     g = torch.Generator().manual_seed(seed)
     torch.manual_seed(seed)
     n = len(yf)
@@ -396,6 +397,10 @@ def train(m, Xf, yf, k, device, seed=0, epochs=20, lr=2e-3, bs=1024, soft=None, 
                 t = torch.softmax(torch.log(S[b] + 1e-8) / T, 1).repeat_interleave(zz.shape[1], 0)
                 kl = nn.functional.kl_div(torch.log_softmax(flat / T, 1), t, reduction="batchmean") * T * T
                 loss = (1 - kd) * loss + kd * kl
+            if tail > 0:
+                sc = -torch.log_softmax(zz, -1)[..., bi].mean(-1)[y[b] == bi]
+                if len(sc):
+                    loss = loss + tail * sc.topk(max(1, int(tailq * len(sc)))).values.mean()
             if syn > 0:
                 j = torch.randint(len(XS), (len(b),), generator=g).to(device)
                 zs = m(XS[j])[0]

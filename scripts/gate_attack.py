@@ -60,6 +60,7 @@ def main():
     ap.add_argument("--at", action="store_true")
     ap.add_argument("--throttle", type=int, nargs="*")
     ap.add_argument("--two-channel", action="store_true")
+    ap.add_argument("--flow-tail", type=float, nargs="*", default=[])  # K19': extra flow twins with the benign-tail loss
     ap.add_argument("--tag", default="")
     a = ap.parse_args()
     g = (conf_clean.A if a.champion_a else G) | json.loads(a.genome)
@@ -117,15 +118,18 @@ def main():
               "teacher": models.oof_proba(Xf[:, :nf], yf, sa.SEED).astype(np.float32)}
         for k in ("cal", "pseudo", "es"):
             zf[f"X_{k}"] = zf["X_fit"][:10]
-        gf = g | {"cert": 0, "rdet": 0}
-        mf, hf, _ = bowl.run_pair(gf, zf, "cpu", sa.SEED, 30)
         fB, bB = dets["gated_net"]
-        fF = lambda X: hf.score(mf, X[:, :nf], "cpu")  # noqa: E731
         ck = meta["src"][cal].astype(np.int64) * hs.MUL + meta["t"][cal] // hs.DAY_MS
-        tB, tF = (float(hs.threshold(hs.day_max(ck, f(Xcal)), 0.005)) for f in (fB, fF))
-        dets["b2"] = (lambda X: np.maximum(fB(X) - tB, fF(X) - tF), lambda X: np.maximum(bB(X) - tB, fF(X) - tF))
-        tau["b2"] = 0.0
-        print(f"K19 taus: context {tB:.4f} (B alone {tau['gated_net']:.4f}), flow {tF:.4f}", flush=True)
+        tB = float(hs.threshold(hs.day_max(ck, fB(Xcal)), 0.005))
+        for v in [0.0] + a.flow_tail:
+            mf, hf, _ = bowl.run_pair(g | {"cert": 0, "rdet": 0, "tail": v}, zf, "cpu", sa.SEED, 30)
+            fF = (lambda mf, hf: lambda X: hf.score(mf, X[:, :nf], "cpu"))(mf, hf)
+            tF = float(hs.threshold(hs.day_max(ck, fF(Xcal)), 0.005))
+            n = "b2" if v == 0 else f"b2t{v:g}"
+            dets[n] = ((lambda fF, tF: lambda X: np.maximum(fB(X) - tB, fF(X) - tF))(fF, tF),
+                       (lambda fF, tF: lambda X: np.maximum(bB(X) - tB, fF(X) - tF))(fF, tF))
+            tau[n] = 0.0
+            print(f"K19 {n} taus: context {tB:.4f} (B alone {tau['gated_net']:.4f}), flow {tF:.4f}", flush=True)
     rows, key = sa.victims(bank, meta)
     raw_rows = bank.kept[rows]
     V = light.iloc[raw_rows]
@@ -139,7 +143,9 @@ def main():
     X0 = tx(base)
     day = lambda w: float(pd.Series(w).groupby(key).any().mean())  # noqa: E731
     if a.throttle:
-        throttle(a, bank, light, meta, dets, tau, tx, held)
+        harm = {n: day(b(X0) > tau[n]) for n, (_, b) in dets.items()}  # clean victim block_day (no spoofing)
+        print("clean block_day", json.dumps({n: round(v, 4) for n, v in harm.items()}), flush=True)
+        throttle(a, bank, light, meta, dets, tau, tx, held, harm)
         return
     if a.clean_only and a.tau_day:
         ck = meta["src"][cal].astype(np.int64) * hs.MUL + meta["t"][cal] // hs.DAY_MS
@@ -230,7 +236,7 @@ def main():
               f"{int(w.violations.sum())} (adaptive {int(ad.violations)})")
 
 
-def throttle(a, bank, light, meta, dets, tau, tx, held):
+def throttle(a, bank, light, meta, dets, tau, tx, held, harm):
     """PREREG §9 K16: alarm / certified-block TPR on test attack rows when every attacking source keeps <= k of its
     attack flows per 240 s (greedy in time order); host context recomputed on the throttled raw flows."""
     rng = np.random.default_rng(0)
@@ -277,6 +283,7 @@ def throttle(a, bank, light, meta, dets, tau, tx, held):
                 r[f"{n}_btpr_{part}"] = float((lb[msk] > tau[n]).mean()) if msk.any() else np.nan
             r[f"{n}_tpr_macro"] = np.nanmean([r[f"{n}_tpr_unk"], r[f"{n}_tpr_known"]])
             r[f"{n}_btpr_macro"] = np.nanmean([r[f"{n}_btpr_unk"], r[f"{n}_btpr_known"]])
+            r[f"{n}_clean_block_day"] = harm[n]
         res.append(r)
         print(json.dumps({q: round(v, 4) if isinstance(v, float) else v for q, v in r.items()}), flush=True)
     pd.DataFrame(res).to_csv(sa.OUT / f"gate_throttle_{a.dataset}{'_' + a.tag if a.tag else ''}.csv", index=False)
