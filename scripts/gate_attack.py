@@ -62,11 +62,12 @@ def main():
     ap.add_argument("--two-channel", action="store_true")
     ap.add_argument("--flow-tail", type=float, nargs="*", default=[])  # K19': extra flow twins with the benign-tail loss
     ap.add_argument("--tag", default="")
+    ap.add_argument("--held-idx", type=int, default=0)  # K19': held-out family = sorted families[held_idx]
     a = ap.parse_args()
     g = (conf_clean.A if a.champion_a else G) | json.loads(a.genome)
     t0 = time.time()
     light, bank = sa.setup(a.dataset)
-    held = bank.families[0]
+    held = bank.families[a.held_idx]
     P = (held,)
     fit, _ = bank.fit_rows(P)
     known = sorted(set(bank.fam[fit]))
