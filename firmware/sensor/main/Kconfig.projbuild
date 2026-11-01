@@ -1,0 +1,20 @@
+menu "OnePass sensor"
+    config OP_WIFI_SSID
+        string "Wi-Fi SSID"
+        default "bigp-lab"
+    config OP_WIFI_PASS
+        string "Wi-Fi password"
+        default ""
+    config OP_BROKER_URI
+        string "MQTT broker URI"
+        default "mqtt://192.168.77.1:1883"
+    config OP_MQTT_USER
+        string "MQTT username"
+        default "esp32sensor"
+    config OP_MQTT_PASS
+        string "MQTT password"
+        default ""
+    config OP_PERIOD_MS
+        int "Publish period (ms)"
+        default 5000
+endmenu

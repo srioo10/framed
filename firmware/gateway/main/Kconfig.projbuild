@@ -1,0 +1,40 @@
+menu "Veto gateway"
+    config GW_UP_SSID
+        string "Upstream Wi-Fi SSID (the Pi)"
+        default "bigp-lab"
+    config GW_UP_PASS
+        string "Upstream Wi-Fi password"
+        default ""
+    config GW_UP_IP
+        string "Static IP on the upstream network"
+        default "192.168.77.2"
+    config GW_UP_GW
+        string "Upstream gateway (the Pi)"
+        default "192.168.77.1"
+    config GW_AP_SSID
+        string "IoT Wi-Fi SSID served by the gateway"
+        default "bigp-iot"
+    config GW_AP_PASS
+        string "IoT Wi-Fi password (8+ characters)"
+        default ""
+    config GW_CHANNEL
+        int "Wi-Fi channel (must equal the upstream AP's)"
+        default 6
+    choice GW_MODEL
+        prompt "Model"
+        default GW_MODEL_TRANSFER
+        config GW_MODEL_TRANSFER
+            bool "B-transfer (paper recipe, trained on CTU-13)"
+        config GW_MODEL_LAB
+            bool "B-lab (same recipe, trained on lab traffic)"
+    endchoice
+    config GW_ORDINARY
+        bool "Ordinary IPS: block on every alarm (comparison mode, no certificate)"
+        default n
+    config GW_BLOCK_TTL_S
+        int "Block duration (s)"
+        default 300
+    config GW_HOSTS
+        int "Host-context table slots (power of two)"
+        default 32
+endmenu

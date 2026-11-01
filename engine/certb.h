@@ -92,7 +92,7 @@ static inline double cb_score(const CertB *c, const double *x) { return cb_score
 
 /* Theorem 1' deletion box of an observed row x (sensitivity.deletion_box, windows <= 120 s so a = b = m) */
 static inline void cb_dbox(const CertB *c, const double *x, double *lo, double *hi) {
-  const double EPS = 1e-4;
+  const double CB_EPS = 1e-4;
   for (int i = 0; i < c->D; i++) lo[i] = hi[i] = x[i];
   int a = c->m_budget;
   for (int g = 0; g < 4; g++) {
@@ -110,7 +110,7 @@ static inline void cb_dbox(const CertB *c, const double *x, double *lo, double *
     }
     lo[o + 4] = (log1p(0.0) - c->mu[o + 4]) / c->sd[o + 4]; hi[o + 4] = INFINITY;
   }
-  for (int i = c->F; i < c->D; i++) { lo[i] = fmin(lo[i], x[i]) - EPS; hi[i] = fmax(hi[i], x[i]) + EPS; }
+  for (int i = c->F; i < c->D; i++) { lo[i] = fmin(lo[i], x[i]) - CB_EPS; hi[i] = fmax(hi[i], x[i]) + CB_EPS; }
 }
 
 /* certified block: lower bound over the deletion box > tau (float64, outward margin 1e-6 as fighters.score_lower) */

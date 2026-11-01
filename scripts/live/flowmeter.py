@@ -20,7 +20,7 @@ from pathlib import Path
 IDLE_S, ACTIVE_S = 30.0, 120.0  # shortcut: nProbe-like defaults; the ESP32 meter must use the same two numbers
 COLS = ["FLOW_START_MILLISECONDS", "FLOW_END_MILLISECONDS", "IPV4_SRC_ADDR", "L4_SRC_PORT", "IPV4_DST_ADDR",
         "L4_DST_PORT", "PROTOCOL", "IN_BYTES", "IN_PKTS", "OUT_BYTES", "OUT_PKTS", "TCP_FLAGS",
-        "FLOW_DURATION_MILLISECONDS", "END_REASON"]
+        "FLOW_DURATION_MILLISECONDS", "END_REASON", "CLOSE_MILLISECONDS"]
 
 
 def packets(path):
@@ -73,8 +73,11 @@ class Meter:
         a, b = (src, sport), (dst, dport)
         k = (proto,) + (a + b if a <= b else b + a)
         fl = self.flows.get(k)
-        if fl is not None and (ts - fl["last"] > IDLE_S or ts - fl["start"] > ACTIVE_S):
-            self.close(k, "idle" if ts - fl["last"] > IDLE_S else "active")
+        if fl is not None and ts - fl["last"] > IDLE_S:
+            self.close(k, "idle")
+            fl = None
+        elif fl is not None and ts - fl["start"] > ACTIVE_S:
+            self.close(k, "active", ts)
             fl = None
         if fl is None:
             client = a
@@ -91,17 +94,19 @@ class Meter:
             if flags & 0x01:
                 fl["fin"].add(fwd)
             if flags & 0x04 or len(fl["fin"]) == 2:
-                self.close(k, "rst" if flags & 0x04 else "fin")
+                self.close(k, "rst" if flags & 0x04 else "fin", ts)
 
     def expire(self, now):
         for k in [k for k, f in self.flows.items() if now - f["last"] > IDLE_S]:
             self.close(k, "idle")
 
-    def close(self, k, why):
+    def close(self, k, why, at=None):
+        """at = close time (the host-context clock, as the gateway): the closing packet, or last + IDLE_S on idle."""
         f = self.flows.pop(k)
         ms = lambda t: int(round(t * 1000))
+        tc = ms(at) if at is not None else ms(f["last"]) + (int(IDLE_S * 1000) if why == "idle" else 0)
         self.emit([ms(f["start"]), ms(f["last"]), f["cli"][0], f["cli"][1], f["srv"][0], f["srv"][1], k[0], f["ib"],
-                   f["ip"], f["ob"], f["op"], f["flags"], ms(f["last"]) - ms(f["start"]), why])
+                   f["ip"], f["ob"], f["op"], f["flags"], ms(f["last"]) - ms(f["start"]), why, tc])
 
     def flush(self):
         for k in list(self.flows):
