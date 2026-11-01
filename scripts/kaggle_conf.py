@@ -76,6 +76,7 @@ shutil.copytree(code, W + "/scripts", dirs_exist_ok=True)
 shutil.copytree(os.path.dirname(nids), W + "/src", dirs_exist_ok=True)
 shutil.copytree(proc, W + "/data/processed", dirs_exist_ok=True)
 shutil.copytree(os.path.dirname(bowl), W + "/results/bowl", dirs_exist_ok=True)
+os.makedirs(W + "/results/cert", exist_ok=True)  # gate_attack.py writes there without creating it
 env = dict(os.environ, PYTHONPATH=W + "/src", OMP_NUM_THREADS="4", NIDS_LEAN="1")
 for cmd in {cmds}:
     print("RUN", cmd, flush=True)
