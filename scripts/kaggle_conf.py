@@ -198,10 +198,13 @@ def pull(a):
             o.mkdir(parents=True)
             if subprocess.run([KAGGLE, "kernels", "output", f"{user()}/{ks}", "-p", str(o), "--file-pattern", r"^[^/]*\.(csv|jsonl|json|log|txt)$"]).returncode:
                 continue
+            # attack kinds also run locally (the local 4-thread run is official): Kaggle copies are repro checks
+            dest = out_dir / "kaggle_repro" if kind in ("attack", "c3", "k14", "k16", "k17", "k18") else out_dir
+            dest.mkdir(exist_ok=True)
             for f in o.iterdir():
                 if f.suffix in (".csv", ".jsonl", ".log"):
-                    shutil.copy(f, out_dir / f.name)
-                    print("->", f.name)
+                    shutil.copy(f, dest / f.name)
+                    print("->", dest.name, f.name)
 
 
 if __name__ == "__main__":
