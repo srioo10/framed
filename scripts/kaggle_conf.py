@@ -61,10 +61,10 @@ def cmds(kind, ds):
     if kind == "c3":
         return [["gate_attack.py", ds, "--tau-day", "--genome", B]]
     K = ["gate_attack.py", ds, "--tau-day", "--genome", B]  # PREREG §9 K16 / K17 / K18
-    if kind == "k16":
-        return [K + ["--throttle", "1", "2", "5", "10", "20", "50"]]
-    if kind == "k17":
-        return [K + ["--m-attack", "10", "50", "100", "--random", "8", "--no-bytes-grid", "--tag", "k17"]]
+    if kind == "k16":  # K19 throttle run (carries the K16 rows)
+        return [K + ["--two-channel", "--throttle", "1", "2", "5", "10", "20", "50", "--tag", "k19"]]
+    if kind == "k17":  # K19 pattern run (carries the K17 rows)
+        return [K + ["--two-channel", "--m-attack", "10", "50", "100", "--random", "8", "--no-bytes-grid", "--tag", "k19"]]
     if kind == "k18":
         return [K + ["--random", "8", "--no-bytes-grid", "--at", "--tag", "k18"]]
     if kind == "k14":  # PREREG §9 K14 + K15
@@ -82,7 +82,7 @@ code = os.path.dirname(glob.glob("/kaggle/input/**/conf_clean.py", recursive=Tru
 nids = os.path.dirname(glob.glob("/kaggle/input/**/nids/models.py", recursive=True)[0])
 procs = sorted({os.path.dirname(f) for f in glob.glob("/kaggle/input/**/*_hostmeta.npz", recursive=True)})
 bowl = os.path.dirname(glob.glob("/kaggle/input/**/round*/death.json", recursive=True)[0])
-W = "/kaggle/working/w"
+W = "/tmp/w"  # outside /kaggle/working so the kernel output holds only results, not the 1 GB data copy
 shutil.copytree(code, W + "/scripts", dirs_exist_ok=True)
 shutil.copytree(os.path.dirname(nids), W + "/src", dirs_exist_ok=True)
 for proc in procs:  # every mounted bigp-proc-* dataset (the lean kinds mount several)
