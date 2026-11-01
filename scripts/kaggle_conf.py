@@ -196,7 +196,7 @@ def pull(a):
             o = STAGE / f"out_{ks}"
             shutil.rmtree(o, ignore_errors=True)
             o.mkdir(parents=True)
-            if subprocess.run([KAGGLE, "kernels", "output", f"{user()}/{ks}", "-p", str(o)]).returncode:
+            if subprocess.run([KAGGLE, "kernels", "output", f"{user()}/{ks}", "-p", str(o), "--file-pattern", r"^[^/]*\.(csv|jsonl|json|log|txt)$"]).returncode:
                 continue
             for f in o.iterdir():
                 if f.suffix in (".csv", ".jsonl", ".log"):
