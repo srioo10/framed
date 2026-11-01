@@ -62,6 +62,7 @@ def main():
     ap.add_argument("--two-channel", action="store_true")
     ap.add_argument("--flow-tail", type=float, nargs="*", default=[])  # K19': extra flow twins with the benign-tail loss
     ap.add_argument("--tag", default="")
+    ap.add_argument("--no-gate", action="store_true")  # ABL2: B's own scores, block = alarm (certificate off)
     ap.add_argument("--held-idx", type=int, default=0)  # K19': held-out family = sorted families[held_idx]
     a = ap.parse_args()
     g = (conf_clean.A if a.champion_a else G) | json.loads(a.genome)
@@ -99,6 +100,8 @@ def main():
             "rf": (lambda X: nl(rf.predict_proba(X)[:, bi]), lambda X: ct.rf_lower(rf, *bowl.dbox(z, X, a.m), bi)),
             "xgb": (lambda X: nl(xg.predict_proba(X)[:, bi]),
                     lambda X: ct.xgb_upper(xg, *bowl.dbox(z, X, a.m), bi, z["k"], lower=True))}
+    if a.no_gate:
+        dets["b_nogate"] = (dets["gated_net"][0], dets["gated_net"][0])
     if a.at:  # PREREG §9 K18: same genome, PGD adversarial training in the same boxes instead of interval bounds
         ga = g | {"cert": 0, "rdet": 0, "adv": g.get("cert", 4), "advd": g.get("rdet", 2)}
         ma, hha, _ = bowl.run_pair(ga, z, "cpu", sa.SEED, 30)
