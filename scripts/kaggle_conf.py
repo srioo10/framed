@@ -54,6 +54,10 @@ def cmds(kind, ds):
                  f"conf_groot_{ds}_s{s}.csv"] for s in (SEEDS if kind == "groot" else (int(kind[-1]),))]
     if kind == "attack":  # ToN: CONF C4 + C3
         return [["spoof_attack.py", ds], ["gate_attack.py", ds, "--tau-day", "--genome", B]]
+    if kind == "leank1":  # memory-lean ToN C4, guarded by the bit-exactness test
+        return [["test_lean_hostctx.py", "nf_ctu13", "nf_ugr16"], ["spoof_attack.py", ds]]
+    if kind == "leanc3":  # memory-lean ToN C3, guarded by the test on CTU-13
+        return [["test_lean_hostctx.py", "nf_ctu13"], ["gate_attack.py", ds, "--tau-day", "--genome", B]]
     if kind == "c3":
         return [["gate_attack.py", ds, "--tau-day", "--genome", B]]
     if kind == "k14":  # PREREG §9 K14 + K15
@@ -62,19 +66,20 @@ def cmds(kind, ds):
     return [["k5_trees.py", "--workers", "4", "--seed", str(s), "--out", f"conf_trees_{ds}_s{s}.csv"]]
 
 
-KINDS = ["clean", "baselines", "k5b", "trees2", "trees3", "trees4", "groot", "groot2", "groot3", "groot4", "attack", "c3", "k14"]
+KINDS = ["clean", "baselines", "k5b", "trees2", "trees3", "trees4", "groot", "groot2", "groot3", "groot4", "attack", "c3", "k14", "leank1", "leanc3"]
 B = ('{"family": "tabm", "enc": "raw", "e": 4, "w": 32, "depth": 2, "sn": 0, "act": "relu", "members": 8, "head": "nlog", '
      '"kd": 0.9, "syn": 0.5, "clip": 1, "cert": 4, "gate": 1, "rdet": 2, "ls": 0.0, "focal": 0.0, "lr": 0.003}')
 # CONF C4 (K1 on ToN) and C3 on ToN (B, K4 at tau_day): need data/processed and the bowl champions, not the arena
 ATTACK = '''import glob, os, shutil, subprocess, sys
 code = os.path.dirname(glob.glob("/kaggle/input/**/conf_clean.py", recursive=True)[0])
 nids = os.path.dirname(glob.glob("/kaggle/input/**/nids/models.py", recursive=True)[0])
-proc = os.path.dirname(glob.glob("/kaggle/input/**/{ds}_hostmeta.npz", recursive=True)[0])
+procs = sorted({os.path.dirname(f) for f in glob.glob("/kaggle/input/**/*_hostmeta.npz", recursive=True)})
 bowl = os.path.dirname(glob.glob("/kaggle/input/**/round*/death.json", recursive=True)[0])
 W = "/kaggle/working/w"
 shutil.copytree(code, W + "/scripts", dirs_exist_ok=True)
 shutil.copytree(os.path.dirname(nids), W + "/src", dirs_exist_ok=True)
-shutil.copytree(proc, W + "/data/processed", dirs_exist_ok=True)
+for proc in procs:  # every mounted bigp-proc-* dataset (the lean kinds mount several)
+    shutil.copytree(proc, W + "/data/processed", dirs_exist_ok=True)
 shutil.copytree(os.path.dirname(bowl), W + "/results/bowl", dirs_exist_ok=True)
 os.makedirs(W + "/results/cert", exist_ok=True)  # gate_attack.py writes there without creating it
 env = dict(os.environ, PYTHONPATH=W + "/src", OMP_NUM_THREADS="4", NIDS_LEAN="1")
@@ -82,6 +87,8 @@ for cmd in {cmds}:
     print("RUN", cmd, flush=True)
     r = subprocess.run([sys.executable, W + "/scripts/" + cmd[0], *cmd[1:]], env=env, cwd=W)
     print("RC", r.returncode, cmd, flush=True)
+    if r.returncode and cmd[0].startswith("test_"):  # never run on a pipeline that failed its exactness test
+        break
 for f in glob.glob(W + "/results/cert/*.*"):
     shutil.copy(f, "/kaggle/working/")
 '''
@@ -129,14 +136,16 @@ def data(a):
         k = STAGE / f"conf_{ds}_{kind}"
         shutil.rmtree(k, ignore_errors=True)
         k.mkdir()
-        (k / "run.py").write_text((ATTACK if kind in ("attack", "c3", "k14") else KERNEL).replace("{ds}", ds)
+        (k / "run.py").write_text((ATTACK if kind in ("attack", "c3", "k14", "leank1", "leanc3") else KERNEL).replace("{ds}", ds)
                                   .replace("{cmds}", repr(cmds(kind, ds))))
         ks = f"bigp-conf-{ds.replace('_', '-')}-{kind}"
         (k / "kernel-metadata.json").write_text(json.dumps({
             "id": f"{u}/{ks}", "title": ks, "code_file": "run.py", "language": "python", "kernel_type": "script",
             "is_private": True, "enable_gpu": kind in a.gpu, "enable_internet": False,
             "dataset_sources": [f"{u}/{slug}", f"{u}/bigp-k5code"] + ([f"{u}/bigp-proc-{ds.replace('_', '-')}"]
-                                                                      if kind in ("attack", "c3", "k14") else [])}))
+                                                                      if kind in ("attack", "c3", "k14") else [])
+                               + ([f"{u}/bigp-proc-nf-ton", f"{u}/bigp-proc-nf-ctu13", f"{u}/bigp-proc-nf-ugr16"]
+                                  if kind.startswith("lean") else [])}))
         for _ in range(144):  # a full concurrent-session quota refuses the push: retry every 10 min for 24 h
             acc = ["--accelerator", "NvidiaTeslaT4"] if kind in a.gpu else []  # enable_gpu alone runs on CPU
             r = subprocess.run([KAGGLE, "kernels", "push", "-p", str(k), *acc], capture_output=True, text=True)

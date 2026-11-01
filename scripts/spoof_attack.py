@@ -43,7 +43,8 @@ def champion(r=None):
 
 
 def setup(ds):
-    raw = load.LOADERS[ds]()
+    cache = load.CACHE / f"{ds}.parquet"  # read only the 6 columns (the full 57-column NF-ToN frame is ~10 GB)
+    raw = pd.read_parquet(cache, columns=COLS) if cache.exists() else load.LOADERS[ds]()
     light = pd.DataFrame({c: raw[c].to_numpy() for c in COLS})
     light["IPV4_SRC_ADDR"], light["IPV4_DST_ADDR"] = (light[c].astype(str) for c in ("IPV4_SRC_ADDR", "IPV4_DST_ADDR"))
     del raw
