@@ -126,6 +126,15 @@ def main():
         dets["b2"] = (lambda X: np.maximum(fB(X) - tB, fF(X) - tF), lambda X: np.maximum(bB(X) - tB, fF(X) - tF))
         tau["b2"] = 0.0
         print(f"K19 taus: context {tB:.4f} (B alone {tau['gated_net']:.4f}), flow {tF:.4f}", flush=True)
+        sBc, sFc = fB(Xcal), fF(Xcal)
+        for q in (0.5, 0.9):  # b3 dev (CTU-13): flow block only with certified context corroboration, bB >= tL
+            tL = float(np.quantile(sBc, q))
+            tF3 = float(hs.threshold(hs.day_max(ck, np.where(sBc > tL, sFc, -np.inf)), 0.005))
+            dets[f"b3q{int(q * 100)}"] = (
+                lambda X, tL=tL, tF3=tF3: np.maximum(fB(X) - tB, np.minimum(fF(X) - tF3, fB(X) - tL)),
+                lambda X, tL=tL, tF3=tF3: np.maximum(bB(X) - tB, np.minimum(fF(X) - tF3, bB(X) - tL)))
+            tau[f"b3q{int(q * 100)}"] = 0.0
+            print(f"b3 q{q}: tL {tL:.4f} tF {tF3:.4f}", flush=True)
     rows, key = sa.victims(bank, meta)
     raw_rows = bank.kept[rows]
     V = light.iloc[raw_rows]
@@ -200,7 +209,8 @@ def main():
                 assert (i0.FLOW_START_MILLISECONDS.to_numpy() == i1.FLOW_START_MILLISECONDS.to_numpy()).all()
                 inj, u = i0.copy(), rng.random((len(i0), 3)) < p
                 for j, cs in enumerate((["IPV4_SRC_ADDR", "IPV4_DST_ADDR"], ["L4_DST_PORT"], ["OUT_PKTS"])):
-                    inj.loc[u[:, j], cs] = i1.loc[u[:, j], cs]
+                    for c in cs:  # np.where: i1's random ports are int64, the victim-port column int32
+                        inj[c] = np.where(u[:, j], i1[c].to_numpy(), i0[c].to_numpy())
                 peer, port, fail = (f"{q:.2f}" for q in p)
             X = base.copy()
             X[hostctx.COLS] = sa.host_context(S, inj, vmask)
