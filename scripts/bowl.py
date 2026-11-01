@@ -163,6 +163,11 @@ def box(z, X, m):
     return (v.astype(np.float32) for v in sensitivity.box(X, z["cols"], z["mu"], z["sd"], m))
 
 
+def smooth_mask(cols):
+    """Host-context columns the smoothing baseline perturbs (bytes columns are zeroed inputs)."""
+    return np.array([c[:3] == "hc_" and "_bytes_" not in c for c in cols], np.float32)
+
+
 def dbox(z, X, m):
     import sensitivity
     return (v.astype(np.float32) for v in sensitivity.deletion_box(X, z["cols"], z["mu"], z["sd"], m))
@@ -199,7 +204,8 @@ def run_pair(g, z, device, seed, epochs):
                  soft=rf[0] if g.get("teacher") == "rf" else z["teacher"], kd=g["kd"], ls=g["ls"], focal=g["focal"],
                  Xs=rf[1], Ss=rf[2], syn=g.get("syn", 0.0), Lc=Lc, Hc=Hc, cert=g.get("cert", 0.0), bi=z["bi"],
                  Ld=Ld, Hd=Hd, rdet=g.get("rdet", 0.0), adv=g.get("adv", 0.0), advd=g.get("advd", 0.0),
-                 tail=g.get("tail", 0.0), tailq=g.get("tailq", 0.05))
+                 tail=g.get("tail", 0.0), tailq=g.get("tailq", 0.05), gnoise=g.get("gnoise", 0.0),
+                 gmask=torch.as_tensor(smooth_mask(z["cols"]), device=device) if g.get("gnoise") else None)
     h = fx.Head(g["head"], z["bi"]).fit(m, z["X_fit"], z["y_fit"], device)
     s = {k: h.score(m, z[f"X_{k}"], device) for k in ("cal", "pseudo", "es")}
     return m, h, s

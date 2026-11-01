@@ -62,6 +62,7 @@ def main():
     ap.add_argument("--two-channel", action="store_true")
     ap.add_argument("--flow-tail", type=float, nargs="*", default=[])  # K19': extra flow twins with the benign-tail loss
     ap.add_argument("--tag", default="")
+    ap.add_argument("--smooth", type=float, nargs="*", default=[])  # RS baseline: Gaussian sigmas (Cohen et al.)
     ap.add_argument("--no-gate", action="store_true")  # ABL2: B's own scores, block = alarm (certificate off)
     ap.add_argument("--held-idx", type=int, default=0)  # K19': held-out family = sorted families[held_idx]
     a = ap.parse_args()
@@ -116,6 +117,14 @@ def main():
     if a.tau_day and not a.clean_only:  # CONF C3: block tau per the HOSTDAY outcome
         ck = meta["src"][cal].astype(np.int64) * hs.MUL + meta["t"][cal] // hs.DAY_MS
         tau = {n: float(hs.threshold(hs.day_max(ck, f(Xcal)))) for n, (f, _) in dets.items()}
+    for sg in a.smooth:  # PREREG §9 RS: randomized smoothing, block iff the certified L2 radius covers the deletion box
+        ms, hs_, _ = bowl.run_pair(g | {"cert": 0, "rdet": 0, "gnoise": sg}, z, "cpu", sa.SEED, 30)
+        ck = meta["src"][cal].astype(np.int64) * hs.MUL + meta["t"][cal] // hs.DAY_MS
+        fs = (lambda ms, hs_: lambda X: hs_.score(ms, X, "cpu"))(ms, hs_)
+        ts = float(hs.threshold(hs.day_max(ck, fs(Xcal))))  # base classifier at the 1% host-day tau
+        dets[f"rs{sg:g}"] = smoothed(fs, ts, sg, bowl.smooth_mask(cols).astype(bool), lambda X: bowl.dbox(z, X, a.m))
+        tau[f"rs{sg:g}"] = 0.0
+        print(f"RS sigma {sg}: base tau {ts:.4f}", flush=True)
     if a.two_channel:  # PREREG §9 K19: spoof-invariant flow channel + certified context channel, 0.5% host-days each
         nf = z["nflow"]
         zf = {"X_fit": Xf[:, :nf], "y_fit": yf, "k": z["k"], "bi": bi, "nflow": nf, "cols": cols[:nf],
@@ -238,6 +247,33 @@ def main():
               f"worst attack alarm {w.alarm.max():.4f} block {w.block.max():.4f} | host-day {w.alarm_day.max():.3f} / "
               f"{w.block_day.max():.3f}; adaptive block_day {ad.block_day:.3f}; K4-gate violations "
               f"{int(w.violations.sum())} (adaptive {int(ad.violations)})")
+
+
+def smoothed(f, t, sg, mask, box, N=10000, alpha=0.001, seed=0):
+    """Cohen et al. smoothing of the alarm f(x) > t under N(0, sg^2) noise on the `mask` columns. Alarm score:
+    p_hat - 1/2. Block score: +1 iff the Clopper-Pearson lower bound pA gives an L2 radius sg * Phi^-1(pA) >= the
+    distance from x to the farthest corner of its deletion box on the mask columns (the ball then covers the box),
+    else -1. Both are compared with tau = 0."""
+    from scipy.stats import beta, norm
+    cache = {}
+
+    def run(X):
+        key = (X.shape, float(X[:64].sum()))
+        if key not in cache:
+            rng = np.random.default_rng(seed)
+            k = np.zeros(len(X))
+            for i in range(0, len(X), 20):
+                xb = np.repeat(X[i:i + 20], N, 0)
+                xb[:, mask] += sg * rng.standard_normal((len(xb), mask.sum())).astype(np.float32)
+                k[i:i + 20] = (f(xb) > t).reshape(-1, N).sum(1)
+            lo, hi = box(X)
+            r = np.sqrt((np.maximum(X - lo, hi - X)[:, mask].astype(np.float64) ** 2).sum(1))
+            pa = np.where(k > 0, beta.ppf(alpha, np.maximum(k, 1), N - k + 1), 0.0)
+            R = sg * norm.ppf(np.clip(pa, 1e-12, 1 - 1e-12))
+            cache.clear()
+            cache[key] = (k / N - 0.5, np.where((pa > 0.5) & (R >= r), 1.0, -1.0))
+        return cache[key]
+    return (lambda X: run(X)[0]), (lambda X: run(X)[1])
 
 
 def throttle(a, bank, light, meta, dets, tau, tx, held, harm):

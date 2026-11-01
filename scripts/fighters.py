@@ -353,7 +353,7 @@ def size_bytes(m):
 
 
 def train(m, Xf, yf, k, device, seed=0, epochs=20, lr=2e-3, bs=1024, soft=None, kd=0.0, ls=0.0, focal=0.0, T=4.0,
-          Xs=None, Ss=None, syn=0.0, Lc=None, Hc=None, cert=0.0, bi=0, Ld=None, Hd=None, rdet=0.0, adv=0.0, advd=0.0, tail=0.0, tailq=0.05):
+          Xs=None, Ss=None, syn=0.0, Lc=None, Hc=None, cert=0.0, bi=0, Ld=None, Hd=None, rdet=0.0, adv=0.0, advd=0.0, tail=0.0, tailq=0.05, gnoise=0.0, gmask=None):
     """Mean-member CE (label smoothing ls, focal gamma) mixed with KD (weight kd) to teacher probabilities `soft`,
     plus syn x KD on a batch of synthetic rows Xs labelled by a teacher (Ss), plus cert x worst-case CE (interval
     bound) on boxes [Lc, Hc] of benign fit rows (PREREG §9 CERT), plus rdet x worst-case "not benign" loss on deletion
@@ -385,7 +385,10 @@ def train(m, Xf, yf, k, device, seed=0, epochs=20, lr=2e-3, bs=1024, soft=None, 
             (m.node if hasattr(m, "node") else m).tau = max(0.05, 1.0 - ep / max(1, epochs - 3))
         m.train()
         for b in trt[torch.randperm(len(trt), generator=g).to(device)].split(bs):
-            z, _ = m(X[b])
+            xb = X[b]
+            if gnoise > 0:  # randomized-smoothing baseline: Gaussian augmentation on the gmask columns
+                xb = xb + gnoise * torch.randn(xb.shape, generator=g).to(device) * gmask
+            z, _ = m(xb)
             zz = z if z.dim() == 3 else z[:, None]
             yy = y[b].repeat_interleave(zz.shape[1])
             flat = zz.reshape(-1, k)
