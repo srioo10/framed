@@ -20,6 +20,13 @@
 #else
 #define ORDINARY 0
 #endif
+#ifdef CONFIG_GW_MONITOR
+#define MONITOR 1
+#else
+#define MONITOR 0
+#endif
+#include <stdlib.h>
+static double TAU;  /* CONFIG_GW_TAU if set (PREREG tau_lab), else the model's tau */
 
 #include "certb.h"
 #include "hostctx.h"
@@ -108,14 +115,14 @@ static void decide(Flow *f, int64_t tc, const char *why) {
   hc_flow(&T, hc_fnv(cs), hc_fnv(ss), tc, f->sport, f->opk, f->ib, raw + c->F, &hs, &hd);
   cb_prep(c, raw, x);
   double s = cb_score(c, x), lower = -INFINITY;
-  int alarm = s > c->tau, blk = 0;
+  int alarm = s > TAU, blk = 0;
   if (alarm) {
     nalarm++;
 #if ORDINARY
     blk = 1;
 #else
     lower = cb_block_lower(c, x);
-    blk = lower > c->tau;
+    blk = lower > TAU;
     if (blk && (tc - hs->created < AGE_MS || tc - hd->created < AGE_MS)) { blk = 0; nabst++; }
 #endif
   }
@@ -124,6 +131,7 @@ static void decide(Flow *f, int64_t tc, const char *why) {
   printf("F,%lld,%s,%u,%s,%u,%u,%lu,%lu,%lu,%lu,%lld,%.6g,%.6g,%d,%d,%lu,%s\n", tc, cs, f->cport, ss, f->sport, f->proto,
          (unsigned long)f->ib, (unsigned long)f->ipk, (unsigned long)f->ob, (unsigned long)f->opk, f->last - f->start,
          s, lower, alarm, blk, (unsigned long)us, why);
+  if (MONITOR) blk = 0;
   if (blk) { nblock++; block(f->cip, tc); }
   f->used = 0;
 }
@@ -193,12 +201,13 @@ static void ids_task(void *arg) {
 }
 
 void ids_start(void) {
+  TAU = CONFIG_GW_TAU[0] ? strtod(CONFIG_GW_TAU, NULL) : CB_MODEL.tau;
   self_ip[0] = ipaddr_addr(CONFIG_GW_UP_IP);
   self_ip[1] = ipaddr_addr("192.168.4.1");
   q = xQueueCreate(512, sizeof(Pkt));
-  printf("I,veto ids: %s, model D=%d M=%d W=%d tau=%.6g m=%d, %d host slots (%u B), %d flow slots\n",
-         ORDINARY ? "ORDINARY (block on alarm)" : "VETO (certified block)", CB_MODEL.D, CB_MODEL.M,
-         CB_MODEL.W, CB_MODEL.tau, CB_MODEL.m_budget, CONFIG_GW_HOSTS, (unsigned)sizeof hosts, NFLOW);
+  printf("I,veto ids: %s%s, model D=%d M=%d W=%d tau=%.6g (model %.6g) m=%d, %d host slots (%u B), %d flow slots\n",
+         ORDINARY ? "ORDINARY (block on alarm)" : "VETO (certified block)", MONITOR ? " MONITOR-ONLY" : "",
+         CB_MODEL.D, CB_MODEL.M, CB_MODEL.W, TAU, CB_MODEL.tau, CB_MODEL.m_budget, CONFIG_GW_HOSTS, (unsigned)sizeof hosts, NFLOW);
   printf("I,columns F: t_close,src,sport,dst,dport,proto,in_bytes,in_pkts,out_bytes,out_pkts,dur_ms,score,lower,alarm,"
          "block,us,end\n");
   xTaskCreatePinnedToCore(ids_task, "ids", 12288, NULL, 5, NULL, 1);

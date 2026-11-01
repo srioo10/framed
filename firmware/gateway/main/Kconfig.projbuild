@@ -31,6 +31,12 @@ menu "Veto gateway"
     config GW_ORDINARY
         bool "Ordinary IPS: block on every alarm (comparison mode, no certificate)"
         default n
+    config GW_MONITOR
+        bool "Monitor only: score and log every flow, never block (benign calibration runs)"
+        default n
+    config GW_TAU
+        string "Lab threshold tau_lab (empty = the model's own tau)"
+        default ""
     config GW_BLOCK_TTL_S
         int "Block duration (s)"
         default 300
