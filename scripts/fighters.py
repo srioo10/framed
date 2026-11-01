@@ -251,6 +251,25 @@ def margins_upper(m, lo, hi, bi, lower=False, raw=False):
     return _body_margins(m, lo, hi, bi, lower, raw)
 
 
+def pgd_point(m, lo, hi, bi, sign, steps=10, gen=None):
+    """PREREG §9 K18: PGD in the box [lo, hi] from a random start, ascending sign x mean-member log P(benign)
+    (sign = -1: push benign rows to look attacked; +1: push attack rows to look benign); step 2.5 x width / steps."""
+    lo, hi = lo.clamp(-1e4, 1e4), hi.clamp(-1e4, 1e4)  # the mean-bytes upper bound is inf; the cert-mode clip saturates long before
+    w = hi - lo
+    x = lo + w * torch.rand(lo.shape, generator=gen).to(lo.device)
+    was = m.training
+    m.eval()
+    for _ in range(steps):
+        x.requires_grad_(True)
+        z = m(x)[0]
+        z = z if z.dim() == 3 else z[:, None]
+        obj = sign * torch.log_softmax(z, -1)[..., bi].mean()
+        g, = torch.autograd.grad(obj, x)
+        x = torch.max(torch.min(x.detach() + 2.5 * w / steps * g.sign(), hi), lo)
+    m.train(was)
+    return x.detach()
+
+
 def score_lower(m, lo, hi, bi, head, device="cpu", bs=50_000, f64=True):
     """Sound lower bound of the nlog / min / energy head score over each row's box (robust-alarm gating, Theorem 1'):
     member log P(benign) <= -logsumexp_i lower(z_i - z_bi). energy = nlog - logsumexp(mean z): minus the logsumexp
@@ -334,11 +353,12 @@ def size_bytes(m):
 
 
 def train(m, Xf, yf, k, device, seed=0, epochs=20, lr=2e-3, bs=1024, soft=None, kd=0.0, ls=0.0, focal=0.0, T=4.0,
-          Xs=None, Ss=None, syn=0.0, Lc=None, Hc=None, cert=0.0, bi=0, Ld=None, Hd=None, rdet=0.0):
+          Xs=None, Ss=None, syn=0.0, Lc=None, Hc=None, cert=0.0, bi=0, Ld=None, Hd=None, rdet=0.0, adv=0.0, advd=0.0):
     """Mean-member CE (label smoothing ls, focal gamma) mixed with KD (weight kd) to teacher probabilities `soft`,
     plus syn x KD on a batch of synthetic rows Xs labelled by a teacher (Ss), plus cert x worst-case CE (interval
     bound) on boxes [Lc, Hc] of benign fit rows (PREREG §9 CERT), plus rdet x worst-case "not benign" loss on deletion
-    boxes [Ld, Hd] of attack fit rows (robust-alarm gating); early stop on CE of a 10% carve of the
+    boxes [Ld, Hd] of attack fit rows (robust-alarm gating); adv / advd: the same two terms at PGD points in the same
+    boxes instead of interval bounds (PREREG §9 K18 adversarial-training baseline); early stop on CE of a 10% carve of the
     fit rows; NODE tau anneals 1 -> 0.05."""
     g = torch.Generator().manual_seed(seed)
     torch.manual_seed(seed)
@@ -353,9 +373,9 @@ def train(m, Xf, yf, k, device, seed=0, epochs=20, lr=2e-3, bs=1024, soft=None, 
         XS, SS = torch.from_numpy(Xs).to(device), torch.from_numpy(Ss.astype(np.float32)).to(device)
     opt = torch.optim.AdamW([p for name, p in m.named_parameters() if not name.startswith("gbm")], lr=lr,
                             weight_decay=1e-4)
-    if cert > 0:
+    if cert > 0 or adv > 0:
         LC, HC = (torch.from_numpy(np.asarray(v, np.float32)).to(device) for v in (Lc, Hc))
-    if rdet > 0:
+    if rdet > 0 or advd > 0:
         LD, HD = (torch.from_numpy(np.asarray(v, np.float32)).to(device) for v in (Ld, Hd))
     trt = torch.from_numpy(tr).to(device)
     best, state = np.inf, None
@@ -393,6 +413,19 @@ def train(m, Xf, yf, k, device, seed=0, epochs=20, lr=2e-3, bs=1024, soft=None, 
                 s = torch.logsumexp(margins_upper(m, LD[j], HD[j], bi, lower=True).clamp(min=-50), -1)  # (B, M) >= 0
                 ramp = min(1.0, (ep + 1) / max(1, epochs // 2))
                 loss = loss - ramp * rdet * torch.log(-torch.expm1(-s.clamp(min=1e-4))).mean()  # -log P_worst(attack)
+            if adv > 0:
+                j = torch.randint(len(LC), (len(b),), generator=g).to(device)
+                za = m(pgd_point(m, LC[j], HC[j], bi, -1.0, gen=g))[0]
+                za = za if za.dim() == 3 else za[:, None]
+                ramp = min(1.0, (ep + 1) / max(1, epochs // 2))
+                loss = loss - ramp * adv * torch.log_softmax(za, -1)[..., bi].mean()  # CE to Benign at the PGD point
+            if advd > 0:
+                j = torch.randint(len(LD), (len(b),), generator=g).to(device)
+                zd = m(pgd_point(m, LD[j], HD[j], bi, 1.0, gen=g))[0]
+                zd = zd if zd.dim() == 3 else zd[:, None]
+                pb = torch.softmax(zd, -1)[..., bi].clamp(max=1 - 1e-6)
+                ramp = min(1.0, (ep + 1) / max(1, epochs // 2))
+                loss = loss - ramp * advd * torch.log1p(-pb).mean()  # -log(1 - P(benign)) at the PGD point
             opt.zero_grad()
             loss.backward()
             opt.step()

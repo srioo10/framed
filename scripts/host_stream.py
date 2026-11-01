@@ -84,10 +84,10 @@ def day_max(key, v):
     return pd.Series(v.astype(np.float64)).groupby(key).max()
 
 
-def threshold(m):
-    """Smallest h with share(per-unit max > h) <= BUDGET."""
+def threshold(m, budget=BUDGET):
+    """Smallest h with share(per-unit max > h) <= budget."""
     m = np.sort(m.to_numpy())[::-1]
-    j = int(np.floor(BUDGET * len(m)))
+    j = int(np.floor(budget * len(m)))
     return m[j] if j < len(m) else -np.inf
 
 
