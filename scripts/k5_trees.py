@@ -13,6 +13,7 @@ subsampled to GROOT_ROWS (stratified, seed 1). Verified like RF (leaf benign sha
 Usage: .venv/bin/python scripts/k5_trees.py [--rows 100] [--workers 8] [--pairs nf_ctu13/pair_0 ...] [--models groot]
 """
 import argparse
+import pickle
 import json
 import sys
 import types
@@ -225,8 +226,15 @@ def job(args):
     sub = lambda X: X[np.sort(rng.choice(len(X), min(nrows, len(X)), replace=False))]  # noqa: E731
     Xu, Xk = sub(z["X_pseudo"]), sub(z["X_es"][att]) if att.any() else None
     Xf, yf = augment(z, np.random.default_rng(SEED)) if robust else (z["X_fit"], z["y_fit"])
-    m = groot(z) if name == "groot" else \
-        (models.rf(SEED) if name == "rf" else models.xgb(SEED)).set_params(n_jobs=1).fit(Xf, yf)
+    if name == "xgb_tiny":  # SMALL-1: the K9 size-matched tuned tiny boss (40 trees, depth 4)
+        from xgboost import XGBClassifier
+        t = json.load(open(bowl.ROOT / "results" / "bowl" / "tuned_boss_tiny.json"))["tuned_boss"]
+        m = XGBClassifier(n_estimators=t["n"], max_depth=t["depth"], learning_rate=t["lr"], subsample=t["sub"],
+                          colsample_bytree=t["col"], reg_lambda=t["l2"], min_child_weight=t["mcw"],
+                          tree_method="hist", n_jobs=1, random_state=SEED).fit(Xf, yf)
+    else:
+        m = groot(z) if name == "groot" else \
+            (models.rf(SEED) if name == "rf" else models.xgb(SEED)).set_params(n_jobs=1).fit(Xf, yf)
     col = list(m.classes_).index(bi)
     s = lambda X: -np.log(np.maximum(m.predict_proba(X)[:, col], 1e-45))  # noqa: E731
     s_cal = s(z["X_cal"])
@@ -235,7 +243,8 @@ def job(args):
     low = (lambda lo, hi: ct.rf_lower(m, lo, hi, col)) if rf else \
         (lambda lo, hi: ct.xgb_upper(m, lo, hi, col, k, lower=True))  # noqa: E731
     T, off = trees(m, k, col)
-    out = {"pair": key, "model": name, "robust_trained": int(robust), "seed": SEED, "tau": float(tau)}
+    size = len(pickle.dumps(m)) if rf else len(m.get_booster().save_raw("ubj"))  # serialized model bytes
+    out = {"pair": key, "model": name, "robust_trained": int(robust), "seed": SEED, "tau": float(tau), "bytes": size}
     for part, X in (("unk", Xu), ("known", Xk)):
         if X is None:
             continue

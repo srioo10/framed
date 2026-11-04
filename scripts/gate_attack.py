@@ -65,6 +65,10 @@ def main():
     ap.add_argument("--smooth", type=float, nargs="*", default=[])  # RS baseline: Gaussian sigmas (Cohen et al.)
     ap.add_argument("--no-gate", action="store_true")  # ABL2: B's own scores, block = alarm (certificate off)
     ap.add_argument("--held-idx", type=int, default=0)  # K19': held-out family = sorted families[held_idx]
+    ap.add_argument("--established", action="store_true")  # shared-key attacker: injected flows established (fail=0)
+    ap.add_argument("--opt-harm", action="store_true")  # M6: per-flow white-box optimiser attacker (feature space)
+    ap.add_argument("--dilute", type=int, nargs="*")  # C3: attacker pads its own src key with P benign flows / 120 s
+    ap.add_argument("--rekey", type=int, default=0)  # shared-key (NAT) attacker: N draws of real bot flows re-keyed
     a = ap.parse_args()
     g = (conf_clean.A if a.champion_a else G) | json.loads(a.genome)
     t0 = time.time()
@@ -155,6 +159,12 @@ def main():
     assert np.allclose(H0, base[hostctx.COLS].to_numpy(), rtol=1e-4, atol=1e-3), "subset host context != bank"
     X0 = tx(base)
     day = lambda w: float(pd.Series(w).groupby(key).any().mean())  # noqa: E731
+    if a.opt_harm:
+        opt_harm(a, base, tx, dets, tau, day)
+        return
+    if a.dilute is not None:
+        dilute(a, bank, held, tx, dets, tau)
+        return
     if a.throttle:
         harm = {n: day(b(X0) > tau[n]) for n, (_, b) in dets.items()}  # clean victim block_day (no spoofing)
         print("clean block_day", json.dumps({n: round(v, 4) for n, v in harm.items()}), flush=True)
@@ -207,12 +217,17 @@ def main():
     Vs = V.sort_values("FLOW_START_MILLISECONDS", kind="stable")
     for M in a.m_attack or [a.m]:
         pats = [((side, peer, port, fail, nbytes), None) for side, peer, port, fail, nbytes in itertools.product(
-            ("dst", "src", "both"), (0, 1), (0, 1), (0, 1), (0,) if a.no_bytes_grid else (0, 1_000, 10**9))]
+            ("dst", "src", "both"), (0, 1), (0, 1), (0,) if a.established else (0, 1),
+            (0,) if a.no_bytes_grid else (0, 1_000, 10**9))]
         rng = np.random.default_rng([0, M])
-        pats += [((side, "mix", "mix", "mix", 0), rng.random(3)) for side in rng.choice(["dst", "src", "both"], a.random)]
+        pats += [] if a.established else [((side, "mix", "mix", "mix", 0), rng.random(3))  # mix injects failures
+                                         for side in rng.choice(["dst", "src", "both"], a.random)]
+        pats += [(("rekey", "bot", r, "est", 0), "rekey") for r in range(a.rekey)]
         worst = {n: np.zeros(len(X0), bool) for n in dets}
         for (side, peer, port, fail, nbytes), p in pats:
-            if p is None:
+            if isinstance(p, str) and p == "rekey":
+                inj = rekey(light, np.asarray(bank.host.family), Vs, M, port)
+            elif p is None:
                 inj = sa.inject(Vs, side, M, peer, port, fail, nbytes)
             else:  # per-flow mixture of the all-0 and all-1 injections (same times: the greedy schedule ignores flags)
                 i0, i1 = sa.inject(Vs, side, M, 0, 0, 0, 0), sa.inject(Vs, side, M, 1, 1, 1, 0)
@@ -247,6 +262,139 @@ def main():
               f"worst attack alarm {w.alarm.max():.4f} block {w.block.max():.4f} | host-day {w.alarm_day.max():.3f} / "
               f"{w.block_day.max():.3f}; adaptive block_day {ad.block_day:.3f}; K4-gate violations "
               f"{int(w.violations.sum())} (adaptive {int(ad.violations)})")
+
+
+def inject_ctx(H, cols, k, j120, j10, flags):
+    """Context after injecting j120 flows (j10 of them in the last 10 s, the rest > 10 s earlier) on key k ('src' /
+    'dst'), each failing iff flags[0], to a fresh port / peer each iff flags[1] / flags[2], else all to one fresh
+    attacker port / peer (only its first flow per window is novel), 0 bytes. Exact: fresh pairs change no other flow's
+    novelty (checked against HostFlows in the self-test). H: raw (unprepped) host-context, float64, in place."""
+    for w, j in ((10, j10), (120, j120)):
+        c = {st: cols.index(f"hc_{k}_{st}_{w}s") for st in hostctx.STATS}
+        n = H[:, c["n"]].copy()
+        d = np.maximum(n + j, 1)
+        add = (flags[0] * j, j if flags[1] else min(j, 1), j if flags[2] else min(j, 1), 0)
+        for st, ad in zip(("fail", "newport", "newpeer", "bytes"), add):
+            H[:, c[st]] = (H[:, c[st]] * n + ad) / d
+        H[:, c["n"]] = n + j
+    return H
+
+
+def opt_harm(a, base, tx, dets, tau, day):
+    """M6 (PREREG 2026-11-04 OPT row): per victim flow and per detector, coordinate ascent (2 rounds over the src and dst
+    keys) over injections j120 in {0, m/2, m}, j10 in {0, j120}, flags in {0,1}^3, maximising the detector's block
+    score (B: certified lower bound; RF / XGB: score, block = alarm). One flow per host-day suffices for harm, so the
+    per-flow optimum is a realisable attack. B violations (block without a clean alarm) must be 0 (Theorem 2)."""
+    hc = list(hostctx.COLS)
+    H0 = base[hc].to_numpy(np.float64)
+    opts = [(0, 0, (0, 0, 0))] + [(j, j10, fl) for j in sorted({a.m // 2, a.m}) for j10 in (0, j)
+                                  for fl in itertools.product((0, 1), repeat=3)]
+
+    def X_of(H):
+        X = base.copy()
+        X[hc] = H.astype(np.float32)
+        return tx(X)
+    res = []
+    for n, (f, b) in dets.items():
+        obj = b if n == "gated_net" else f
+        alarm0 = f(X_of(H0)) > tau[n]
+        choice = {"src": np.zeros(len(H0), int), "dst": np.zeros(len(H0), int)}
+        best = obj(X_of(H0))
+        for _ in range(2):
+            for k, other in (("src", "dst"), ("dst", "src")):
+                for i, (j, j10, fl) in enumerate(opts):
+                    H = H0.copy()
+                    for r in np.unique(choice[other]):  # other key at its current choice
+                        sel = choice[other] == r
+                        oj, oj10, ofl = opts[r]
+                        H[sel] = inject_ctx(H[sel], hc, other, oj, oj10, ofl)
+                    v = obj(X_of(inject_ctx(H, hc, k, j, j10, fl)))
+                    up = v > best
+                    best[up], choice[k][up] = v[up], i
+        H = H0.copy()
+        for k in ("src", "dst"):
+            for r in np.unique(choice[k]):
+                sel = choice[k] == r
+                H[sel] = inject_ctx(H[sel], hc, k, *opts[r])
+        Xo = X_of(H)
+        bl, al = obj(Xo) > tau[n], f(Xo) > tau[n]
+        r = {"detector": n, "m": a.m, "alarm_day_clean": day(alarm0), "alarm_day": day(al), "block_day": day(bl),
+             "block": bl.mean(), "violations": int((bl & ~alarm0).sum()) if n == "gated_net" else 0}
+        res.append(r)
+        print(json.dumps({q: round(v, 4) if isinstance(v, float) else v for q, v in r.items()}), flush=True)
+    pd.DataFrame(res).to_csv(sa.OUT / f"opt_harm_{a.dataset}{'_' + a.tag if a.tag else ''}.csv", index=False)
+
+
+def dilute(a, bank, held, tx, dets, tau):
+    """C3 (PREREG 2026-11-04 OPT row): the attacker pads its OWN source key with P successful, non-novel flows per
+    120 s (uniform rate: P/12 in the last 10 s; burst: all P in the last 10 s), in feature space on the same test
+    attack rows as K16. Per P: B certified block TPR and RF / XGB alarm TPR (macro of unknown / known); 'best' = per
+    flow the policy minimising the detector's block score over all P and both timings (upper bound on evasion)."""
+    rng = np.random.default_rng(0)
+    cap = lambda r: np.sort(rng.permutation(r)[:5000])  # noqa: E731  same rows as K16 / HOSTDAY
+    unk = cap(bank.test[held])
+    rows = np.sort(np.concatenate([unk] + [cap(r) for f, r in bank.test.items() if f not in (held, "Benign")]))
+    is_unk = np.isin(rows, unk)
+    base = bank.frame(rows, ())
+    hc = list(hostctx.COLS)
+    H0 = base[hc].to_numpy(np.float64)
+
+    def X_of(P, burst):
+        X = base.copy()
+        X[hc] = inject_ctx(H0.copy(), hc, "src", P, P if burst else round(P / 12), (0, 0, 0)).astype(np.float32)
+        return tx(X)
+    pols = [(P, bu) for P in a.dilute for bu in ((False, True) if P else (False,))]
+    res, best = [], {}
+    for P, bu in pols:
+        X = X_of(P, bu)
+        r = {"P": P, "timing": "burst" if bu else "uniform"}
+        for n, (f, b) in dets.items():
+            s, lb = f(X), b(X) if n == "gated_net" or n.startswith("b2") else f(X)  # certified detectors use the IBP block
+            best[n] = lb if n not in best else np.minimum(best[n], lb)
+            for nm, v in (("tpr", s), ("btpr", lb)):
+                u, k = (v[is_unk] > tau[n]).mean(), (v[~is_unk] > tau[n]).mean()
+                r[f"{n}_{nm}_unk"], r[f"{n}_{nm}_known"], r[f"{n}_{nm}_macro"] = u, k, (u + k) / 2
+        res.append(r)
+        print(json.dumps({q: round(v, 4) if isinstance(v, float) else v for q, v in r.items()}), flush=True)
+    r = {"P": "best", "timing": "per-flow"}
+    for n, v in best.items():
+        u, k = (v[is_unk] > tau[n]).mean(), (v[~is_unk] > tau[n]).mean()
+        r[f"{n}_btpr_unk"], r[f"{n}_btpr_known"], r[f"{n}_btpr_macro"] = u, k, (u + k) / 2
+    res.append(r)
+    print(json.dumps({q: round(v, 4) if isinstance(v, float) else v for q, v in r.items()}), flush=True)
+    pd.DataFrame(res).to_csv(sa.OUT / f"dilute_{a.dataset}{'_' + a.tag if a.tag else ''}.csv", index=False)
+
+
+def rekey(light, fam, V, m, draw):
+    """Shared-key (NAT) attacker: per victim source address, one random bot's real established flows (family not
+    Benign, OUT_PKTS > 0) re-keyed to that address, tiled in time over each victim day, kept only within 120 s before a
+    victim flow (the longest context window), then greedily throttled to <= m per BUDGET_MS. Bytes kept (zeroed later)."""
+    rng = np.random.default_rng([2, draw])
+    B = light[(fam != "Benign") & (light.OUT_PKTS.to_numpy() > 0)]
+    groups = {k: g.sort_values("FLOW_START_MILLISECONDS", kind="stable") for k, g in B.groupby("IPV4_SRC_ADDR")}
+    bots = sorted(k for k, g in groups.items() if len(g) >= m)
+    out = []
+    for kv, grp in V.groupby("IPV4_SRC_ADDR", sort=False):
+        b = groups[bots[rng.integers(len(bots))]]
+        bt = b.FLOW_START_MILLISECONDS.to_numpy()
+        cols = [b[c].to_numpy() for c in ("IPV4_DST_ADDR", "L4_DST_PORT", "OUT_PKTS", "IN_BYTES")]
+        rel, span = bt - bt[0], int(bt[-1] - bt[0]) + 1000
+        tv_all = np.sort(grp.FLOW_START_MILLISECONDS.to_numpy())
+        for d in np.unique(tv_all // hs.DAY_MS):
+            tv = tv_all[tv_all // hs.DAY_MS == d]
+            t0, reps = tv[0] - 120_000, -(-(int(tv[-1] - tv[0]) + 120_000) // span) + 1
+            t = (t0 + rel[None, :] + span * np.arange(reps)[:, None]).ravel()
+            idx = np.tile(np.arange(len(bt)), reps)
+            j = np.searchsorted(tv, t, "left")  # first victim flow at or after t
+            near = (j < len(tv)) & (tv[np.minimum(j, len(tv) - 1)] - t <= 120_000) & (t < tv[-1])
+            q = deque()
+            for ti, ii in zip(t[near], idx[near]):
+                while q and q[0] <= ti - sa.BUDGET_MS:
+                    q.popleft()
+                if len(q) < m and not (q and ti <= q[-1]):
+                    q.append(ti)
+                    out.append((ti, kv, *(c[ii] for c in cols)))
+    return pd.DataFrame(out, columns=sa.COLS)
 
 
 def smoothed(f, t, sg, mask, box, N=10000, alpha=0.001, seed=0):

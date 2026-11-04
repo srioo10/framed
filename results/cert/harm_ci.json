@@ -1,0 +1,186 @@
+{
+ "nf_ctu13": {
+  "host_days": 181,
+  "gated_net": {
+   "clean_block_day": 0.0055248618784530384,
+   "clean_ci": [
+    0.0009759153318539288,
+    0.03062736012129081
+   ],
+   "worst_block_day": 0.0055248618784530384,
+   "worst_ci": [
+    0.0009759153318539288,
+    0.03062736012129081
+   ],
+   "violations": 0,
+   "patterns": 72
+  },
+  "rf": {
+   "clean_block_day": 0.0,
+   "clean_ci": [
+    0.0,
+    0.02078320031854301
+   ],
+   "worst_block_day": 0.0,
+   "worst_ci": [
+    0.0,
+    0.02078320031854301
+   ],
+   "violations": 0,
+   "patterns": 72
+  },
+  "xgb": {
+   "clean_block_day": 0.0,
+   "clean_ci": [
+    0.0,
+    0.02078320031854301
+   ],
+   "worst_block_day": 0.0,
+   "worst_ci": [
+    0.0,
+    0.02078320031854301
+   ],
+   "violations": 0,
+   "patterns": 72
+  },
+  "zero_violation_upper95_per_pattern": 0.01641479165519244
+ },
+ "nf_ugr16": {
+  "host_days": 300,
+  "gated_net": {
+   "clean_block_day": 0.02,
+   "clean_ci": [
+    0.009197506067771085,
+    0.042940186730055147
+   ],
+   "worst_block_day": 0.016666666666666666,
+   "worst_ci": [
+    0.0071393720427721935,
+    0.038415943621705605
+   ],
+   "violations": 0,
+   "patterns": 72
+  },
+  "rf": {
+   "clean_block_day": 0.0,
+   "clean_ci": [
+    0.0,
+    0.012643429997735661
+   ],
+   "worst_block_day": 0.0,
+   "worst_ci": [
+    0.0,
+    0.012643429997735661
+   ],
+   "violations": 0,
+   "patterns": 72
+  },
+  "xgb": {
+   "clean_block_day": 0.0,
+   "clean_ci": [
+    0.0,
+    0.012643429997735661
+   ],
+   "worst_block_day": 0.0,
+   "worst_ci": [
+    0.0,
+    0.012643429997735661
+   ],
+   "violations": 0,
+   "patterns": 72
+  },
+  "zero_violation_upper95_per_pattern": 0.00993608194445772
+ },
+ "nf_cic": {
+  "host_days": 300,
+  "gated_net": {
+   "clean_block_day": 0.013333333333333334,
+   "clean_ci": [
+    0.005196877684679467,
+    0.03377606084644991
+   ],
+   "worst_block_day": 0.01,
+   "worst_ci": [
+    0.0034065567627181124,
+    0.028984004635062833
+   ],
+   "violations": 0,
+   "patterns": 72
+  },
+  "rf": {
+   "clean_block_day": 0.0,
+   "clean_ci": [
+    0.0,
+    0.012643429997735661
+   ],
+   "worst_block_day": 0.0,
+   "worst_ci": [
+    0.0,
+    0.012643429997735661
+   ],
+   "violations": 0,
+   "patterns": 72
+  },
+  "xgb": {
+   "clean_block_day": 0.0,
+   "clean_ci": [
+    0.0,
+    0.012643429997735661
+   ],
+   "worst_block_day": 0.0,
+   "worst_ci": [
+    0.0,
+    0.012643429997735661
+   ],
+   "violations": 0,
+   "patterns": 72
+  },
+  "zero_violation_upper95_per_pattern": 0.00993608194445772
+ },
+ "nf_ton": {
+  "host_days": 300,
+  "gated_net": {
+   "clean_block_day": 0.04,
+   "clean_ci": [
+    0.02302709213793877,
+    0.06860486345997804
+   ],
+   "worst_block_day": 0.04,
+   "worst_ci": [
+    0.02302709213793877,
+    0.06860486345997804
+   ],
+   "violations": 0,
+   "patterns": 72
+  },
+  "rf": {
+   "clean_block_day": 0.016666666666666666,
+   "clean_ci": [
+    0.0071393720427721935,
+    0.038415943621705605
+   ],
+   "worst_block_day": 0.023333333333333334,
+   "worst_ci": [
+    0.01134751559829571,
+    0.04737255433287896
+   ],
+   "violations": 0,
+   "patterns": 72
+  },
+  "xgb": {
+   "clean_block_day": 0.0,
+   "clean_ci": [
+    0.0,
+    0.012643429997735661
+   ],
+   "worst_block_day": 0.0,
+   "worst_ci": [
+    0.0,
+    0.012643429997735661
+   ],
+   "violations": 0,
+   "patterns": 72
+  },
+  "zero_violation_upper95_per_pattern": 0.00993608194445772
+ }
+}

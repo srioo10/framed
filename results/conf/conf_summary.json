@@ -1,0 +1,116 @@
+{
+ "C1": {
+  "claim": "C1 A - max(RF,XGB) fitness",
+  "mean": -0.1136,
+  "ci": [
+   -0.1962,
+   -0.0457
+  ],
+  "n_pairs": 24,
+  "complete": true,
+  "per_dataset": {
+   "nf_cic": 0.0046,
+   "nf_ctu13": -0.0776,
+   "nf_ton": -0.3306,
+   "nf_ugr16": -0.051
+  },
+  "unk_A": 0.5971,
+  "unk_better_boss": 0.6595,
+  "better_boss": "rf",
+  "passed": false
+ },
+ "C5": {
+  "claim": "C5 A - deep_sad fitness",
+  "mean": -0.0594,
+  "ci": [
+   -0.1257,
+   -0.0023
+  ],
+  "n_pairs": 24,
+  "complete": true,
+  "per_dataset": {
+   "nf_cic": -0.0083,
+   "nf_ctu13": -0.001,
+   "nf_ton": -0.2661,
+   "nf_ugr16": 0.0378
+  },
+  "best_baseline": "deep_sad",
+  "baseline_means": {
+   "cade": 0.172,
+   "deep_sad": 0.7845,
+   "horuseye": 0.1239,
+   "horuseye_online": 0.2459,
+   "iforest": 0.1498,
+   "kitnet": 0.2332,
+   "kitnet_online": 0.2736
+  },
+  "passed": false
+ },
+ "C2": {
+  "claim": "C2 B(BaB proof) - rf_box:proof",
+  "mean": 0.1042,
+  "ci": [
+   0.051,
+   0.1661
+  ],
+  "n_pairs": 24,
+  "complete": true,
+  "per_dataset": {
+   "nf_cic": 0.11,
+   "nf_ctu13": 0.0864,
+   "nf_ton": 0.1594,
+   "nf_ugr16": 0.0611
+  },
+  "best_tree": "rf_box:proof",
+  "tree_means": {
+   "groot:milp": 0.6842,
+   "groot:pertree": 0.6626,
+   "groot:proof": 0.6842,
+   "rf:milp": 0.724,
+   "rf:pertree": 0.5368,
+   "rf:proof": 0.6256,
+   "rf_box:milp": 0.7785,
+   "rf_box:pertree": 0.6505,
+   "rf_box:proof": 0.6866,
+   "xgb:milp": 0.6922,
+   "xgb:pertree": 0.5575,
+   "xgb:proof": 0.626,
+   "xgb_box:milp": 0.7456,
+   "xgb_box:pertree": 0.5819,
+   "xgb_box:proof": 0.6703
+  },
+  "passed": true
+ },
+ "C2_ibp_deployed": {
+  "claim": "B(IBP) - rf_box:proof",
+  "mean": 0.1037,
+  "ci": [
+   0.0504,
+   0.1655
+  ],
+  "n_pairs": 24,
+  "complete": true,
+  "per_dataset": {
+   "nf_cic": 0.1094,
+   "nf_ctu13": 0.0861,
+   "nf_ton": 0.1592,
+   "nf_ugr16": 0.06
+  }
+ },
+ "C2_k5_convention": {
+  "claim": "B(BaB K5) - rf_box:milp",
+  "mean": 0.0304,
+  "ci": [
+   -0.0242,
+   0.094
+  ],
+  "n_pairs": 24,
+  "complete": true,
+  "per_dataset": {
+   "nf_cic": 0.085,
+   "nf_ctu13": -0.0111,
+   "nf_ton": 0.0553,
+   "nf_ugr16": -0.0075
+  }
+ }
+}

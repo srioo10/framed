@@ -1,0 +1,12 @@
+[{"stream_name":"stdout","time":12.189336358,"data":"RUN ['spoof_attack.py', 'nf_ton']\n"}
+,{"stream_name":"stdout","time":1632.732262263,"data":"0 none 0 0 0 0 {'rf': 0.047, 'xgb': 0.04, 'champion_r6': 0.05} 1610s\n"}
+,{"stream_name":"stdout","time":1810.649657259,"data":"RC -9 ['spoof_attack.py', 'nf_ton']\n"}
+,{"stream_name":"stdout","time":1810.650577772,"data":"RUN ['gate_attack.py', 'nf_ton', '--tau-day', '--genome', '{\"family\": \"tabm\", \"enc\": \"raw\", \"e\": 4, \"w\": 32, \"depth\": 2, \"sn\": 0, \"act\": \"relu\", \"members\": 8, \"head\": \"nlog\", \"kd\": 0.9, \"syn\": 0.5, \"clip\": 1, \"cert\": 4, \"gate\": 1, \"rdet\": 2, \"ls\": 0.0, \"focal\": 0.0, \"lr\": 0.003}']\n"}
+,{"stream_name":"stdout","time":3199.655286026,"data":"RC -9 ['gate_attack.py', 'nf_ton', '--tau-day', '--genome', '{\"family\": \"tabm\", \"enc\": \"raw\", \"e\": 4, \"w\": 32, \"depth\": 2, \"sn\": 0, \"act\": \"relu\", \"members\": 8, \"head\": \"nlog\", \"kd\": 0.9, \"syn\": 0.5, \"clip\": 1, \"cert\": 4, \"gate\": 1, \"rdet\": 2, \"ls\": 0.0, \"focal\": 0.0, \"lr\": 0.003}']\n"}
+,{"stream_name":"stderr","time":3203.601293988,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":3203.601336869,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":3204.145192827,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":3204.145233299,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":3206.358508652,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":3207.968514402,"data":"[NbConvertApp] Writing 280351 bytes to __results__.html\n"}
+]

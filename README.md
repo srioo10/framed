@@ -1,86 +1,76 @@
-# OnePass-IDS
+# framed
 
-**A one-pass detector of a few kilobytes for known and unseen attack families on IoT networks, evaluated without leakage.**
+**Framing innocent devices by poisoning IDS host context, and Veto, a detector whose blocks are certified:
+injected flows can never cause a block.**
 
-An IDS on an IoT gateway sees each flow once, has kilobytes of memory, and will meet attack families that were not in training. OnePass-IDS is a small MLP (about 6k weights, 10.9 KB as int8) that does two jobs in one forward pass. It names known attack families and gives an unknown-attack score. Two optional additions sit on top: 20 causal per-host context features, and a per-host conformal CUSUM (one float of state per source host).
+Network intrusion detectors that also block (IPS mode) rely on host context: how many connections a host made in the
+last few seconds or minutes, and what share of them failed or reached new ports and peers. These features are what
+let a detector notice attacks it was never trained on. They also have a flaw. Anyone who can add flows to a host's
+context can make an innocent host look like a scanner, and an IPS will then cut it off.
 
-The study has two parts:
+The attacker never touches the victim's own traffic. Two paths work:
 
-1. **A leak-free re-evaluation of ARLHNIDS-IoT** (Srivastava & Sinha, *Computers & Security* 156, 2025, 104515). We re-run its pipeline in the published order and in a leak-free order, and attribute the change to each protocol step.
-2. **OnePass-IDS under a leak-free, host-aware open-set protocol**:
-   - 10-minute time-block grouped splits;
-   - one attack family held out at a time;
-   - a 1% benign false-alarm budget calibrated on held-out benign traffic and reported as measured;
-   - host-bootstrap confidence intervals.
+- **Shared key.** The attacker sits behind the same NAT or CGNAT address or subnet as the victim. Its own truthful,
+  fully established connections poison the context the victim is scored against. No spoofing is needed, and
+  handshake or source-validation filters do not help.
+- **Spoofed one-way flows,** where source validation is missing.
 
-Every hypothesis, claim, deviation and result is logged, dated, in [`PREREG.md`](PREREG.md). Criteria were fixed before the confirmatory runs and never changed after a result.
+Veto is a small detector (a TabM ensemble of 8 members, 3.6 KB as int8) that blocks a flow only when it can prove the
+block is not the attacker's doing. For each flow it computes the set of all clean contexts consistent with what it
+observes, given at most m injected flows per host key per 240 s (the deletion box, Theorem 1). It then bounds its
+score over that whole box with interval bound propagation (Theorem 2). It blocks only if the lower bound clears the
+threshold. Otherwise it raises an alarm without blocking. Injection within the budget therefore cannot cause a
+block (Corollary).
+
+Every test, including the ones that failed, was written down before it ran, with its pass rule, in
+[`PREREG.md`](PREREG.md).
 
 ## Main results
 
-| Finding | Result |
+All of these are from pre-registered tests, with m = 10 flows per key per 240 s.
+
+| Question | Result |
 |---|---|
-| ARLHNIDS protocol effect | macro-F1 0.84–1.00 in the published order → 0.41–0.67 leak-free. The published order puts 14–53% of test rows in training and makes 35–46% of the test set synthetic. |
-| Known families | MLP accuracy 0.93–0.97, about equal to RF and XGBoost |
-| **Unseen families, host level (NF-CICIDS2018)** | **DDU-OnePass 0.682** attacker host-days detected vs RF 0.684 and XGBoost 0.672 (same host evidence), at about 1/1000 of their size. Measured benign host-day alarm rate 1.1%. Holds in host-hour units too. |
-| Unseen families, flow level | MLP beats the tree ensembles on NF-ToN-IoT (0.15 vs ≤ 0.06) and CICIoT2023 (0.59 vs 0.46–0.55); trees and MCDE are better on UNSW-NB15 |
-| Deployment | int8 MLP 10.9 KB / 78 µs per flow vs RF 287 MB / 13 ms (one CPU thread) |
-| Negative results | Nested leave-one-family-out tuning does not transfer to real unseen families. Class balancing (weights, SMOTE) helps known classes only. Taxonomy back-off names unseen floods but not access-type attacks. |
+| Is the threat real? | Spoofed context makes published detectors (Kitsune-style, HorusEye-style, Deep SAD, iForest) and plain RF / XGBoost block 88–100% of innocent host-days on CTU-13 and UGR'16 |
+| Without spoofing? | Shared-key, established-only injection: RF / XGBoost 9.4 / 13.8% of host-days on CTU-13, 92 / 98% on UGR'16 |
+| On the original Kitsune code? | Unmodified Kitsune-py on its own Mirai capture: 13 of 13 victims alarmed (2 of 13 clean), both spoofed and shared-key. Single-packet flows were not enough (5 of 13, reported as a failure) |
+| Does the certificate hold? | 0 injection-caused blocks over 72 attack patterns, an adaptive attacker and a white-box per-flow optimiser, on all datasets |
+| What does it cost? | Veto's clean block rate is 0.55 / 2.0 / 1.33% of host-days (CTU-13 / UGR'16 / CIC), with 95% intervals containing the 1% budget. ToN-IoT drifts to 4.0% |
+| Versus certified trees? | Veto leads robust-trained trees with an exact MILP verifier by +0.104 [0.051, 0.166] under the proof rule. Under the "undecided = blocked" convention the lead is +0.030, not significant |
+| On a $5 gateway? | Inline on an ESP32 access point: 29 / 59 ms per flow, 117 KB heap. An ordinary IPS cuts the sensor off under attack; Veto keeps it online within budget and blocks over budget |
 
-The per-claim index is in [`RESULTS.md`](RESULTS.md).
+What it does not do (all reported in the paper and in `PREREG.md`):
 
-## Data
+- an attacker far over the budget can still cause blocks (20–66% of host-days at 5–10× the budget);
+- a low-rate attacker looks like a spoofer, and no context certificate can block it on context alone (Proposition 1);
+- padding the attacker's own context hides it on CTU-13 (a flow-only second channel fixes this, at a cost on CIC);
+- the attack failed on UNSW-NB15;
+- trees are not costlier to certify;
+- Veto does not beat trees on clean detection.
 
-The datasets are not redistributed. Download them and place the files in the repository root (or set `NIDS_DATA_DIR`):
+## Reproducing the key results
 
-| Dataset | Source | Files expected |
+Python 3.12, `pip install -r requirements.txt`. Datasets are NetFlow-v3 (CTU-13, UGR'16, CSE-CIC-IDS2018, ToN-IoT);
+loaders and leak-free cleaning are in `src/nids/`.
+
+| Result | Command | Output |
 |---|---|---|
-| UNSW-NB15 (raw + official split) | https://research.unsw.edu.au/projects/unsw-nb15-dataset | `OneDrive_1_10-23-2026.zip` (`UNSW-NB15_1..4.csv`, `Training and Testing Sets/`, `NUSW-NB15_features.csv`) |
-| BoT-IoT (5%, 10-best) | https://research.unsw.edu.au/projects/bot-iot-dataset | `UNSW_2018_IoT_Botnet_Final_10_best_Training.csv`, `..._Testing.csv` |
-| CICIoT2023 (per-capture CSV release) | https://www.unb.ca/cic/datasets/iotdataset-2023.html | `CSV.zip` |
-| CICIoT2023 (original MERGED_CSV) | same | `archive(1).zip` |
-| NF-CICIDS2018-v3, NF-ToN-IoT-v3, NF-BoT-IoT-v3, NF-UNSW-NB15-v3 | UQ NIDS datasets, https://staff.itee.uq.edu.au/marius/NIDS_datasets/ | unpacked CSVs in `data/raw/netflow_v3/` (or set `NIDS_NF_DIR`) |
+| Attack on all detectors, certificate soundness, harm | `PYTHONPATH=src python scripts/gate_attack.py nf_ctu13 --tau-day --genome '<B>'` | `results/cert/gate_k4_*_day.csv` |
+| Shared-key attacker | same, with `--established` | `..._sharedkey.csv` |
+| White-box optimiser | same, with `--opt-harm` | `opt_harm_*.csv` |
+| Padding | same, with `--dilute 0 10 30 100 300 1000` | `dilute_*.csv` |
+| Native Kitsune | `python -I scripts/kitsune_native.py <tsv> 0x1 30x3` (add `r` for shared-key, `30x3r`) | `kitsune_native_*.json` |
+| Certified trees (exact MILP) | `python scripts/k5_trees.py` | `k5_*.csv` |
+| Harm intervals | `python scripts/harm_ci.py` | `harm_ci.json` |
 
-File names are defined at the top of [`src/nids/load.py`](src/nids/load.py). Loaders cache parquet copies in `data/processed/`.
+Native Kitsune needs `git clone https://github.com/ymirsky/Kitsune-py third_party/Kitsune-py` (we used commit
+`7c8ea51`, unmodified). `<B>` is the Veto genome, pinned in `PREREG.md` (CONF rows). The C engine (`engine/certb.h`, `engine/certids.c`) and
+the ESP32 firmware (`firmware/gateway`, `firmware/sensor`) implement the same box and bound on the device.
+`scripts/README.md` says which scripts belong to the paper and which to the earlier phase.
 
-## Setup
+## How this started
 
-```bash
-uv venv -p 3.12 .venv
-uv pip install -p .venv/bin/python --index-url https://download.pytorch.org/whl/cpu torch
-uv pip install -p .venv/bin/python -r requirements.txt
-.venv/bin/pytest
-```
-
-No GPU is needed. The NetFlow score banks peak at about 18–20 GB of RAM; run them one at a time.
-
-## Reproducing the paper
-
-| Step | Command | Output |
-|---|---|---|
-| ARLHNIDS reproduction (paper vs leak-free order, GAMO vs SMOTE) | `scripts/arlhnids_sids.py`, `scripts/arlhnids_attrib.py` | `results/arlhnids/` |
-| Score banks (all baselines + MLP + int8 + DDU, per held-out family) | `scripts/score_bank.py <dataset> --seed S --variant V --kind outer`; queue: `runs/onepass.sh` | `runs/bank/` (not in git) |
-| Host metadata and entry audit | `scripts/host_audit.py <dataset>` | `results/host_stream/audit_*.json` |
-| Host-level claims C1–C7 (host-day or host-hour) | `scripts/onepass_claims.py nf_cic --seeds 1 2 3 4 [--unit hour]` | `results/onepass/nf_cic*/claims.md` |
-| Flow-level tables | `scripts/host_report.py --ds <dataset> --variants ...` | `results/onepass/flow_*.md` |
-| Nested tuning (T1) and balancing (B1) | `scripts/tune_mlp.py <dataset> --seed S`; queue: `runs/optimise.sh` | `tuned.parquet` beside each bank part |
-| Taxonomy back-off on CICIoT2023 (C7b) | `scripts/backoff_ciciot.py --seeds 0 1 2 3 4` | `results/onepass/backoff_ciciot.md` |
-| Host-budget robustness | `scripts/host_robust.py --member mlp_ce` | `results/onepass/robust_nf_cic_*.md` |
-| Deployment cost | `scripts/onepass_cost.py` | `results/onepass/cost.md` |
-| Figures | `scripts/paper_figs.py --out figures` | `figures/` |
-
-## Layout
-
-```
-PREREG.md      pre-registration: hypotheses, claims, deviations and results, dated
-RESULTS.md     claim-by-claim index of results and where each lives
-src/nids/      loaders, cleaning, splits, models (MLP, DDU, int8), host context, MCDE, ARLHNIDS components
-scripts/       experiments, reports and figures (see the table above)
-runs/          run queues and the temperature / memory monitor
-results/       every result table cited in the paper
-figures/       paper figures (regenerated by scripts/paper_figs.py)
-tests/         loader, cleaning, split, leakage and host-stream checks
-```
-
-## Reference
-
-Srivastava, A., & Sinha, D. (2025). ARLHNIDS-IoT: An accurate and robust lightweight hybrid-NIDS for IoT network security. *Computers & Security*, 156, 104515.
+The project began as a leak-free re-evaluation of ARLHNIDS-IoT and a small one-pass IDS (OnePass-IDS). While testing
+its C engine we found that spoofed flows made neural and KitNET detectors alarm on benign hosts through their host
+context. That observation became this work. The earlier study, its results and its failed directions are kept in
+[`archive/`](archive/) and in the dated rows of `PREREG.md`.

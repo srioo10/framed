@@ -1,0 +1,26 @@
+[
+ {
+  "k": 0,
+  "tau": 0.09801233755388626,
+  "victims": 13,
+  "victim_packets": 6689,
+  "packet_alarm": 0.005830467932426372,
+  "victim_alarm": 0.15384615384615385
+ },
+ {
+  "k": 10,
+  "tau": 0.09801233755388626,
+  "victims": 13,
+  "victim_packets": 6689,
+  "packet_alarm": 0.006876962176708028,
+  "victim_alarm": 0.38461538461538464
+ },
+ {
+  "k": 100,
+  "tau": 0.09801233755388626,
+  "victims": 13,
+  "victim_packets": 6689,
+  "packet_alarm": 0.06069666616833608,
+  "victim_alarm": 1.0
+ }
+]

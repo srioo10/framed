@@ -1,0 +1,22 @@
+[
+ {
+  "k": 0,
+  "ppf": 1,
+  "reply": false,
+  "tau": 0.09801233755388626,
+  "victims": 13,
+  "victim_packets": 6689,
+  "packet_alarm": 0.005830467932426372,
+  "victim_alarm": 0.15384615384615385
+ },
+ {
+  "k": 30,
+  "ppf": 3,
+  "reply": true,
+  "tau": 0.09801233755388626,
+  "victims": 13,
+  "victim_packets": 6689,
+  "packet_alarm": 0.0167439079085065,
+  "victim_alarm": 1.0
+ }
+]

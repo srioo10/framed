@@ -1,0 +1,11 @@
+age_rule,flood,victim_flows,alarm,block,violations,engine
+1,clean,7326,0.004641004641004641,0.001092001092001092,0,"certids: 4026161 flows in 91.88 s (22.82 us/flow), 1949921 alarms, 569836 certified blocks, 1370742 abstentions (entry < 130 s old), 234499 evictions"
+1,evict,7326,0.004777504777504778,0.0,0,"certids: 4963889 flows in 103.45 s (20.84 us/flow), 1946236 alarms, 498926 certified blocks, 1438120 abstentions (entry < 130 s old), 2165948 evictions"
+1,k1_dst+evict,7326,0.004368004368004368,0.0,0,"certids: 4978919 flows in 107.46 s (21.58 us/flow), 1946374 alarms, 498875 certified blocks, 1438247 abstentions (entry < 130 s old), 2181006 evictions"
+1,k1_src+evict,7326,0.005323505323505323,0.0,0,"certids: 4976939 flows in 104.27 s (20.95 us/flow), 1946262 alarms, 499045 certified blocks, 1438000 abstentions (entry < 130 s old), 2179060 evictions"
+1,k1_both+evict,7326,0.005187005187005187,0.0,0,"certids: 4991969 flows in 109.90 s (22.02 us/flow), 1946414 alarms, 498926 certified blocks, 1438200 abstentions (entry < 130 s old), 2194119 evictions"
+0,clean,7326,0.004641004641004641,0.004641004641004641,0,"certids: 4026161 flows in 99.01 s (24.59 us/flow), 1949921 alarms, 1940578 certified blocks, 0 abstentions (entry < 130 s old), 234499 evictions"
+0,evict,7326,0.004777504777504778,0.004641004641004641,0,"certids: 4963889 flows in 109.83 s (22.13 us/flow), 1946236 alarms, 1937046 certified blocks, 0 abstentions (entry < 130 s old), 2165948 evictions"
+0,k1_dst+evict,7326,0.004368004368004368,0.004368004368004368,0,"certids: 4978919 flows in 104.86 s (21.06 us/flow), 1946374 alarms, 1937122 certified blocks, 0 abstentions (entry < 130 s old), 2181006 evictions"
+0,k1_src+evict,7326,0.005323505323505323,0.0045045045045045045,0,"certids: 4976939 flows in 105.94 s (21.29 us/flow), 1946262 alarms, 1937045 certified blocks, 0 abstentions (entry < 130 s old), 2179060 evictions"
+0,k1_both+evict,7326,0.005187005187005187,0.004368004368004368,0,"certids: 4991969 flows in 98.97 s (19.83 us/flow), 1946414 alarms, 1937126 certified blocks, 0 abstentions (entry < 130 s old), 2194119 evictions"

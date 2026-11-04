@@ -17,3 +17,9 @@ research_notes/
 data/arena/
 data/kaggle/
 engine/build_b/
+
+# external clones (Kitsune-py: github.com/ymirsky/Kitsune-py @ 7c8ea51)
+third_party/
+catboost_info/
+graphify-out/
+new_dataset/

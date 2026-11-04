@@ -1,0 +1,1 @@
+{"pair": "nf_ctu13/pair_1", "model": "groot", "robust_trained": 0, "tau": 0.7399197619541302, "plain_unk": 0.2, "pertree_unk": 0.11, "milp_unk": 0.13, "undecided_unk": 0, "n_unk": 100, "plain_known": 1.0, "pertree_known": 0.99, "milp_known": 0.99, "undecided_known": 0, "n_known": 100, "plain": 0.6, "pertree": 0.55, "milp": 0.56}

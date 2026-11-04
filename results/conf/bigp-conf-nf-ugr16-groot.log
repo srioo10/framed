@@ -1,0 +1,116 @@
+[{"stream_name":"stdout","time":19.769164499,"data":"versions 2.11.0+cpu 1.6.1 3.4.1 1.16.3\n"}
+,{"stream_name":"stdout","time":21.374025479,"data":"md5 nf_ugr16/pair_0.npz 317d3ef341419444f5678e7ed47fa01a\n"}
+,{"stream_name":"stdout","time":22.229307587,"data":"md5 nf_ugr16/pair_1.npz 44cc97834c9fdcc70cf7f53cfde79cd7\n"}
+,{"stream_name":"stdout","time":22.87467929,"data":"md5 nf_ugr16/pair_2.npz 7739853b88f82d52a34617d09bfd5b45\n"}
+,{"stream_name":"stdout","time":23.764996701,"data":"md5 nf_ugr16/pair_3.npz 39c2d377b5d4fdfb1e730a21d31f79e0\n"}
+,{"stream_name":"stdout","time":24.490818156,"data":"md5 nf_ugr16/pair_4.npz b0666b7cd0545bb37e21189a1806ef55\n"}
+,{"stream_name":"stdout","time":25.16031493,"data":"md5 nf_ugr16/pair_5.npz 1c9169aeafa268a8b5d6a0693c57a23b\n"}
+,{"stream_name":"stdout","time":25.160896403,"data":"RUN ['k5_trees.py', '--workers', '4', '--models', 'groot', '--seed', '2', '--out', 'conf_groot_nf_ugr16_s2.csv']\n"}
+,{"stream_name":"stderr","time":42.697435655,"data":"concurrent.futures.process._RemoteTraceback: \n"}
+,{"stream_name":"stderr","time":42.697475802,"data":"\"\"\"\n"}
+,{"stream_name":"stderr","time":42.69750262,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":42.697506789,"data":"  File \"/usr/lib/python3.13/concurrent/futures/process.py\", line 254, in _process_worker\n"}
+,{"stream_name":"stderr","time":42.697510685,"data":"    r = call_item.fn(*call_item.args, **call_item.kwargs)\n"}
+,{"stream_name":"stderr","time":42.697514681,"data":"  File \"/kaggle/working/w/scripts/k5_trees.py\", line 228, in job\n"}
+,{"stream_name":"stderr","time":42.697519179,"data":"    m = groot(z) if name == \"groot\" else \\\n"}
+,{"stream_name":"stderr","time":42.697523182,"data":"        ~~~~~^^^\n"}
+,{"stream_name":"stderr","time":42.697527092,"data":"  File \"/kaggle/working/w/scripts/k5_trees.py\", line 82, in groot\n"}
+,{"stream_name":"stderr","time":42.697531605,"data":"    return GrootRF(z[\"bi\"], n_estimators=50, max_depth=10, one_adversarial_class=True, random_state=SEED,\n"}
+,{"stream_name":"stderr","time":42.697535891,"data":"           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":42.697539767,"data":"                   n_jobs=1).fit(X[idx], att[idx].astype(int), am)\n"}
+,{"stream_name":"stderr","time":42.6975447,"data":"                   ^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":42.697547367,"data":"  File \"/kaggle/working/w/scripts/k5_trees.py\", line 42, in __init__\n"}
+,{"stream_name":"stderr","time":42.69757276,"data":"    from groot.model import GrootRandomForestClassifier\n"}
+,{"stream_name":"stderr","time":42.69757629,"data":"ModuleNotFoundError: No module named 'groot'\n"}
+,{"stream_name":"stderr","time":42.697578819,"data":"\"\"\"\n"}
+,{"stream_name":"stderr","time":42.697880689,"data":"\n"}
+,{"stream_name":"stderr","time":42.697900497,"data":"The above exception was the direct cause of the following exception:\n"}
+,{"stream_name":"stderr","time":42.697906301,"data":"\n"}
+,{"stream_name":"stderr","time":42.697910469,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":42.698849552,"data":"  File \"/kaggle/working/w/scripts/k5_trees.py\", line 304, in \u003cmodule\u003e\n"}
+,{"stream_name":"stderr","time":42.698875135,"data":"    main()\n"}
+,{"stream_name":"stderr","time":42.698883660999996,"data":"    ~~~~^^\n"}
+,{"stream_name":"stderr","time":42.698887881,"data":"  File \"/kaggle/working/w/scripts/k5_trees.py\", line 293, in main\n"}
+,{"stream_name":"stderr","time":42.698891744,"data":"    r = fu.result()\n"}
+,{"stream_name":"stderr","time":42.698895561,"data":"  File \"/usr/lib/python3.13/concurrent/futures/_base.py\", line 453, in result\n"}
+,{"stream_name":"stderr","time":42.698916129,"data":"    return self.__get_result()\n"}
+,{"stream_name":"stderr","time":42.698920477,"data":"           ~~~~~~~~~~~~~~~~~^^\n"}
+,{"stream_name":"stderr","time":42.698924309,"data":"  File \"/usr/lib/python3.13/concurrent/futures/_base.py\", line 402, in __get_result\n"}
+,{"stream_name":"stderr","time":42.698928247,"data":"    raise self._exception\n"}
+,{"stream_name":"stderr","time":42.698932111,"data":"ModuleNotFoundError: No module named 'groot'\n"}
+,{"stream_name":"stdout","time":43.615730077,"data":"RC 1 ['k5_trees.py', '--workers', '4', '--models', 'groot', '--seed', '2', '--out', 'conf_groot_nf_ugr16_s2.csv']\n"}
+,{"stream_name":"stdout","time":43.615769383,"data":"RUN ['k5_trees.py', '--workers', '4', '--models', 'groot', '--seed', '3', '--out', 'conf_groot_nf_ugr16_s3.csv']\n"}
+,{"stream_name":"stderr","time":59.236362367,"data":"concurrent.futures.process._RemoteTraceback: \n"}
+,{"stream_name":"stderr","time":59.236407955,"data":"\"\"\"\n"}
+,{"stream_name":"stderr","time":59.236415709,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":59.236420872,"data":"  File \"/usr/lib/python3.13/concurrent/futures/process.py\", line 254, in _process_worker\n"}
+,{"stream_name":"stderr","time":59.236426167,"data":"    r = call_item.fn(*call_item.args, **call_item.kwargs)\n"}
+,{"stream_name":"stderr","time":59.23643146,"data":"  File \"/kaggle/working/w/scripts/k5_trees.py\", line 228, in job\n"}
+,{"stream_name":"stderr","time":59.236437153,"data":"    m = groot(z) if name == \"groot\" else \\\n"}
+,{"stream_name":"stderr","time":59.236442322,"data":"        ~~~~~^^^\n"}
+,{"stream_name":"stderr","time":59.236447065,"data":"  File \"/kaggle/working/w/scripts/k5_trees.py\", line 82, in groot\n"}
+,{"stream_name":"stderr","time":59.23645221,"data":"    return GrootRF(z[\"bi\"], n_estimators=50, max_depth=10, one_adversarial_class=True, random_state=SEED,\n"}
+,{"stream_name":"stderr","time":59.236457509,"data":"           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":59.236461255,"data":"                   n_jobs=1).fit(X[idx], att[idx].astype(int), am)\n"}
+,{"stream_name":"stderr","time":59.23646433,"data":"                   ^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":59.236467424,"data":"  File \"/kaggle/working/w/scripts/k5_trees.py\", line 42, in __init__\n"}
+,{"stream_name":"stderr","time":59.236471477,"data":"    from groot.model import GrootRandomForestClassifier\n"}
+,{"stream_name":"stderr","time":59.236494981,"data":"ModuleNotFoundError: No module named 'groot'\n"}
+,{"stream_name":"stderr","time":59.236502782,"data":"\"\"\"\n"}
+,{"stream_name":"stderr","time":59.236511984,"data":"\n"}
+,{"stream_name":"stderr","time":59.236517073,"data":"The above exception was the direct cause of the following exception:\n"}
+,{"stream_name":"stderr","time":59.236521899,"data":"\n"}
+,{"stream_name":"stderr","time":59.236567881,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":59.237431805,"data":"  File \"/kaggle/working/w/scripts/k5_trees.py\", line 304, in \u003cmodule\u003e\n"}
+,{"stream_name":"stderr","time":59.23745601,"data":"    main()\n"}
+,{"stream_name":"stderr","time":59.23746249,"data":"    ~~~~^^\n"}
+,{"stream_name":"stderr","time":59.237467251,"data":"  File \"/kaggle/working/w/scripts/k5_trees.py\", line 293, in main\n"}
+,{"stream_name":"stderr","time":59.237472707,"data":"    r = fu.result()\n"}
+,{"stream_name":"stderr","time":59.237618114,"data":"  File \"/usr/lib/python3.13/concurrent/futures/_base.py\", line 453, in result\n"}
+,{"stream_name":"stderr","time":59.23762717,"data":"    return self.__get_result()\n"}
+,{"stream_name":"stderr","time":59.237630995,"data":"           ~~~~~~~~~~~~~~~~~^^\n"}
+,{"stream_name":"stderr","time":59.237634747,"data":"  File \"/usr/lib/python3.13/concurrent/futures/_base.py\", line 402, in __get_result\n"}
+,{"stream_name":"stderr","time":59.23763848,"data":"    raise self._exception\n"}
+,{"stream_name":"stderr","time":59.237642834,"data":"ModuleNotFoundError: No module named 'groot'\n"}
+,{"stream_name":"stdout","time":60.019241981,"data":"RC 1 ['k5_trees.py', '--workers', '4', '--models', 'groot', '--seed', '3', '--out', 'conf_groot_nf_ugr16_s3.csv']\n"}
+,{"stream_name":"stdout","time":60.019276495,"data":"RUN ['k5_trees.py', '--workers', '4', '--models', 'groot', '--seed', '4', '--out', 'conf_groot_nf_ugr16_s4.csv']\n"}
+,{"stream_name":"stderr","time":75.548620488,"data":"concurrent.futures.process._RemoteTraceback: \n"}
+,{"stream_name":"stderr","time":75.548660428,"data":"\"\"\"\n"}
+,{"stream_name":"stderr","time":75.548672686,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":75.548676784,"data":"  File \"/usr/lib/python3.13/concurrent/futures/process.py\", line 254, in _process_worker\n"}
+,{"stream_name":"stderr","time":75.548680791,"data":"    r = call_item.fn(*call_item.args, **call_item.kwargs)\n"}
+,{"stream_name":"stderr","time":75.548684899,"data":"  File \"/kaggle/working/w/scripts/k5_trees.py\", line 228, in job\n"}
+,{"stream_name":"stderr","time":75.548692348,"data":"    m = groot(z) if name == \"groot\" else \\\n"}
+,{"stream_name":"stderr","time":75.548696105,"data":"        ~~~~~^^^\n"}
+,{"stream_name":"stderr","time":75.548699756,"data":"  File \"/kaggle/working/w/scripts/k5_trees.py\", line 82, in groot\n"}
+,{"stream_name":"stderr","time":75.54870362,"data":"    return GrootRF(z[\"bi\"], n_estimators=50, max_depth=10, one_adversarial_class=True, random_state=SEED,\n"}
+,{"stream_name":"stderr","time":75.548707688,"data":"           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":75.548711637,"data":"                   n_jobs=1).fit(X[idx], att[idx].astype(int), am)\n"}
+,{"stream_name":"stderr","time":75.54871535,"data":"                   ^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":75.548719049,"data":"  File \"/kaggle/working/w/scripts/k5_trees.py\", line 42, in __init__\n"}
+,{"stream_name":"stderr","time":75.548724021,"data":"    from groot.model import GrootRandomForestClassifier\n"}
+,{"stream_name":"stderr","time":75.548727204,"data":"ModuleNotFoundError: No module named 'groot'\n"}
+,{"stream_name":"stderr","time":75.548729828,"data":"\"\"\"\n"}
+,{"stream_name":"stderr","time":75.549025617,"data":"\n"}
+,{"stream_name":"stderr","time":75.549053915,"data":"The above exception was the direct cause of the following exception:\n"}
+,{"stream_name":"stderr","time":75.54905908,"data":"\n"}
+,{"stream_name":"stderr","time":75.549067154,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":75.549879108,"data":"  File \"/kaggle/working/w/scripts/k5_trees.py\", line 304, in \u003cmodule\u003e\n"}
+,{"stream_name":"stderr","time":75.549914902,"data":"    main()\n"}
+,{"stream_name":"stderr","time":75.549920026,"data":"    ~~~~^^\n"}
+,{"stream_name":"stderr","time":75.549924138,"data":"  File \"/kaggle/working/w/scripts/k5_trees.py\", line 293, in main\n"}
+,{"stream_name":"stderr","time":75.549928641,"data":"    r = fu.result()\n"}
+,{"stream_name":"stderr","time":75.549948007,"data":"  File \"/usr/lib/python3.13/concurrent/futures/_base.py\", line 453, in result\n"}
+,{"stream_name":"stderr","time":75.549952267,"data":"    return self.__get_result()\n"}
+,{"stream_name":"stderr","time":75.549956105,"data":"           ~~~~~~~~~~~~~~~~~^^\n"}
+,{"stream_name":"stderr","time":75.549960258,"data":"  File \"/usr/lib/python3.13/concurrent/futures/_base.py\", line 402, in __get_result\n"}
+,{"stream_name":"stderr","time":75.549964225,"data":"    raise self._exception\n"}
+,{"stream_name":"stderr","time":75.54996842,"data":"ModuleNotFoundError: No module named 'groot'\n"}
+,{"stream_name":"stdout","time":76.333470639,"data":"RC 1 ['k5_trees.py', '--workers', '4', '--models', 'groot', '--seed', '4', '--out', 'conf_groot_nf_ugr16_s4.csv']\n"}
+,{"stream_name":"stderr","time":79.446551977,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":79.446590379,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":79.946446076,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":79.946471819,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":81.147722081,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":82.926429284,"data":"[NbConvertApp] Writing 282563 bytes to __results__.html\n"}
+]
