@@ -37,7 +37,7 @@ All of these are from pre-registered tests, with m = 10 flows per key per 240 s.
 | Does the certificate hold? | 0 injection-caused blocks over 72 attack patterns, an adaptive attacker and a white-box per-flow optimiser, on all datasets |
 | What does it cost? | Veto's clean block rate is 0.55 / 2.0 / 1.33% of host-days (CTU-13 / UGR'16 / CIC), with 95% intervals containing the 1% budget. ToN-IoT drifts to 4.0% |
 | Versus certified trees? | Veto leads robust-trained trees with an exact MILP verifier by +0.104 [0.051, 0.166] under the proof rule. Under the "undecided = blocked" convention the lead is +0.030, not significant |
-| On a $5 gateway? | Inline on an ESP32 access point: 29 / 59 ms per flow, 117 KB heap. An ordinary IPS cuts the sensor off under attack; Veto keeps it online within budget and blocks over budget |
+| On a $5 gateway? | Inline on an ESP32 access point: 29 / 59 ms per flow, 117 KB heap. In monitor mode a within-budget spoof lifts the sensor over the threshold (an ordinary IPS would block it) while Veto's certified bound keeps it online; over budget Veto blocks too. In enforce the /24 shared-key attack is blunted within budget (it bites only over budget) and the spoof path is not stageable on our lab AP — matching the offline /24 result |
 
 What it does not do (all reported in the paper and in `PREREG.md`):
 
@@ -46,7 +46,8 @@ What it does not do (all reported in the paper and in `PREREG.md`):
 - padding the attacker's own context hides it on CTU-13 (a flow-only second channel fixes this, at a cost on CIC);
 - the attack failed on UNSW-NB15;
 - trees are not costlier to certify;
-- Veto does not beat trees on clean detection.
+- Veto does not beat trees on clean detection;
+- on real hardware the /24 (NAT) shared-key attack is weaker within budget than per-IP keying, and the spoof path is not stageable in enforce on a standard access point (source-IP anti-spoofing), so the live demonstration is sharpest with per-device keys.
 
 ## Reproducing the key results
 
