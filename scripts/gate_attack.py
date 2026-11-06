@@ -46,6 +46,31 @@ G = {"family": "mlp", "enc": "raw", "e": 2, "w": 64, "depth": 2, "sn": 0, "act":
      "kd": 0.5, "syn": 0.5, "ls": 0.0, "focal": 2.0, "lr": 0.003, "clip": 1, "gate": 1, "cert": 4, "rdet": 4}
 
 
+def mono_det(Xf, yf, bi, cols, nb, box, tiny=False):
+    """Binary XGB (same hyperparameters as models.xgb, or the device-fitting 40x4 tiny config if tiny=True) with
+    s = -log P(benign) monotone in every context column, the direction set by the sign of the column's correlation
+    with 'attack' on the fit rows. min of s over the box is then s at the corner (lo where s rises, hi where it
+    falls): exact, one model call."""
+    from xgboost import XGBClassifier
+    y = (yf != bi).astype(int)
+    hc = np.array([c.startswith("hc_") and i not in nb for i, c in enumerate(cols)])
+    r = np.array([np.corrcoef(Xf[:, j], y)[0, 1] if hc[j] and Xf[:, j].std() > 0 else 0.0 for j in range(len(cols))])
+    d = np.where(hc, np.where(np.nan_to_num(r) < 0, -1, 1), 0)
+    ntree, depth = (40, 4) if tiny else (300, 8)  # tiny = the size-matched device-fitting config (~23 KB)
+    md = XGBClassifier(n_estimators=ntree, max_depth=depth, learning_rate=0.1, tree_method="hist", n_jobs=-1,
+                       random_state=sa.SEED, monotone_constraints="(" + ",".join(map(str, d)) + ")").fit(Xf, y)
+    s = lambda X: -np.log(np.maximum(md.predict_proba(X)[:, 0], 1e-45))  # noqa: E731
+    def lower(X):
+        lo, hi = box(X)
+        fixed = ~hc & ~np.isin(np.arange(len(cols)), nb)  # bytes columns: box [0, inf) but every input zeroes them
+        assert np.allclose(lo[:, fixed], hi[:, fixed]) and (X[:, nb] == 0).all(), "box moves a non-context column"
+        return s(np.where(d > 0, lo, np.where(d < 0, hi, X)).astype(np.float32))
+    Xt = Xf[:2000]
+    assert (lower(Xt) <= s(Xt) + 1e-6).all(), "corner bound above the score"
+    print(f"MONO: {int((d > 0).sum())} up, {int((d < 0).sum())} down of {int(hc.sum())} context columns", flush=True)
+    return s, lower
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("dataset")
@@ -69,6 +94,12 @@ def main():
     ap.add_argument("--opt-harm", action="store_true")  # M6: per-flow white-box optimiser attacker (feature space)
     ap.add_argument("--dilute", type=int, nargs="*")  # C3: attacker pads its own src key with P benign flows / 120 s
     ap.add_argument("--opt-gap", action="store_true")  # OPT-GAP: framing witnesses on alarmed-not-blocked test rows
+    ap.add_argument("--mono", action="store_true")  # MONO: monotone-constrained XGB, exact corner certificate
+    ap.add_argument("--mono-tiny", action="store_true")  # MONO-TINY: size-matched monotone model
+    ap.add_argument("--nat", type=int, default=1)  # NAT: K victim addresses share one key
+    ap.add_argument("--recal", type=float, default=0.0)  # RECAL: tau from the earliest q of test benign traffic
+    ap.add_argument("--per-family", action="store_true")  # LOWRATE-CLASS: throttle readout per attack family
+    ap.add_argument("--m-cert", type=int, nargs="*", default=[])  # FRONTIER: same B certified at extra budgets m0
     ap.add_argument("--rekey", type=int, default=0)  # shared-key (NAT) attacker: N draws of real bot flows re-keyed
     a = ap.parse_args()
     g = (conf_clean.A if a.champion_a else G) | json.loads(a.genome)
@@ -106,6 +137,13 @@ def main():
             "rf": (lambda X: nl(rf.predict_proba(X)[:, bi]), lambda X: ct.rf_lower(rf, *bowl.dbox(z, X, a.m), bi)),
             "xgb": (lambda X: nl(xg.predict_proba(X)[:, bi]),
                     lambda X: ct.xgb_upper(xg, *bowl.dbox(z, X, a.m), bi, z["k"], lower=True))}
+    for m0 in a.m_cert:  # FRONTIER: block iff the certified radius >= m0 (same model and tau as gated_net)
+        dets[f"veto_m{m0}"] = (dets["gated_net"][0], (lambda m0: lambda X: fx.score_lower(
+            m, *bowl.dbox(z, X, m0), bi, g["head"]))(m0))
+    if a.mono:  # MONO baseline: binary XGB monotone in every context column -> exact certificate at the box corner
+        dets["mono"] = mono_det(Xf, yf, bi, cols, nb, lambda X: bowl.dbox(z, X, a.m))
+    if a.mono_tiny:  # MONO-TINY: size-matched (40x4, ~23 KB) monotone model, the device-fitting comparison
+        dets["mono_tiny"] = mono_det(Xf, yf, bi, cols, nb, lambda X: bowl.dbox(z, X, a.m), tiny=True)
     if a.no_gate:
         dets["b_nogate"] = (dets["gated_net"][0], dets["gated_net"][0])
     if a.at:  # PREREG §9 K18: same genome, PGD adversarial training in the same boxes instead of interval bounds
@@ -122,6 +160,17 @@ def main():
     if a.tau_day and not a.clean_only:  # CONF C3: block tau per the HOSTDAY outcome
         ck = meta["src"][cal].astype(np.int64) * hs.MUL + meta["t"][cal] // hs.DAY_MS
         tau = {n: float(hs.threshold(hs.day_max(ck, f(Xcal)))) for n, (f, _) in dets.items()}
+    recal_cut = None
+    if a.recal:  # RECAL: tau from the earliest q of test-period benign traffic; victims only after that cut
+        tb = bank.test_benign
+        recal_cut = float(np.quantile(meta["t"][tb], a.recal))
+        rec = tb[(meta["t"][tb] < recal_cut) & benign_host[meta["src"][tb]]]
+        ck = meta["src"][rec].astype(np.int64) * hs.MUL + meta["t"][rec] // hs.DAY_MS
+        Xr = tx(bank.frame(rec, ()))
+        tau0 = tau
+        tau = {n: float(hs.threshold(hs.day_max(ck, f(Xr)))) for n, (f, _) in dets.items()}
+        dets["gated_net_c0"], tau["gated_net_c0"] = dets["gated_net"], tau0["gated_net"]  # same days, original tau
+        print(f"RECAL q={a.recal}: {len(rec)} rows, tau", json.dumps({n: round(v, 4) for n, v in tau.items()}), flush=True)
     for sg in a.smooth:  # PREREG §9 RS: randomized smoothing, block iff the certified L2 radius covers the deletion box
         ms, hs_, _ = bowl.run_pair(g | {"cert": 0, "rdet": 0, "gnoise": sg}, z, "cpu", sa.SEED, 30)
         ck = meta["src"][cal].astype(np.int64) * hs.MUL + meta["t"][cal] // hs.DAY_MS
@@ -152,6 +201,9 @@ def main():
         opt_gap(a, bank, light, held, tx, *dets["gated_net"], tau["gated_net"])
         return
     rows, key = sa.victims(bank, meta)
+    if recal_cut is not None:
+        keep = meta["t"][rows] >= recal_cut
+        rows, key = rows[keep], key[keep]
     raw_rows = bank.kept[rows]
     V = light.iloc[raw_rows]
     S_idx = np.flatnonzero((light.IPV4_SRC_ADDR.isin(set(V.IPV4_SRC_ADDR))
@@ -159,6 +211,14 @@ def main():
     S = light.iloc[S_idx].reset_index(drop=True)
     vmask = np.isin(S_idx, raw_rows)
     base = bank.frame(rows, ())
+    if a.nat > 1:  # NAT: victim source addresses in random groups of K share one key (co-tenant benign devices)
+        ips = np.random.default_rng([3, a.nat]).permutation(np.unique(V.IPV4_SRC_ADDR.to_numpy()))
+        gmap = {ip: ips[i - i % a.nat] for i, ip in enumerate(ips)}
+        for c in ("IPV4_SRC_ADDR", "IPV4_DST_ADDR"):
+            S[c] = S[c].map(lambda v: gmap.get(v, v))
+        V = V.assign(IPV4_SRC_ADDR=V.IPV4_SRC_ADDR.map(gmap), IPV4_DST_ADDR=V.IPV4_DST_ADDR.map(lambda v: gmap.get(v, v)))
+        base[hostctx.COLS] = sa.host_context(S, light.iloc[:0], vmask)  # merged clean context: the new ground truth
+        print(f"NAT K={a.nat}: {len(ips)} victim addresses -> {len(set(gmap.values()))} keys", flush=True)
     H0 = sa.host_context(S, light.iloc[:0], vmask)
     bad = ~np.isclose(H0, base[hostctx.COLS].to_numpy(), rtol=1e-4, atol=1e-3)
     if bad.any():  # say where before failing
@@ -571,6 +631,11 @@ def throttle(a, bank, light, meta, dets, tau, tx, held, harm):
             r[f"{n}_tpr_macro"] = np.nanmean([r[f"{n}_tpr_unk"], r[f"{n}_tpr_known"]])
             r[f"{n}_btpr_macro"] = np.nanmean([r[f"{n}_btpr_unk"], r[f"{n}_btpr_known"]])
             r[f"{n}_clean_block_day"] = harm[n]
+            if a.per_family and (n == "gated_net" or n.startswith("veto_m")):  # LOWRATE-CLASS: per attack family
+                fk = bank.fam[rows][kt]
+                for fm in np.unique(fk):
+                    r[f"{n}_btpr_fam_{fm}"] = float((lb[fk == fm] > tau[n]).mean())
+                    r[f"{n}_kept_fam_{fm}"] = float(kt[bank.fam[rows] == fm].mean())
         res.append(r)
         print(json.dumps({q: round(v, 4) if isinstance(v, float) else v for q, v in r.items()}), flush=True)
     pd.DataFrame(res).to_csv(sa.out(f"gate_throttle_{a.dataset}{'_' + a.tag if a.tag else ''}.csv"), index=False)

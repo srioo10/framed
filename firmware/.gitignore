@@ -2,3 +2,6 @@ build/
 sdkconfig
 sdkconfig.old
 managed_components/
+sdkconfig.sk*
+build_sk*/
+sdkconfig.shed

@@ -40,15 +40,17 @@ All of these are from pre-registered tests, with m = 10 flows per key per 240 s.
 | Is the threat real? | Spoofed context makes published detectors (Kitsune-style, HorusEye-style, Deep SAD, iForest) and plain RF / XGBoost block 88–100% of innocent host-days on CTU-13 and UGR'16 |
 | Without spoofing? | Shared-key, established-only injection: RF / XGBoost 9.4 / 13.8% of host-days on CTU-13, 92 / 98% on UGR'16 |
 | On the original Kitsune code? | Unmodified Kitsune-py on its own Mirai capture: 13 of 13 victims alarmed (2 of 13 clean), both spoofed and shared-key. Single-packet flows were not enough (5 of 13, reported as a failure) |
-| How close to the best frame-proof rule? | Veto blocks at least 96% of what any frame-proof rule could block (framing-witness search; CTU-13, UGR'16, CIC) |
+| How close to the best frame-proof rule? | Veto blocks at least 96% of what the optimal frame-proof rule for the same detector could block (framing-witness search; CTU-13, UGR'16, CIC). Optimality is relative to Veto's own score |
 | Does the certificate hold? | 0 injection-caused blocks over 72 attack patterns, an adaptive attacker and a white-box per-flow optimiser, on all datasets |
 | What does it cost? | Veto's clean block rate is 0.55 / 2.0 / 1.33% of host-days (CTU-13 / UGR'16 / CIC), with 95% intervals containing the 1% budget. ToN-IoT drifts to 4.0% |
-| Versus certified trees? | A certified tree ensemble that fits the same chip (23 KB) trails Veto by 0.159 [0.099, 0.220]. Veto leads full-size certified forests (0.5–17 MB) by +0.104 [0.051, 0.166] under the proof rule; under the "undecided = blocked" convention the lead is +0.030, not significant |
-| On a $15 gateway? | Inline on an ESP32 access point: 29 / 59 ms per flow, 117 KB heap. An ordinary IPS cuts the sensor off under attack; Veto keeps it online within budget and blocks over budget |
+| Versus certified trees? | A certified tree ensemble that fits the same chip (23 KB) trails Veto by 0.159 [0.099, 0.220]. Veto leads full-size certified forests (0.5–17 MB) by +0.104 [0.051, 0.166] under the proof rule; under the "undecided = blocked" convention the lead is +0.030, not significant. With both sides on fast per-tree bounds (the deployable pairing), Veto leads by +0.128 [0.079, 0.182] |
+| Versus a monotone model? | An exact-certified monotone gradient-boosted model (minimum = score at the box corner) ties Veto on certified detection on two of three datasets and wins on CTU-13, but it is 0.5–1.1 MB (does not fit the chip) and its alarms flood under attack (30% of innocent host-days on UGR'16, vs 3% for Veto) |
+| On a $15 gateway? | Inline on an ESP32 access point: 29 / 59 ms per flow, 117 KB heap. An ordinary IPS cuts the sensor off under attack; Veto keeps it online within budget and blocks over budget. An over-rate pre-filter closes the fail-open hole on hardware: under a 10× flood the gateway forwards zero flows unscored (was ~34,500/run), sheds 81% of the flood, and keeps the innocent sensor scored and unblocked |
 
 What it does not do (all reported in the paper and in `PREREG.md`):
 
 - an attacker far over the budget can still cause blocks (20–66% of host-days at 5–10× the budget);
+- a flood spread across many source keys can still saturate the gateway (the single-source fail-open hole is closed by an over-rate pre-filter; distributed floods are not covered);
 - a low-rate attacker looks like a spoofer, and no context certificate can block it on context alone (Proposition 1);
 - padding the attacker's own context hides it on CTU-13 (a flow-only second channel fixes this, at a cost on CIC);
 - the attack failed on UNSW-NB15;

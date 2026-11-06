@@ -40,6 +40,16 @@ menu "Veto gateway"
     config GW_BLOCK_TTL_S
         int "Block duration (s)"
         default 300
+    config GW_SHED
+        bool "Shed over-rate sources when the decision queue is over half full (fail-open fix)"
+        default n
+    config GW_SHED_C
+        int "Shed threshold: flows opened per source per 10 s"
+        depends on GW_SHED
+        default 50
+    config GW_KEY_PREFIX24
+        bool "Key host context by /24 prefix (shared-key test: clients on one subnet share a context, as behind NAT)"
+        default n
     config GW_HOSTS
         int "Host-context table slots (power of two)"
         default 32

@@ -47,7 +47,26 @@ typedef struct { uint8_t used, proto, fin; uint8_t flags; uint32_t cip, sip; uin
                  int64_t start, last; uint32_t ib, ob, ipk, opk; } Flow;
 
 static QueueHandle_t q;
-static volatile uint32_t qdrop, bdrop, npk;
+static volatile uint32_t qdrop, bdrop, npk, nshed;
+#ifdef CONFIG_GW_SHED
+/* SHED (PREREG 2026-11-06): under saturation, drop packets of sources that opened more than GW_SHED_C flows in the
+ * current 10 s. Such a source is far over the certified budget, where frame-proofness never applied; within-rate
+ * sources keep the queue. A distributed flood (many sources each under C) still saturates: disclosed, not fixed. */
+#define NSRC 32
+static uint32_t sh_ip[NSRC], sh_n[NSRC];
+static int64_t sh_t0[NSRC];
+static int shed(uint32_t src, int64_t t, int opens) {
+  if (!opens) return 0;  /* only new-connection packets (SYN / connectionless) drive shedding; return traffic
+    (RST, SYN-ACK) never resets a counter and is never shed, so an over-rate source sharing a hash slot with the
+    always-active upstream cannot thrash the slot to zero. */
+  int i = (src * 2654435761u) >> (32 - 5);  /* Knuth multiplicative hash -> 5-bit slot (NSRC=32); mixes all octets
+    so lab /24 addresses (all first-octet 192) do not collapse to one slot. shortcut: a same-slot collision between
+    two SYN-sending sources resets the counter (errs toward not shedding). Keep NSRC a power of two = 32. */
+  if (sh_ip[i] != src || t - sh_t0[i] >= 10000) { sh_ip[i] = src; sh_t0[i] = t; sh_n[i] = 0; }
+  sh_n[i] += opens;
+  return sh_n[i] > CONFIG_GW_SHED_C && uxQueueMessagesWaiting(q) > 256;
+}
+#endif
 static volatile uint32_t blk_ip[NBLK];
 static volatile int64_t blk_until[NBLK];
 static Flow fl[NFLOW];
@@ -80,6 +99,9 @@ int gw_ip4_input_hook(struct pbuf *p, struct netif *inp) {
     if (k.proto == 6 && p->len >= ihl + 14) k.flags = h[ihl + 13];
   }
   npk++;
+#ifdef CONFIG_GW_SHED
+  if (shed(k.src, k.t, k.proto != 6 || (k.flags & 0x12) == 0x02)) { nshed++; pbuf_free(p); return 1; }
+#endif
   if (xQueueSend(q, &k, 0) != pdTRUE) qdrop++;
   return 0;
 }
@@ -112,7 +134,13 @@ static void decide(Flow *f, int64_t tc, const char *why) {
   raw[3] = f->ib; raw[4] = f->ob; raw[5] = f->ipk; raw[6] = f->opk;
   Host *hs, *hd;
   int64_t t0 = esp_timer_get_time();
-  hc_flow(&T, hc_fnv(cs), hc_fnv(ss), tc, f->sport, f->opk, f->ib, raw + c->F, &hs, &hd);
+#ifdef CONFIG_GW_KEY_PREFIX24
+  char kc[16], ks[16];  /* host key = a.b.c.0: every client in the /24 shares one context (PREREG LIVE-SK) */
+  ipstr(f->cip & 0x00ffffffu, kc); ipstr(f->sip & 0x00ffffffu, ks);
+#else
+  const char *kc = cs, *ks = ss;
+#endif
+  hc_flow(&T, hc_fnv(kc), hc_fnv(ks), tc, f->sport, f->opk, f->ib, raw + c->F, &hs, &hd);
   cb_prep(c, raw, x);
   double s = cb_score(c, x), lower = -INFINITY;
   int alarm = s > TAU, blk = 0;
@@ -195,6 +223,7 @@ static void ids_task(void *arg) {
              (unsigned)esp_get_minimum_free_heap_size(), (unsigned long)npk, (unsigned long)qdrop,
              (unsigned long)bdrop, open, T.evictions, (unsigned long)nevict_flow, (unsigned long)nflow,
              (unsigned long)nalarm, (unsigned long)nblock, (unsigned long)nabst);
+      printf("Q,%lld,%lu,%lu\n", t, (unsigned long)qdrop, (unsigned long)nshed);
       next_stat = t + 10000;
     }
   }
