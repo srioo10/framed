@@ -15,8 +15,14 @@ The attacker never touches the victim's own traffic. Two paths work:
   handshake or source-validation filters do not help.
 - **Spoofed one-way flows,** where source validation is missing.
 
-Veto is a small detector (a TabM ensemble of 8 members, 3.6 KB as int8) that blocks a flow only when it can prove the
-block is not the attacker's doing. For each flow it computes the set of all clean contexts consistent with what it
+We call a block rule **m-frame-proof** if an attacker who adds at most m flows per host key per 240 s can never cause a
+block that the clean traffic would not have caused. No existing detector we test is frame-proof. The best possible
+frame-proof rule blocks a flow only if it looks like an attack in every clean world consistent with what the IPS
+observed (Theorem 3). A consequence is that no frame-proof rule can block a source that stays within the budget on
+its context alone.
+
+Veto is a small detector (a TabM ensemble of 8 members, 3.6 KB as int8) that relaxes that rule into something a
+microcontroller can compute. It blocks a flow only when it can prove the block is not the attacker's doing. For each flow it computes the set of all clean contexts consistent with what it
 observes, given at most m injected flows per host key per 240 s (the deletion box, Theorem 1). It then bounds its
 score over that whole box with interval bound propagation (Theorem 2). It blocks only if the lower bound clears the
 threshold. Otherwise it raises an alarm without blocking. Injection within the budget therefore cannot cause a
@@ -34,9 +40,10 @@ All of these are from pre-registered tests, with m = 10 flows per key per 240 s.
 | Is the threat real? | Spoofed context makes published detectors (Kitsune-style, HorusEye-style, Deep SAD, iForest) and plain RF / XGBoost block 88–100% of innocent host-days on CTU-13 and UGR'16 |
 | Without spoofing? | Shared-key, established-only injection: RF / XGBoost 9.4 / 13.8% of host-days on CTU-13, 92 / 98% on UGR'16 |
 | On the original Kitsune code? | Unmodified Kitsune-py on its own Mirai capture: 13 of 13 victims alarmed (2 of 13 clean), both spoofed and shared-key. Single-packet flows were not enough (5 of 13, reported as a failure) |
+| How close to the best frame-proof rule? | Veto blocks at least 96% of what any frame-proof rule could block (framing-witness search; CTU-13, UGR'16, CIC) |
 | Does the certificate hold? | 0 injection-caused blocks over 72 attack patterns, an adaptive attacker and a white-box per-flow optimiser, on all datasets |
 | What does it cost? | Veto's clean block rate is 0.55 / 2.0 / 1.33% of host-days (CTU-13 / UGR'16 / CIC), with 95% intervals containing the 1% budget. ToN-IoT drifts to 4.0% |
-| Versus certified trees? | Veto leads robust-trained trees with an exact MILP verifier by +0.104 [0.051, 0.166] under the proof rule. Under the "undecided = blocked" convention the lead is +0.030, not significant |
+| Versus certified trees? | A certified tree ensemble that fits the same chip (23 KB) trails Veto by 0.159 [0.099, 0.220]. Veto leads full-size certified forests (0.5–17 MB) by +0.104 [0.051, 0.166] under the proof rule; under the "undecided = blocked" convention the lead is +0.030, not significant |
 | On a $15 gateway? | Inline on an ESP32 access point: 29 / 59 ms per flow, 117 KB heap. An ordinary IPS cuts the sensor off under attack; Veto keeps it online within budget and blocks over budget |
 
 What it does not do (all reported in the paper and in `PREREG.md`):
@@ -61,6 +68,7 @@ loaders and leak-free cleaning are in `src/nids/`.
 | Padding | same, with `--dilute 0 10 30 100 300 1000` | `dilute_*.csv` |
 | Native Kitsune | `python -I scripts/kitsune_native.py <tsv> 0x1 30x3` (add `r` for shared-key, `30x3r`) | `kitsune_native_*.json` |
 | Certified trees (exact MILP) | `python scripts/k5_trees.py` | `k5_*.csv` |
+| Gap to the optimal frame-proof rule | same as the first row, with `--opt-gap` | `opt_gap_*.csv` |
 | Harm intervals | `python scripts/harm_ci.py` | `harm_ci.json` |
 
 Native Kitsune needs `git clone https://github.com/ymirsky/Kitsune-py third_party/Kitsune-py` (we used commit

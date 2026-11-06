@@ -34,6 +34,12 @@ from nids import hostctx, load, models  # noqa: E402
 SEED, N_DAYS, BUDGET_MS = 1, 300, 240_000
 COLS = ["FLOW_START_MILLISECONDS", "IPV4_SRC_ADDR", "IPV4_DST_ADDR", "L4_DST_PORT", "OUT_PKTS", "IN_BYTES"]
 OUT = ROOT / "results" / "cert"
+
+
+def out(name):
+    """Result path; /24 runs (NIDS_KEY_PREFIX=24) get an _rk24 suffix so they never overwrite the per-IP files."""
+    p = Path(name)
+    return OUT / f"{p.stem}{'_rk24' if hostctx.KEY_PREFIX == 24 else ''}{p.suffix}"
 PUB = ["kitnet", "iforest", "horuseye", "deep_sad", "cade", "kitnet_online", "horuseye_online"]  # PREREG §9 BSAN
 
 
@@ -46,7 +52,8 @@ def setup(ds):
     cache = load.CACHE / f"{ds}.parquet"  # read only the 6 columns (the full 57-column NF-ToN frame is ~10 GB)
     raw = pd.read_parquet(cache, columns=COLS) if cache.exists() else load.LOADERS[ds]()
     light = pd.DataFrame({c: raw[c].to_numpy() for c in COLS})
-    light["IPV4_SRC_ADDR"], light["IPV4_DST_ADDR"] = (light[c].astype(str) for c in ("IPV4_SRC_ADDR", "IPV4_DST_ADDR"))
+    # host keys, not addresses: with NIDS_KEY_PREFIX=24 every attack (budget per key, re-keying) works on /24 keys
+    light["IPV4_SRC_ADDR"], light["IPV4_DST_ADDR"] = (hostctx.key_of(light[c]) for c in ("IPV4_SRC_ADDR", "IPV4_DST_ADDR"))
     del raw
     bank = sb.Bank(ds, SEED, "host", 40000, 200000)
     return light, bank
@@ -203,7 +210,7 @@ def main():
                   f"{time.time() - t0:.0f}s", flush=True)
     OUT.mkdir(parents=True, exist_ok=True)
     R = pd.DataFrame(res)
-    R.to_csv(OUT / f"k1_{'blind_' if a.blind else ''}{'' if pub is None else 'pub_' if pub is True else 'pub_' + '+'.join(pub) + '_'}{a.dataset}.csv", index=False)
+    R.to_csv(out(f"k1_{'blind_' if a.blind else ''}{'' if pub is None else 'pub_' if pub is True else 'pub_' + '+'.join(pub) + '_'}{a.dataset}.csv"), index=False)
     clean = R[R.m == 0].set_index("detector").ben_P
     best = R[R.m > 0].groupby("detector").ben_P.max()
     k1 = {d: bool(best[d] >= 0.10 and best[d] >= 5 * max(clean[d], 1e-9)) for d in best.index}

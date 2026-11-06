@@ -10,6 +10,8 @@ of the same key that started in [t - W, t) (strictly earlier; IPs are keys, neve
 Population = raw flows minus a removal set of families (the score bank's role rule), or, for the `host_iso` control,
 Benign plus the flow's own family only (no other attack family can light up a shared attacker host).
 """
+import os
+
 import numpy as np
 import pandas as pd
 
@@ -18,6 +20,20 @@ STATS = ("n", "fail", "newport", "newpeer", "bytes")
 COLS = [f"hc_{k}_{s}_{w // 1000}s" for w in WINDOWS_MS for k in ("src", "dst") for s in STATS]
 LONG_MS = (3_600_000, 86_400_000)  # PREREG §9 K7 long-memory host profile
 LONG_COLS = [f"hl_{k}_{s}_{w // 1000}s" for w in LONG_MS for k in ("src", "dst") for s in STATS]
+KEY_PREFIX = int(os.environ.get("NIDS_KEY_PREFIX", "0"))  # PREREG §9 REKEY24: 24 = host key is the /24, not the IP
+assert KEY_PREFIX in (0, 24), "only per-IP (0) and /24 keys are implemented"
+
+
+def key_of(ips):
+    """Host-context key of a Series of IPv4 addresses: the address string itself (default, unchanged), or a.b.c for
+    /24 keying (a CTU-13 scenario tag such as 's1:' stays attached, so hosts of different captures never share a key)."""
+    ips = ips.astype(str)
+    if KEY_PREFIX != 24:
+        return ips
+    u, inv = np.unique(ips.to_numpy(), return_inverse=True)  # map distinct addresses only (rows >> hosts)
+    u = pd.Series(u)
+    full = u.str.count(r"\.") == 3  # idempotent: the attack frame is keyed once, then passes through HostFlows
+    return pd.Series(u.where(~full, u.str.rpartition(".")[0]).to_numpy()[inv], index=ips.index)
 
 
 def _codes(*cols):
@@ -35,7 +51,7 @@ class HostFlows:
         self.t = self.t - self.t.min()
         self.span = int(self.t.max()) + max(WINDOWS_MS + LONG_MS) + 1
         self._fam = pd.Categorical(raw["family"].astype(str))
-        src, dst = (_codes(raw[c].astype(str).to_numpy()) for c in ("IPV4_SRC_ADDR", "IPV4_DST_ADDR"))
+        src, dst = (_codes(key_of(raw[c]).to_numpy()) for c in ("IPV4_SRC_ADDR", "IPV4_DST_ADDR"))
         port = _codes(raw["L4_DST_PORT"].to_numpy())
         if permute_seed is not None:
             rng, block = np.random.default_rng(permute_seed), self.t // 600_000

@@ -68,6 +68,7 @@ def main():
     ap.add_argument("--established", action="store_true")  # shared-key attacker: injected flows established (fail=0)
     ap.add_argument("--opt-harm", action="store_true")  # M6: per-flow white-box optimiser attacker (feature space)
     ap.add_argument("--dilute", type=int, nargs="*")  # C3: attacker pads its own src key with P benign flows / 120 s
+    ap.add_argument("--opt-gap", action="store_true")  # OPT-GAP: framing witnesses on alarmed-not-blocked test rows
     ap.add_argument("--rekey", type=int, default=0)  # shared-key (NAT) attacker: N draws of real bot flows re-keyed
     a = ap.parse_args()
     g = (conf_clean.A if a.champion_a else G) | json.loads(a.genome)
@@ -147,6 +148,9 @@ def main():
                        (lambda fF, tF: lambda X: np.maximum(bB(X) - tB, fF(X) - tF))(fF, tF))
             tau[n] = 0.0
             print(f"K19 {n} taus: context {tB:.4f} (B alone {tau['gated_net']:.4f}), flow {tF:.4f}", flush=True)
+    if a.opt_gap:
+        opt_gap(a, bank, light, held, tx, *dets["gated_net"], tau["gated_net"])
+        return
     rows, key = sa.victims(bank, meta)
     raw_rows = bank.kept[rows]
     V = light.iloc[raw_rows]
@@ -156,7 +160,11 @@ def main():
     vmask = np.isin(S_idx, raw_rows)
     base = bank.frame(rows, ())
     H0 = sa.host_context(S, light.iloc[:0], vmask)
-    assert np.allclose(H0, base[hostctx.COLS].to_numpy(), rtol=1e-4, atol=1e-3), "subset host context != bank"
+    bad = ~np.isclose(H0, base[hostctx.COLS].to_numpy(), rtol=1e-4, atol=1e-3)
+    if bad.any():  # say where before failing
+        print("host-context mismatch: rows", int(bad.any(1).sum()), "of", len(bad), "cols",
+              [c for c, x in zip(hostctx.COLS, bad.any(0)) if x], flush=True)
+    assert not bad.any(), "subset host context != bank"
     X0 = tx(base)
     day = lambda w: float(pd.Series(w).groupby(key).any().mean())  # noqa: E731
     if a.opt_harm:
@@ -190,7 +198,7 @@ def main():
                 r["gtpr_macro"] = (r["gtpr_unk"] + r["gtpr_known"]) / 2
                 res.append(r)
                 print(json.dumps({k: round(v, 4) if isinstance(v, float) else v for k, v in r.items()}), flush=True)
-        pd.DataFrame(res).to_csv(sa.OUT / f"gate_hostday_{a.dataset}.csv", index=False)
+        pd.DataFrame(res).to_csv(sa.out(f"gate_hostday_{a.dataset}.csv"), index=False)
         return
     if a.clean_only:
         c = cols.index("hc_src_n_120s")
@@ -205,7 +213,7 @@ def main():
                             **{f"alarm_g{q}": al[g0 == q].mean() if (g0 == q).any() else np.nan for q in range(4)},
                             **{f"share_g{q}": (g0 == q).mean() for q in range(4)}})
                 print(json.dumps({k: round(v, 4) if isinstance(v, float) else v for k, v in res[-1].items()}), flush=True)
-        pd.DataFrame(res).to_csv(sa.OUT / f"gate_calib_{a.dataset}.csv", index=False)
+        pd.DataFrame(res).to_csv(sa.out(f"gate_calib_{a.dataset}.csv"), index=False)
         return
     alarm0, res = {}, []
     for n, (f, b) in dets.items():
@@ -253,8 +261,8 @@ def main():
             res.append({"detector": n, "pattern": "adaptive", "m_attack": M, "alarm": np.nan, "block": w.mean(),
                         "alarm_day": np.nan, "block_day": day(w), "violations": int((w & ~alarm0[n]).sum())})
     R = pd.DataFrame(res)
-    R.to_csv(sa.OUT / f"gate_k4_{a.dataset}{'_A' if a.champion_a else ''}{'_day' if a.tau_day else ''}"
-                      f"{'_' + a.tag if a.tag else ''}.csv", index=False)
+    R.to_csv(sa.out(f"gate_k4_{a.dataset}{'_A' if a.champion_a else ''}{'_day' if a.tau_day else ''}"
+                      f"{'_' + a.tag if a.tag else ''}.csv"), index=False)
     print(f"{a.dataset} m={a.m} victims={len(rows)} flows / {len(np.unique(key))} host-days")
     for (n, M), D in R[R.pattern != "clean"].groupby(["detector", "m_attack"], sort=False):
         c, w, ad = R[(R.detector == n) & (R.pattern == "clean")].iloc[0], D[D.pattern != "adaptive"], D[D.pattern == "adaptive"].iloc[0]
@@ -262,6 +270,96 @@ def main():
               f"worst attack alarm {w.alarm.max():.4f} block {w.block.max():.4f} | host-day {w.alarm_day.max():.3f} / "
               f"{w.block_day.max():.3f}; adaptive block_day {ad.block_day:.3f}; K4-gate violations "
               f"{int(w.violations.sum())} (adaptive {int(ad.violations)})")
+
+
+class Windows:
+    """Raw-row lookup: every flow whose src key is s (or dst key is d) with start in [t0, t1]."""
+    def __init__(self, light):
+        self.t = light["FLOW_START_MILLISECONDS"].to_numpy(np.int64)
+        self.t = self.t - self.t.min()
+        self.span = int(self.t.max()) + 1
+        codes, _ = pd.factorize(pd.concat([light.IPV4_SRC_ADDR, light.IPV4_DST_ADDR]).astype(str))
+        n = len(light)
+        self.code = {"src": codes[:n].astype(np.int64), "dst": codes[n:].astype(np.int64)}
+        self.o, self.q = {}, {}
+        for k, c in self.code.items():
+            q = c * self.span + self.t
+            self.o[k] = np.argsort(q, kind="stable")
+            self.q[k] = q[self.o[k]]
+
+    def rows(self, k, c, t0, t1):
+        lo = np.searchsorted(self.q[k], c * self.span + t0, side="left")
+        hi = np.searchsorted(self.q[k], c * self.span + t1, side="right")
+        return self.o[k][lo:hi]
+
+
+def clean_worlds(light, W, j, m):
+    """OPT-GAP: raw host context (K, 20) of raw flow j in K candidate clean worlds; world 0 = nothing deleted. Each
+    world deletes <= m flows of j's src key and <= m of its dst key, all in [t - 120 s, t) (so <= m per key in any
+    240 s, Theorem 1' box), chosen by 7 policies per side. Exact: all flows of the two keys in [t - 240 s, t]."""
+    t, s, d = W.t[j], W.code["src"][j], W.code["dst"][j]
+    idx = np.union1d(W.rows("src", s, t - 240_000, t), W.rows("dst", d, t - 240_000, t))
+    M = light.iloc[idx].copy()
+    M["family"] = "Benign"
+    h = hostctx.HostFlows(M)
+    me = int(np.flatnonzero(idx == j)[0])
+    tl = W.t[idx]
+    allp = np.ones(len(idx), bool)
+    pols = []
+    for k, c in (("src", s), ("dst", d)):
+        win = np.flatnonzero((W.code[k][idx] == c) & (tl >= t - 120_000) & (tl < t))
+        win = win[np.argsort(-tl[win], kind="stable")]  # most recent first
+        fail = h.fail[win] > 0
+        peer = h._novel(h.pair_peer[k], allp, 120_000)[win]
+        port = h._novel(h.pair_port[k], allp, 120_000)[win]
+        rank = win[np.argsort(-(fail.astype(int) + peer + port), kind="stable")]
+        pols.append([win[:0], win[:m], win[::-1][:m], win[fail][:m], win[peer][:m], win[port][:m], rank[:m]])
+    H = []
+    for ds in pols[0]:
+        for dd in pols[1]:
+            pop = allp.copy()
+            pop[np.union1d(ds, dd)] = False
+            assert pop[me]
+            H.append(h.features(pop)[me])
+    return np.asarray(H, np.float64)
+
+
+def opt_gap(a, bank, light, held, tx, f, b, tau):
+    """PREREG 2026-11-06 OPT-GAP row. Framing witnesses: a clean world (<= m observed flows per key treated as
+    injected and deleted) where f <= tau means no m-frame-proof rule may block the row. UB = alarmed - witnessed."""
+    rng = np.random.default_rng(0)
+    cap = lambda r, n=5000: np.sort(rng.permutation(r)[:n])  # noqa: E731
+    T = {"unk": cap(bank.test[held]),
+         "known": np.concatenate([cap(r) for fm, r in bank.test.items() if fm not in (held, "Benign")])}
+    W, res = Windows(light), []
+    for split, r in T.items():
+        base = bank.frame(r, ())
+        X = tx(base)
+        s, lb = f(X), b(X)
+        al, bl = s > tau, lb > tau
+        gap, blk = np.flatnonzero(al & ~bl), np.flatnonzero(bl)
+        gs, bs = cap(gap, 2000), cap(blk, 500)
+        wit, t1 = {}, time.time()
+        for i in np.r_[gs, bs]:
+            H = clean_worlds(light, W, bank.kept[r[i]], a.m)
+            obs = base.iloc[i][hostctx.COLS].to_numpy(np.float64)
+            assert np.allclose(H[0], obs, rtol=1e-4, atol=1e-3), f"world 0 != bank row {i}"
+            Xi = base.iloc[[i] * len(H)].reset_index(drop=True)
+            Xi[hostctx.COLS] = H.astype(np.float32)
+            wit[i] = float(f(tx(Xi)).min())
+        wg = np.array([wit[i] <= tau for i in gs])
+        viol = int(sum(wit[i] <= tau for i in bs))
+        A, B = al.mean(), bl.mean()
+        wshare = wg.mean() if len(gs) else 0.0
+        ub = A - (A - B) * wshare
+        row = {"dataset": a.dataset, "split": split, "n": len(r), "tau": float(tau), "alarm": A, "veto_block": B,
+               "gap_rows": len(gap), "gap_searched": len(gs), "witnessed_share": wshare, "ub_opt": ub,
+               "R": B / ub if ub > 0 else np.nan, "blocked_checked": len(bs), "violations": viol}
+        res.append(row)
+        print(json.dumps({k: round(v, 4) if isinstance(v, float) else v for k, v in row.items()}),
+              f"{time.time() - t1:.0f}s", flush=True)
+        assert viol == 0, "framing witness on a Veto-blocked row: Theorem 1'/2 violated"
+    pd.DataFrame(res).to_csv(sa.out(f"opt_gap_{a.dataset}.csv"), index=False)
 
 
 def inject_ctx(H, cols, k, j120, j10, flags):
@@ -322,7 +420,7 @@ def opt_harm(a, base, tx, dets, tau, day):
              "block": bl.mean(), "violations": int((bl & ~alarm0).sum()) if n == "gated_net" else 0}
         res.append(r)
         print(json.dumps({q: round(v, 4) if isinstance(v, float) else v for q, v in r.items()}), flush=True)
-    pd.DataFrame(res).to_csv(sa.OUT / f"opt_harm_{a.dataset}{'_' + a.tag if a.tag else ''}.csv", index=False)
+    pd.DataFrame(res).to_csv(sa.out(f"opt_harm_{a.dataset}{'_' + a.tag if a.tag else ''}.csv"), index=False)
 
 
 def dilute(a, bank, held, tx, dets, tau):
@@ -362,7 +460,7 @@ def dilute(a, bank, held, tx, dets, tau):
         r[f"{n}_btpr_unk"], r[f"{n}_btpr_known"], r[f"{n}_btpr_macro"] = u, k, (u + k) / 2
     res.append(r)
     print(json.dumps({q: round(v, 4) if isinstance(v, float) else v for q, v in r.items()}), flush=True)
-    pd.DataFrame(res).to_csv(sa.OUT / f"dilute_{a.dataset}{'_' + a.tag if a.tag else ''}.csv", index=False)
+    pd.DataFrame(res).to_csv(sa.out(f"dilute_{a.dataset}{'_' + a.tag if a.tag else ''}.csv"), index=False)
 
 
 def rekey(light, fam, V, m, draw):
@@ -375,7 +473,8 @@ def rekey(light, fam, V, m, draw):
     bots = sorted(k for k, g in groups.items() if len(g) >= m)
     out = []
     for kv, grp in V.groupby("IPV4_SRC_ADDR", sort=False):
-        b = groups[bots[rng.integers(len(bots))]]
+        cand = [k for k in bots if k != kv]  # never the victim's own key (at /24 it can hold real bots: no double count)
+        b = groups[cand[rng.integers(len(cand))]]
         bt = b.FLOW_START_MILLISECONDS.to_numpy()
         cols = [b[c].to_numpy() for c in ("IPV4_DST_ADDR", "L4_DST_PORT", "OUT_PKTS", "IN_BYTES")]
         rel, span = bt - bt[0], int(bt[-1] - bt[0]) + 1000
@@ -474,7 +573,7 @@ def throttle(a, bank, light, meta, dets, tau, tx, held, harm):
             r[f"{n}_clean_block_day"] = harm[n]
         res.append(r)
         print(json.dumps({q: round(v, 4) if isinstance(v, float) else v for q, v in r.items()}), flush=True)
-    pd.DataFrame(res).to_csv(sa.OUT / f"gate_throttle_{a.dataset}{'_' + a.tag if a.tag else ''}.csv", index=False)
+    pd.DataFrame(res).to_csv(sa.out(f"gate_throttle_{a.dataset}{'_' + a.tag if a.tag else ''}.csv"), index=False)
 
 
 if __name__ == "__main__":
