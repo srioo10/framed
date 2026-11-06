@@ -78,6 +78,20 @@ Native Kitsune needs `git clone https://github.com/ymirsky/Kitsune-py third_part
 the ESP32 firmware (`firmware/gateway`, `firmware/sensor`) implement the same box and bound on the device.
 `scripts/README.md` says which scripts belong to the paper and which to the earlier phase.
 
+## Audit your own detector for framing
+
+`scripts/frame_audit.py` checks whether an attacker who can add m flows per host key per 240 s can make a detector
+alarm on innocent hosts. Give it benign NetFlow records and a scoring function; it injects the 8 spoofed-flow
+patterns from the paper and reports the share of innocent host-days alarmed, clean and attacked.
+
+```
+python scripts/frame_audit.py flows.csv --detector mymodule:score --m 10 --out audit.json
+python scripts/frame_audit.py --selfcheck   # synthetic check: a fail2ban-style rule is framed, a constant is not
+```
+
+The scoring function receives the flows and their recomputed per-host context (`src/nids/hostctx.py`), so detectors
+that use any mix of per-flow and per-host features can be audited without retraining.
+
 ## How this started
 
 The project began as a leak-free re-evaluation of ARLHNIDS-IoT and a small one-pass IDS (OnePass-IDS). While testing

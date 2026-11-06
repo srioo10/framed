@@ -47,6 +47,8 @@ def cmds(kind, ds):
         return [["conf_clean.py", "--workers", "4", "--out", f"clean_{ds}.jsonl"]]
     if kind == "baselines":
         return [["conf_baselines.py", "--workers", "4", "--out", f"baselines_{ds}.jsonl"]]
+    if kind == "k5bq8":  # PREREG INT8-CONF
+        return [["k5b_net.py", "--workers", "4", "--q8", "--seed", str(s), "--out", f"conf_k5bq8_{ds}_s{s}.csv"] for s in SEEDS]
     if kind == "k5b":
         return [["k5b_net.py", "--workers", "4", "--seed", str(s), "--out", f"conf_k5b_{ds}_s{s}.csv"] for s in SEEDS]
     if kind.startswith("groot"):  # groot = seeds 2-4 in one kernel; groot2 / groot3 / groot4 = one seed each
@@ -67,13 +69,25 @@ def cmds(kind, ds):
         return [K + ["--two-channel", "--m-attack", "10", "50", "100", "--random", "8", "--no-bytes-grid", "--tag", "k19"]]
     if kind == "k18":
         return [K + ["--random", "8", "--no-bytes-grid", "--at", "--tag", "k18"]]
+    if kind in ("rk24", "rk24sk"):  # PREREG §9 REKEY24 (NIDS_KEY_PREFIX=24 set in the kernel)
+        return [K + (["--established", "--rekey", "5"] if kind == "rk24sk" else []) + ["--tag", kind]]
     if kind == "k14":  # PREREG §9 K14 + K15
         return [["spoof_attack.py", ds, "--baselines"], ["ips_point.py", ds]]
+    if kind.startswith("lmt"):  # PREREG LONGMILP: box-augmented RF, exact MILP at 600 s per row
+        s = int(kind[-1])
+        return [["k5_trees.py", "--workers", "4", "--models", "rf", "--robust", "1", "--limit", "600", "--seed", str(s),
+                 "--out", f"conf_lmilp_trees_{ds}_s{s}.csv"]]
+    if kind.startswith("lmb"):  # PREREG LONGMILP: champion B, BaB at 600 s per row
+        s = int(kind[-1])
+        return [["k5b_net.py", "--workers", "4", "--time", "600", "--seed", str(s), "--out", f"conf_lmilp_b_{ds}_s{s}.csv"]]
     s = int(kind[-1])  # trees2 / trees3 / trees4
     return [["k5_trees.py", "--workers", "4", "--seed", str(s), "--out", f"conf_trees_{ds}_s{s}.csv"]]
 
 
-KINDS = ["clean", "baselines", "k5b", "trees2", "trees3", "trees4", "groot", "groot2", "groot3", "groot4", "attack", "c3", "k14", "leank1", "leanc3", "k16", "k17", "k18"]
+KINDS = ["clean", "baselines", "k5b", "trees2", "trees3", "trees4", "groot", "groot2", "groot3", "groot4", "attack", "c3", "k14", "leank1", "leanc3", "k16", "k17", "k18", "rk24", "rk24sk", "k5bq8",
+         "lmt2", "lmt3", "lmt4", "lmb2", "lmb3", "lmb4"]
+OPT_IN = ("rk24", "rk24sk", "k5bq8", "lmt2", "lmt3", "lmt4", "lmb2", "lmb3", "lmb4")  # started only when named with --kinds (REKEY24 runs only CTU-13 / UGR'16)
+AK = ("attack", "c3", "k14", "k16", "k17", "k18", "rk24", "rk24sk")  # kinds on the ATTACK kernel + bigp-proc
 B = ('{"family": "tabm", "enc": "raw", "e": 4, "w": 32, "depth": 2, "sn": 0, "act": "relu", "members": 8, "head": "nlog", '
      '"kd": 0.9, "syn": 0.5, "clip": 1, "cert": 4, "gate": 1, "rdet": 2, "ls": 0.0, "focal": 0.0, "lr": 0.003}')
 # CONF C4 (K1 on ToN) and C3 on ToN (B, K4 at tau_day): need data/processed and the bowl champions, not the arena
@@ -89,7 +103,7 @@ for proc in procs:  # every mounted bigp-proc-* dataset (the lean kinds mount se
     shutil.copytree(proc, W + "/data/processed", dirs_exist_ok=True)
 shutil.copytree(os.path.dirname(bowl), W + "/results/bowl", dirs_exist_ok=True)
 os.makedirs(W + "/results/cert", exist_ok=True)  # gate_attack.py writes there without creating it
-env = dict(os.environ, PYTHONPATH=W + "/src", OMP_NUM_THREADS="4", NIDS_LEAN="1")
+env = dict(os.environ, PYTHONPATH=W + "/src", OMP_NUM_THREADS="4", NIDS_LEAN="1", NIDS_KEY_PREFIX="{prefix}")
 for cmd in {cmds}:
     print("RUN", cmd, flush=True)
     r = subprocess.run([sys.executable, W + "/scripts/" + cmd[0], *cmd[1:]], env=env, cwd=W)
@@ -143,14 +157,15 @@ def data(a):
         k = STAGE / f"conf_{ds}_{kind}"
         shutil.rmtree(k, ignore_errors=True)
         k.mkdir()
-        (k / "run.py").write_text((ATTACK if kind in ("attack", "c3", "k14", "leank1", "leanc3", "k16", "k17", "k18") else KERNEL).replace("{ds}", ds)
+        (k / "run.py").write_text((ATTACK if kind in AK + ("leank1", "leanc3") else KERNEL).replace("{ds}", ds)
+                                  .replace("{prefix}", "24" if kind.startswith("rk24") else "0")
                                   .replace("{cmds}", repr(cmds(kind, ds))))
         ks = f"bigp-conf-{ds.replace('_', '-')}-{kind}"
         (k / "kernel-metadata.json").write_text(json.dumps({
             "id": f"{u}/{ks}", "title": ks, "code_file": "run.py", "language": "python", "kernel_type": "script",
             "is_private": True, "enable_gpu": kind in a.gpu, "enable_internet": False,
             "dataset_sources": [f"{u}/{slug}", f"{u}/bigp-k5code"] + ([f"{u}/bigp-proc-{ds.replace('_', '-')}"]
-                                                                      if kind in ("attack", "c3", "k14", "k16", "k17", "k18") else [])
+                                                                      if kind in AK else [])
                                + ([f"{u}/bigp-proc-nf-ton", f"{u}/bigp-proc-nf-ctu13", f"{u}/bigp-proc-nf-ugr16"]
                                   if kind.startswith("lean") else [])}))
         for _ in range(144):  # a full concurrent-session quota refuses the push: retry every 10 min for 24 h
@@ -199,7 +214,8 @@ def pull(a):
             if subprocess.run([KAGGLE, "kernels", "output", f"{user()}/{ks}", "-p", str(o), "--file-pattern", r"^[^/]*\.(csv|jsonl|json|log|txt)$"]).returncode:
                 continue
             # attack kinds also run locally (the local 4-thread run is official): Kaggle copies are repro checks
-            dest = out_dir / "kaggle_repro" if kind in ("attack", "c3", "k14", "k16", "k17", "k18") else out_dir
+            # rk24 / rk24sk are Kaggle-only, so their UGR'16 outputs are the official results
+            dest = out_dir / "kaggle_repro" if kind in AK and kind not in OPT_IN else out_dir
             dest.mkdir(exist_ok=True)
             for f in o.iterdir():
                 if f.suffix in (".csv", ".jsonl", ".log"):
@@ -211,7 +227,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("cmd", choices=["push", "data", "proc", "status", "pull"])
     ap.add_argument("ds", nargs="?")
-    ap.add_argument("--kinds", nargs="+", default=KINDS)
+    ap.add_argument("--kinds", nargs="+", default=[k for k in KINDS if k not in OPT_IN])
     ap.add_argument("--gpu", nargs="*", default=[])  # kinds to run on GPU sessions (as extra CPU slots)
     ap.add_argument("--no-upload", action="store_true")  # dataset already up: only (re)start kernels
     a = ap.parse_args()

@@ -93,15 +93,19 @@ def main():
     ap.add_argument("--established", action="store_true")  # shared-key attacker: injected flows established (fail=0)
     ap.add_argument("--opt-harm", action="store_true")  # M6: per-flow white-box optimiser attacker (feature space)
     ap.add_argument("--dilute", type=int, nargs="*")  # C3: attacker pads its own src key with P benign flows / 120 s
+    ap.add_argument("--gap-split", type=float, default=0.0)  # GAP-SPLIT: BaB seconds per unwitnessed gap row
     ap.add_argument("--opt-gap", action="store_true")  # OPT-GAP: framing witnesses on alarmed-not-blocked test rows
     ap.add_argument("--mono", action="store_true")  # MONO: monotone-constrained XGB, exact corner certificate
     ap.add_argument("--mono-tiny", action="store_true")  # MONO-TINY: size-matched monotone model
+    ap.add_argument("--train-seed", type=int, default=0)  # SEEDS: model training seed only (split stays seed 1)
+    ap.add_argument("--rules", action="store_true")  # RULES: deployed-practice rate / fail2ban / scan thresholds
     ap.add_argument("--nat", type=int, default=1)  # NAT: K victim addresses share one key
     ap.add_argument("--recal", type=float, default=0.0)  # RECAL: tau from the earliest q of test benign traffic
     ap.add_argument("--per-family", action="store_true")  # LOWRATE-CLASS: throttle readout per attack family
     ap.add_argument("--m-cert", type=int, nargs="*", default=[])  # FRONTIER: same B certified at extra budgets m0
     ap.add_argument("--rekey", type=int, default=0)  # shared-key (NAT) attacker: N draws of real bot flows re-keyed
     a = ap.parse_args()
+    TS = a.train_seed or sa.SEED
     g = (conf_clean.A if a.champion_a else G) | json.loads(a.genome)
     t0 = time.time()
     light, bank = sa.setup(a.dataset)
@@ -121,16 +125,16 @@ def main():
         return X
     Xf, yf = tx(dfit), np.array([code[f] for f in bank.fam[fit]])
     z = {"X_fit": Xf, "y_fit": yf, "k": len(known), "bi": code["Benign"], "nflow": len(bank.feats), "cols": cols,
-         "mu": prep.mu, "sd": prep.sd, "teacher": models.oof_proba(Xf, yf, sa.SEED).astype(np.float32)}
+         "mu": prep.mu, "sd": prep.sd, "teacher": models.oof_proba(Xf, yf, TS).astype(np.float32)}
     for k in ("cal", "pseudo", "es"):
         z[f"X_{k}"] = Xf[:10]
-    m, h, _ = bowl.run_pair(g, z, "cpu", sa.SEED, 30)
+    m, h, _ = bowl.run_pair(g, z, "cpu", TS, 30)
     if a.champion_a:
         lo, hi = bowl.hc_clip(z)
         m.register_buffer("clo", torch.as_tensor(lo, dtype=torch.float32))
         m.register_buffer("chi", torch.as_tensor(hi, dtype=torch.float32))
     bi, nl = z["bi"], (lambda p: -np.log(np.maximum(p, 1e-45)))
-    rf, xg = models.rf(sa.SEED).fit(Xf, yf), models.xgb(sa.SEED).fit(Xf, yf)
+    rf, xg = models.rf(TS).fit(Xf, yf), models.xgb(TS).fit(Xf, yf)
     def net(m, h, head):
         return lambda X: h.score(m, X, "cpu"), lambda X: fx.score_lower(m, *bowl.dbox(z, X, a.m), bi, head)
     dets = {"gated_net": net(m, h, g["head"]),
@@ -144,11 +148,21 @@ def main():
         dets["mono"] = mono_det(Xf, yf, bi, cols, nb, lambda X: bowl.dbox(z, X, a.m))
     if a.mono_tiny:  # MONO-TINY: size-matched (40x4, ~23 KB) monotone model, the device-fitting comparison
         dets["mono_tiny"] = mono_det(Xf, yf, bi, cols, nb, lambda X: bowl.dbox(z, X, a.m), tiny=True)
+    if a.rules:  # RULES: block = alarm on one raw host-context count, as deployed rate limiters / fail2ban / scan rules do
+        def raw(X, c):  # undo Prep: standard scale, then signed log1p
+            j = cols.index(c)
+            v = X[:, j].astype(np.float64) * prep.sd[j] + prep.mu[j]
+            return np.sign(v) * np.expm1(np.abs(v))
+        rules = {"rule_rate": lambda X: raw(X, "hc_src_n_10s"),
+                 "rule_f2b": lambda X: raw(X, "hc_src_n_120s") * raw(X, "hc_src_fail_120s"),
+                 "rule_scan": lambda X: raw(X, "hc_src_n_120s") * (raw(X, "hc_src_newport_120s") + raw(X, "hc_src_newpeer_120s"))}
+        for n, f in rules.items():
+            dets[n] = (f, f)
     if a.no_gate:
         dets["b_nogate"] = (dets["gated_net"][0], dets["gated_net"][0])
     if a.at:  # PREREG §9 K18: same genome, PGD adversarial training in the same boxes instead of interval bounds
         ga = g | {"cert": 0, "rdet": 0, "adv": g.get("cert", 4), "advd": g.get("rdet", 2)}
-        ma, hha, _ = bowl.run_pair(ga, z, "cpu", sa.SEED, 30)
+        ma, hha, _ = bowl.run_pair(ga, z, "cpu", TS, 30)
         f_at, b_at = net(ma, hha, ga["head"])
         dets["at_plain"], dets["at_gated"] = (f_at, f_at), (f_at, b_at)
     meta = np.load(ROOT / "data" / "processed" / f"{bank.ds}_hostmeta.npz", allow_pickle=False)
@@ -198,7 +212,9 @@ def main():
             tau[n] = 0.0
             print(f"K19 {n} taus: context {tB:.4f} (B alone {tau['gated_net']:.4f}), flow {tF:.4f}", flush=True)
     if a.opt_gap:
-        opt_gap(a, bank, light, held, tx, *dets["gated_net"], tau["gated_net"])
+        bab = None if not a.gap_split else (lambda X1: fx.bab_block(
+            m, h, *[v[0] for v in bowl.dbox(z, X1, a.m)], bi, g["head"], tau["gated_net"], time_s=a.gap_split))
+        opt_gap(a, bank, light, held, tx, *dets["gated_net"], tau["gated_net"], bab)
         return
     rows, key = sa.victims(bank, meta)
     if recal_cut is not None:
@@ -384,7 +400,7 @@ def clean_worlds(light, W, j, m):
     return np.asarray(H, np.float64)
 
 
-def opt_gap(a, bank, light, held, tx, f, b, tau):
+def opt_gap(a, bank, light, held, tx, f, b, tau, bab=None):
     """PREREG 2026-11-06 OPT-GAP row. Framing witnesses: a clean world (<= m observed flows per key treated as
     injected and deleted) where f <= tau means no m-frame-proof rule may block the row. UB = alarmed - witnessed."""
     rng = np.random.default_rng(0)
@@ -415,11 +431,16 @@ def opt_gap(a, bank, light, held, tx, f, b, tau):
         row = {"dataset": a.dataset, "split": split, "n": len(r), "tau": float(tau), "alarm": A, "veto_block": B,
                "gap_rows": len(gap), "gap_searched": len(gs), "witnessed_share": wshare, "ub_opt": ub,
                "R": B / ub if ub > 0 else np.nan, "blocked_checked": len(bs), "violations": viol}
+        if bab is not None:  # GAP-SPLIT: unwitnessed gap rows -> BaB over the box: proved = IBP slack, refuted = box admits
+            ug = [i for i in gs if wit[i] > tau][:300]
+            out = [bab(X[i:i + 1]) for i in ug]
+            row |= {"split_rows": len(ug), "ibp_slack": sum(bk for bk, d in out), "box_admits": sum(d and not bk for bk, d in out),
+                    "undecided": sum(not d for bk, d in out)}
         res.append(row)
         print(json.dumps({k: round(v, 4) if isinstance(v, float) else v for k, v in row.items()}),
               f"{time.time() - t1:.0f}s", flush=True)
         assert viol == 0, "framing witness on a Veto-blocked row: Theorem 1'/2 violated"
-    pd.DataFrame(res).to_csv(sa.out(f"opt_gap_{a.dataset}.csv"), index=False)
+    pd.DataFrame(res).to_csv(sa.out(f"opt_gap_{a.dataset}{'_split' if bab else ''}.csv"), index=False)
 
 
 def inject_ctx(H, cols, k, j120, j10, flags):

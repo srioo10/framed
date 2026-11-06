@@ -203,6 +203,9 @@ def milp_bound(T, off, lo, hi, x, bi, k, rf):
     return float(s_lo), xr, r.status == 0  # status 1 = time limit: dual bound sound but may be loose
 
 
+CAP = float(-np.log(1e-45))  # the score cap of s below (np.maximum(p, 1e-45))
+
+
 def augment(z, rng):
     """Fit rows plus 2 uniform samples per row from its box at M (benign: injection box, attack: deletion box)."""
     X, y = z["X_fit"], z["y_fit"]
@@ -269,7 +272,8 @@ def job(args):
                 lt = low(lo[i:i + 1], hi[i:i + 1])[0]
                 if (rf or k == 2) and opt:  # timed-out MILP may be looser; multiclass XGB: the MILP bound is a different sound bound, not a tighter one
                     assert s_lo >= lt - 1e-4, f"{key} {name}: MILP bound {s_lo} < per-tree bound {lt}"
-                assert s_lo <= s(pts).min() + 1e-4 and s_lo <= s(X[i:i + 1])[0] + 1e-4, f"{key} {name}: unsound"
+                sb = min(s_lo, CAP)  # s is clipped at CAP (p >= 1e-45); the XGB MILP bounds the unclipped score
+                assert sb <= s(pts).min() + 1e-4 and sb <= s(X[i:i + 1])[0] + 1e-4, f"{key} {name} rt{int(robust)}: unsound"
     if Xk is None:  # no known attack rows in this pair: known = unknown, as in gate_bosses
         for q in ("plain", "pertree", "milp"):
             out[f"{q}_known"] = out[f"{q}_unk"]
@@ -280,7 +284,7 @@ def job(args):
 
 
 def main():
-    global SEED
+    global SEED, LIMIT
     ap = argparse.ArgumentParser()
     ap.add_argument("--rows", type=int, default=100)
     ap.add_argument("--workers", type=int, default=8)
@@ -289,11 +293,13 @@ def main():
     ap.add_argument("--out", default="k5_trees.csv")
     ap.add_argument("--arena", type=Path, default=bowl.ARENA)
     ap.add_argument("--seed", type=int, default=SEED)  # CONF: training seeds 2-4; rows stay RNG seed 0
+    ap.add_argument("--limit", type=float, default=LIMIT)  # MILP seconds per row (LONGMILP: 600)
+    ap.add_argument("--robust", type=int, nargs="+", default=[0, 1])  # which variants: 0 plain, 1 box-augmented
     a = ap.parse_args()
-    SEED = a.seed
+    SEED, LIMIT = a.seed, a.limit
     bowl.ARENA = a.arena  # forked workers inherit it
     keys = a.pairs or [f"{p['ds']}/{p['name']}" for p in bowl.load_pairs(bowl.ARENA, cheap=False)]
-    jobs = [(kk, n, r, a.rows) for kk in keys for n in a.models for r in ((0,) if n == "groot" else (0, 1))]
+    jobs = [(kk, n, r, a.rows) for kk in keys for n in a.models for r in ((0,) if n == "groot" else tuple(a.robust))]
     out = bowl.ROOT / "results" / "cert"
     out.mkdir(parents=True, exist_ok=True)
     rows = []
