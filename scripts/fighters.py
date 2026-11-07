@@ -293,7 +293,7 @@ def score_lower(m, lo, hi, bi, head, device="cpu", bs=50_000, f64=True):
     return np.concatenate(out)
 
 
-def bab_block(m, h, lo, hi, bi, head, tau, max_boxes=8192, time_s=20.0, device="cpu"):
+def bab_block(m, h, lo, hi, bi, head, tau, max_boxes=8192, time_s=20.0, device="cpu", batch=65536):
     """PREREG §9 K5b: branch and bound by input splitting over one row's box [lo, hi]. Returns (blocked, decided):
     blocked only when the float64 IBP lower bound of every sub-box clears tau; a sub-box centre whose real score is
     <= tau is a realised attack (decided, not blocked); budget out -> (False, False). m64 = float64 copy of m."""
@@ -305,21 +305,23 @@ def bab_block(m, h, lo, hi, bi, head, tau, max_boxes=8192, time_s=20.0, device="
         L, H = np.clip(L, c0, c1), np.clip(H, c0, c1)
     L, H = np.clip(L, -1e6, 1e6), np.clip(H, -1e6, 1e6)  # shortcut: an unclipped infinite column is split at +-1e6
     n = 0
-    while True:
-        keep = score_lower(m64, L, H, bi, head, device) <= tau
-        L, H = L[keep], H[keep]
-        if not len(L):
-            return True, True
-        c = (L + H) / 2
+    while len(L):  # L, H: pending boxes, taken in LIFO batches of `batch` (one batch = the whole frontier while it fits)
+        bL, bH, L, H = L[-batch:], H[-batch:], L[:-batch], H[:-batch]
+        keep = score_lower(m64, bL, bH, bi, head, device) <= tau
+        bL, bH = bL[keep], bH[keep]
+        if not len(bL):
+            continue
+        c = (bL + bH) / 2
         if (h.score(m, c.astype(np.float32), device) <= tau).any():
             return False, True
-        n += len(L)
+        n += len(bL)
         if n >= max_boxes or time.time() - t0 > time_s:
             return False, False
-        j, r = (H - L).argmax(1), np.arange(len(L))
-        L2, H1 = L.copy(), H.copy()
+        j, r = (bH - bL).argmax(1), np.arange(len(bL))
+        L2, H1 = bL.copy(), bH.copy()
         H1[r, j] = L2[r, j] = c[r, j]
-        L, H = np.concatenate([L, L2]), np.concatenate([H1, H])
+        L, H = np.concatenate([L, bL, L2]), np.concatenate([H, H1, bH])
+    return True, True
 
 
 def score_upper(m, lo, hi, bi, head, device="cpu", bs=50_000, f64=True):
