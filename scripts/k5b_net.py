@@ -22,7 +22,7 @@ M, SEED = 10, 1
 
 
 def job(args):
-    key, nrows, time_s, q8, seed, maxb = args
+    key, nrows, time_s, q8, seed, maxb, batch = args
     torch.set_num_threads(1)
     z = next(p for p in bowl.drop_bytes(bowl.load_pairs(bowl.ARENA, cheap=False), {"drop_bytes": 1})
              if f"{p['ds']}/{p['name']}" == key)
@@ -47,7 +47,7 @@ def job(args):
         ibp = fx.score_lower(m, lo, hi, bi, B["head"]) > tau
         blk, und = ibp.copy(), np.zeros(len(X), bool)
         for i in np.flatnonzero(plain & ~ibp):
-            blk[i], decided = fx.bab_block(m, h, lo[i], hi[i], bi, B["head"], tau, time_s=time_s, max_boxes=maxb)
+            blk[i], decided = fx.bab_block(m, h, lo[i], hi[i], bi, B["head"], tau, time_s=time_s, max_boxes=maxb, batch=batch)
             und[i] = not decided
         out |= {f"plain_{part}": plain.mean(), f"ibp_{part}": ibp.mean(), f"bab_{part}": blk.mean(),
                 f"babk5_{part}": (blk | und).mean(), f"undecided_{part}": int(und.sum()), f"n_{part}": len(X)}
@@ -66,6 +66,7 @@ def main():
     ap.add_argument("--rows", type=int, default=100)
     ap.add_argument("--time", type=float, default=20.0)
     ap.add_argument("--max-boxes", type=float, default=8192)  # LONGMILP: 1e12 so the time limit binds
+    ap.add_argument("--bab-batch", type=int, default=65536)  # LONGMILP: 4096 keeps the LIFO stack small
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--pairs", nargs="*")
     ap.add_argument("--out", default="k5b_net.csv")
@@ -80,7 +81,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     rows = []
     with ProcessPoolExecutor(a.workers) as ex, open(out / a.out.replace(".csv", ".jsonl"), "a") as f:
-        for fu in as_completed([ex.submit(job, (k, a.rows, a.time, a.q8, a.seed, int(a.max_boxes))) for k in keys]):
+        for fu in as_completed([ex.submit(job, (k, a.rows, a.time, a.q8, a.seed, int(a.max_boxes), a.bab_batch)) for k in keys]):
             rows.append(fu.result())
             f.write(json.dumps(rows[-1]) + "\n")
             f.flush()

@@ -83,7 +83,7 @@ def cmds(kind, ds):
                  "--out", f"conf_lmilp_trees_{ds}_s{s}.csv"]]
     if kind.startswith("lmb"):  # PREREG LONGMILP: champion B, BaB at 600 s per row
         s = int(kind[-1])
-        return [["k5b_net.py", "--workers", "4", "--time", "600", "--max-boxes", "1e12", "--seed", str(s), "--out", f"conf_lmilp_b_{ds}_s{s}.csv"]]
+        return [["k5b_net.py", "--workers", "4", "--time", "600", "--max-boxes", "1e12", "--bab-batch", "4096", "--seed", str(s), "--out", f"conf_lmilp_b_{ds}_s{s}.csv"]]
     s = int(kind[-1])  # trees2 / trees3 / trees4
     return [["k5_trees.py", "--workers", "4", "--seed", str(s), "--out", f"conf_trees_{ds}_s{s}.csv"]]
 
