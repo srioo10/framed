@@ -179,6 +179,9 @@ def score(ds, outdir):
             continue
         if name == "fidelity":
             srcs = set(meta["runs"]["fidelity"]["attack_srcs"])
+            conn = outdir / "fidelity" / "zeek" / "conn.log"  # a sampled fidelity log may omit some sources
+            seen = {ln.split("\t", 3)[2] for ln in open(conn) if not ln.startswith("#")}
+            srcs &= seen
             ips = {ip for ip, _ in bhd}
             res["runs"]["fidelity"] = {"attack_srcs_blocked": round(len(ips & srcs) / max(len(srcs), 1), 4),
                                        "n": len(srcs)}
