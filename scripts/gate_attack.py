@@ -93,6 +93,7 @@ def main():
     ap.add_argument("--established", action="store_true")  # shared-key attacker: injected flows established (fail=0)
     ap.add_argument("--opt-harm", action="store_true")  # M6: per-flow white-box optimiser attacker (feature space)
     ap.add_argument("--dilute", type=int, nargs="*")  # C3: attacker pads its own src key with P benign flows / 120 s
+    ap.add_argument("--gap-boxes", type=int, default=8192)  # GAP-SPLIT run 2: BaB box cap
     ap.add_argument("--gap-split", type=float, default=0.0)  # GAP-SPLIT: BaB seconds per unwitnessed gap row
     ap.add_argument("--opt-gap", action="store_true")  # OPT-GAP: framing witnesses on alarmed-not-blocked test rows
     ap.add_argument("--mono", action="store_true")  # MONO: monotone-constrained XGB, exact corner certificate
@@ -213,7 +214,7 @@ def main():
             print(f"K19 {n} taus: context {tB:.4f} (B alone {tau['gated_net']:.4f}), flow {tF:.4f}", flush=True)
     if a.opt_gap:
         bab = None if not a.gap_split else (lambda X1: fx.bab_block(
-            m, h, *[v[0] for v in bowl.dbox(z, X1, a.m)], bi, g["head"], tau["gated_net"], time_s=a.gap_split))
+            m, h, *[v[0] for v in bowl.dbox(z, X1, a.m)], bi, g["head"], tau["gated_net"], time_s=a.gap_split, max_boxes=a.gap_boxes))
         opt_gap(a, bank, light, held, tx, *dets["gated_net"], tau["gated_net"], bab)
         return
     rows, key = sa.victims(bank, meta)
@@ -440,7 +441,7 @@ def opt_gap(a, bank, light, held, tx, f, b, tau, bab=None):
         print(json.dumps({k: round(v, 4) if isinstance(v, float) else v for k, v in row.items()}),
               f"{time.time() - t1:.0f}s", flush=True)
         assert viol == 0, "framing witness on a Veto-blocked row: Theorem 1'/2 violated"
-    pd.DataFrame(res).to_csv(sa.out(f"opt_gap_{a.dataset}{'_split' if bab else ''}.csv"), index=False)
+    pd.DataFrame(res).to_csv(sa.out(f"opt_gap_{a.dataset}{'_split' if bab else ''}{'' if a.gap_boxes == 8192 else '_b' + str(a.gap_boxes)}.csv"), index=False)
 
 
 def inject_ctx(H, cols, k, j120, j10, flags):

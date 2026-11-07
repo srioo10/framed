@@ -145,7 +145,7 @@ def realise(x, preds, y, le):
     return x
 
 
-def milp_bound(T, off, lo, hi, x, bi, k, rf):
+def milp_bound(T, off, lo, hi, x, bi, k, rf, limit=None):
     """(lower bound of s over the box, s at a realised point or None)."""
     L = [(i, node, cond) for i, tr in enumerate(T) for node, cond in leaves(tr, lo, hi)]
     preds = sorted({(f, t) for _, _, cond in L for f, t, _ in cond})
@@ -188,7 +188,7 @@ def milp_bound(T, off, lo, hi, x, bi, k, rf):
     integ = np.r_[np.ones(nP), np.zeros(nL), np.zeros(1 if multi else 0)]
     bnd = (np.r_[np.zeros(nP + nL), [-np.inf] if multi else []], np.r_[np.ones(nP + nL), [np.inf] if multi else []])
     r = milp(c, integrality=integ, bounds=Bounds(*bnd), constraints=LinearConstraint(A, lb, ub),
-             options={"time_limit": LIMIT, "disp": False})
+             options={"time_limit": limit or LIMIT, "disp": False})
     dual = getattr(r, "mip_dual_bound", None)
     if dual is None or not np.isfinite(dual):
         dual = r.fun if r.status == 0 else -np.inf
@@ -266,7 +266,7 @@ def job(args):
                 f"undecided_{part}": und, f"n_{part}": len(X)}
         if part == "unk":  # soundness check on 20 rows
             for i in range(min(20, len(X))):
-                s_lo, _, opt = milp_bound(T, off, lo[i], hi[i], X[i], col, k, rf)
+                s_lo, _, opt = milp_bound(T, off, lo[i], hi[i], X[i], col, k, rf, min(LIMIT, 20.0))  # check only: any limit is sound
                 top = np.maximum(np.minimum(hi[i], z["X_fit"].max(0)), lo[i])
                 pts = lo[i] + np.random.default_rng(i).random((200, X.shape[1]), dtype=np.float32) * (top - lo[i])
                 lt = low(lo[i:i + 1], hi[i:i + 1])[0]

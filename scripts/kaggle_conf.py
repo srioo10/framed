@@ -73,9 +73,13 @@ def cmds(kind, ds):
         return [K + (["--established", "--rekey", "5"] if kind == "rk24sk" else []) + ["--tag", kind]]
     if kind == "k14":  # PREREG §9 K14 + K15
         return [["spoof_attack.py", ds, "--baselines"], ["ips_point.py", ds]]
+    if kind.startswith("seed"):  # PREREG SEEDS: training seed s for SHARED-KEY and OPT (split stays seed 1)
+        s = kind[-1]
+        return [K + ["--established", "--rekey", "5", "--train-seed", s, "--tag", f"sharedkey_s{s}"],
+                K + ["--opt-harm", "--train-seed", s, "--tag", f"opt_s{s}"]]
     if kind.startswith("lmt"):  # PREREG LONGMILP: box-augmented RF, exact MILP at 600 s per row
         s = int(kind[-1])
-        return [["k5_trees.py", "--workers", "4", "--models", "rf", "--robust", "1", "--limit", "600", "--seed", str(s),
+        return [["k5_trees.py", "--workers", "2", "--models", "rf", "--robust", "1", "--limit", "600", "--seed", str(s),
                  "--out", f"conf_lmilp_trees_{ds}_s{s}.csv"]]
     if kind.startswith("lmb"):  # PREREG LONGMILP: champion B, BaB at 600 s per row
         s = int(kind[-1])
@@ -85,9 +89,9 @@ def cmds(kind, ds):
 
 
 KINDS = ["clean", "baselines", "k5b", "trees2", "trees3", "trees4", "groot", "groot2", "groot3", "groot4", "attack", "c3", "k14", "leank1", "leanc3", "k16", "k17", "k18", "rk24", "rk24sk", "k5bq8",
-         "lmt2", "lmt3", "lmt4", "lmb2", "lmb3", "lmb4"]
-OPT_IN = ("rk24", "rk24sk", "k5bq8", "lmt2", "lmt3", "lmt4", "lmb2", "lmb3", "lmb4")  # started only when named with --kinds (REKEY24 runs only CTU-13 / UGR'16)
-AK = ("attack", "c3", "k14", "k16", "k17", "k18", "rk24", "rk24sk")  # kinds on the ATTACK kernel + bigp-proc
+         "lmt2", "lmt3", "lmt4", "lmb2", "lmb3", "lmb4", "seed2", "seed3", "seed4"]
+OPT_IN = ("rk24", "rk24sk", "k5bq8", "lmt2", "lmt3", "lmt4", "lmb2", "lmb3", "lmb4", "seed2", "seed3", "seed4")  # started only when named with --kinds (REKEY24 runs only CTU-13 / UGR'16)
+AK = ("attack", "c3", "k14", "k16", "k17", "k18", "rk24", "rk24sk", "seed2", "seed3", "seed4")  # kinds on the ATTACK kernel + bigp-proc
 B = ('{"family": "tabm", "enc": "raw", "e": 4, "w": 32, "depth": 2, "sn": 0, "act": "relu", "members": 8, "head": "nlog", '
      '"kd": 0.9, "syn": 0.5, "clip": 1, "cert": 4, "gate": 1, "rdet": 2, "ls": 0.0, "focal": 0.0, "lr": 0.003}')
 # CONF C4 (K1 on ToN) and C3 on ToN (B, K4 at tau_day): need data/processed and the bowl champions, not the arena
