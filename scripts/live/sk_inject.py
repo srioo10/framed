@@ -10,7 +10,9 @@ log: its score (ordinary IPS) and its certified lower bound (Veto). Within budge
 Peers: one per /24, because the PREFIX24 build keys peers by /24 too (peer novelty uses the masked server key), so n
 peers inside one /24 would count as a single new peer. On the Pi, for k = first..first+n-1:
 `sudo ip addr add 192.168.<k>.1/32 dev <lab-iface>`, and `python3 -m http.server 8080` (binds all addresses).
-Usage: python3 sk_inject.py --n 10
+LIVE-NAT (per-IP keys behind a NAT): the same distinct peers work, since each peer is a distinct address. --fail k sends
+k of the n connections to a closed port (the attacker's own failed connections; variant F uses --fail n).
+Usage: python3 sk_inject.py --n 10 [--fail 10]
 """
 import argparse
 import socket
@@ -22,11 +24,23 @@ def main():
     ap.add_argument("--first", type=int, default=120, help="first peer /24: peers are 192.168.<first+i>.1")
     ap.add_argument("--n", type=int, default=10, help="distinct peers = injected established flows (<=10 in budget)")
     ap.add_argument("--dport", type=int, default=8080)
+    ap.add_argument("--fail", type=int, default=0, help="this many of the n flows go to --closed-port (refused)")
+    ap.add_argument("--closed-port", type=int, default=9)
     a = ap.parse_args()
+    assert 0 <= a.fail <= a.n
     assert 100 <= a.first and a.first + a.n <= 200, "lab-only peer /24s 192.168.100-199 (none used by the testbed)"
-    t0, ok = int(time.time() * 1000), 0
+    t0, ok, refused = int(time.time() * 1000), 0, 0
     for i in range(a.n):
         dst = f"192.168.{a.first + i}.1"
+        if i < a.fail:  # failed flow: SYN to a closed port, peer answers RST
+            try:
+                socket.create_connection((dst, a.closed_port), timeout=3).close()
+                print(f"  {dst}:{a.closed_port} unexpectedly open")
+            except ConnectionRefusedError:
+                refused += 1
+            except OSError as e:
+                print(f"  {dst}:{a.closed_port}: {e}")
+            continue
         try:
             with socket.create_connection((dst, a.dport), timeout=3) as s:
                 s.sendall(b"GET / HTTP/1.0\r\nHost: lab\r\n\r\n")
@@ -35,8 +49,9 @@ def main():
             ok += 1
         except OSError as e:
             print(f"  {dst}: {e}")
-    print(f"{t0} established {ok}/{a.n} flows -> 192.168.{a.first}..{a.first + a.n - 1}.1:{a.dport}")
-    if ok < a.n:  # not fatal: an ordinary IPS may block the attacker mid-run; the log says which flows were metered
+    print(f"{t0} refused {refused}/{a.fail} (failed flows), established {ok}/{a.n - a.fail}"
+          f" flows -> 192.168.{a.first}..{a.first + a.n - 1}.1:{a.dport}")
+    if ok + refused < a.n:  # not fatal: an ordinary IPS may block the attacker mid-run; the log says which flows were metered
         print("WARNING: not every flow was established (Pi aliases down, or the attacker itself was blocked)")
 
 
