@@ -81,6 +81,10 @@ def cmds(kind, ds):
         s = int(kind[-1])
         return [["k5_trees.py", "--workers", "2", "--models", "rf", "--robust", "1", "--limit", "600", "--seed", str(s),
                  "--out", f"conf_lmilp_trees_{ds}_s{s}.csv"]]
+    if kind[:3] in ("lmr", "lmx", "lmp"):  # PREREG LONGMILP-COVER: the other trees at 600 s (rf plain, xgb box, xgb plain)
+        s, (mdl, rb) = int(kind[-1]), {"lmr": ("rf", "0"), "lmx": ("xgb", "1"), "lmp": ("xgb", "0")}[kind[:3]]
+        return [["k5_trees.py", "--workers", "2", "--models", mdl, "--robust", rb, "--limit", "600", "--seed", str(s),
+                 "--out", f"conf_lmilp_trees_{ds}_s{s}_{kind[:3]}.csv"]]
     if kind.startswith("lmb"):  # PREREG LONGMILP: champion B, BaB at 600 s per row
         s = int(kind[-1])
         return [["k5b_net.py", "--workers", "4", "--time", "600", "--max-boxes", "1e12", "--bab-batch", "4096", "--seed", str(s), "--out", f"conf_lmilp_b_{ds}_s{s}.csv"]]
@@ -89,8 +93,8 @@ def cmds(kind, ds):
 
 
 KINDS = ["clean", "baselines", "k5b", "trees2", "trees3", "trees4", "groot", "groot2", "groot3", "groot4", "attack", "c3", "k14", "leank1", "leanc3", "k16", "k17", "k18", "rk24", "rk24sk", "k5bq8",
-         "lmt2", "lmt3", "lmt4", "lmb2", "lmb3", "lmb4", "seed2", "seed3", "seed4"]
-OPT_IN = ("rk24", "rk24sk", "k5bq8", "lmt2", "lmt3", "lmt4", "lmb2", "lmb3", "lmb4", "seed2", "seed3", "seed4")  # started only when named with --kinds (REKEY24 runs only CTU-13 / UGR'16)
+         "lmt2", "lmt3", "lmt4", "lmb2", "lmb3", "lmb4", "seed2", "seed3", "seed4"] + ['lmr2', 'lmr3', 'lmr4', 'lmx2', 'lmx3', 'lmx4', 'lmp2', 'lmp3', 'lmp4']
+OPT_IN = ("rk24", "rk24sk", "k5bq8", "lmt2", "lmt3", "lmt4", "lmb2", "lmb3", "lmb4", "seed2", "seed3", "seed4") + tuple(['lmr2', 'lmr3', 'lmr4', 'lmx2', 'lmx3', 'lmx4', 'lmp2', 'lmp3', 'lmp4'])  # started only when named with --kinds (REKEY24 runs only CTU-13 / UGR'16)
 AK = ("attack", "c3", "k14", "k16", "k17", "k18", "rk24", "rk24sk", "seed2", "seed3", "seed4")  # kinds on the ATTACK kernel + bigp-proc
 B = ('{"family": "tabm", "enc": "raw", "e": 4, "w": 32, "depth": 2, "sn": 0, "act": "relu", "members": 8, "head": "nlog", '
      '"kd": 0.9, "syn": 0.5, "clip": 1, "cert": 4, "gate": 1, "rdet": 2, "ls": 0.0, "focal": 0.0, "lr": 0.003}')
