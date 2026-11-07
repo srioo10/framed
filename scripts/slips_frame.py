@@ -117,18 +117,33 @@ def export(ds, outdir, days=None):
     print(f"{ds}: {len(meta['runs'])} runs, {len(pv)} victim host-days -> {outdir}")
 
 
+import calendar  # noqa: E402
 import re  # noqa: E402
 
-BLOCK_RE = re.compile(r"IP (\d+\.\d+\.\d+\.\d+)\s+detected as malicious in timewindow", re.I)
+# slips.log: "... IP <ip> detected as malicious in timewindow N (start YYYY/MM/DD HH:MM:SS, stop ...) ..."
+BLOCK_RE = re.compile(r"IP (\d+\.\d+\.\d+\.\d+)\s+detected as malicious in timewindow \d+ "
+                      r"\(start (\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})", re.I)
+
+
+def blocked_host_days(slips_dir):
+    """The block signal as (ip, epoch_day): Slips declared ip malicious in a timewindow whose start falls on that
+    day (the aggregated alert that drives blocking, in slips.log). Slips echoes the flow's own UTC time. None if no
+    slips.log. Per-flow evidence is NOT a block."""
+    f = Path(slips_dir) / "slips.log"
+    if not f.exists():
+        return None
+    out = set()
+    for line in open(f, errors="replace"):
+        m = BLOCK_RE.search(line)
+        if m:
+            t = calendar.timegm(__import__("time").strptime(m.group(2), "%Y/%m/%d %H:%M:%S"))
+            out.add((m.group(1), t * 1000 // 86_400_000))
+    return out
 
 
 def alerted_ips(slips_dir):
-    """The block signal: IPs Slips declared malicious in some timewindow (alerts.log aggregated alert, the event
-    that drives blocking). Returns None if the run produced no alerts.log. Per-flow evidence is NOT a block."""
-    f = Path(slips_dir) / "alerts" / "alerts.log"
-    if not f.exists():
-        return None
-    return {m.group(1) for line in open(f, errors="replace") for m in [BLOCK_RE.search(line)] if m}
+    d = blocked_host_days(slips_dir)
+    return None if d is None else {ip for ip, _ in d}
 
 
 def evidence_ips(slips_dir):
@@ -154,28 +169,36 @@ def evidence_ips(slips_dir):
 def score(ds, outdir):
     outdir = Path(outdir)
     meta = json.loads((outdir / "meta.json").read_text())
-    vdays = {(i, d) for i, d in meta["victim_days"]}
+    vdays = {(i, int(d)) for i, d in meta["victim_days"]}  # (victim ip, epoch day)
     victims = {i for i, _ in vdays}
-    res = {"ds": ds, "n_victim_host_days": len(vdays), "runs": {}, "evidence_only": {}}
+    res = {"ds": ds, "n_victim_host_days": len(vdays), "runs": {}, "newly_framed": {}}
     for name in meta["runs"]:
-        ips = alerted_ips(outdir / name / "slips")
-        if ips is None:
+        bhd = blocked_host_days(outdir / name / "slips")
+        if bhd is None:
             res["runs"][name] = "NO_OUTPUT"
             continue
-        ev = evidence_ips(outdir / name / "slips")
         if name == "fidelity":
             srcs = set(meta["runs"]["fidelity"]["attack_srcs"])
+            ips = {ip for ip, _ in bhd}
             res["runs"]["fidelity"] = {"attack_srcs_blocked": round(len(ips & srcs) / max(len(srcs), 1), 4),
-                                       "attack_srcs_any_evidence": round(len(ev & srcs) / max(len(srcs), 1), 4),
                                        "n": len(srcs)}
         else:
-            res["runs"][name] = round(len(victims & ips) / max(len(victims), 1), 4)  # rule: Slips BLOCK on victim
-            res["evidence_only"][name] = round(len(victims & ev) / max(len(victims), 1), 4)
+            res["runs"][name] = round(len(vdays & bhd) / max(len(vdays), 1), 4)  # share of victim host-days BLOCKED
+    # newly-framed: victim host-days blocked under a pattern that were NOT blocked clean (the attack's true effect)
+    clean_bhd = blocked_host_days(outdir / "clean" / "slips")
+    if clean_bhd is not None:
+        clean_vd = vdays & clean_bhd
+        for name in meta["runs"]:
+            if name.startswith("p"):
+                b = blocked_host_days(outdir / name / "slips")
+                if b is not None:
+                    res["newly_framed"][name] = round(len((vdays & b) - clean_vd) / max(len(vdays), 1), 4)
     clean = res["runs"].get("clean")
     pats = {k: v for k, v in res["runs"].items() if k.startswith("p") and isinstance(v, float)}
     if isinstance(clean, float) and pats:
         worst = max(pats.values())
         res["clean"], res["worst_pattern"] = clean, worst
+        res["worst_newly_framed"] = max(res["newly_framed"].values()) if res["newly_framed"] else None
         res["framable"] = bool(worst >= 2 * clean and worst - clean >= 0.05)  # SHARED-KEY bar (PREREG SLIPS-FRAME)
     (ROOT / "results" / "cert" / f"slips_frame_{ds}.json").write_text(json.dumps(res, indent=1))
     print(json.dumps(res, indent=1))
