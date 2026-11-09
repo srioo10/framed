@@ -1,5 +1,5 @@
 # This file was generated using idf.py save-defconfig or menuconfig [D] key. It can be edited manually.
 # Espressif IoT Development Framework (ESP-IDF) 5.3.1 Project Minimal Configuration
 #
-CONFIG_OP_WIFI_PASS="iloveapples!"
-CONFIG_OP_MQTT_PASS="r8@123"
+CONFIG_OP_WIFI_PASS=""
+CONFIG_OP_MQTT_PASS=""
