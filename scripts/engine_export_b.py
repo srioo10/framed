@@ -31,6 +31,13 @@ def q8(t):
     return q.numpy().astype(np.int64), s
 
 
+def quantise(m):
+    """Round B to the deployed int8 weights in place: body Linear weights and member heads (r and biases stay float)."""
+    assert isinstance(m, fx.Body) and m.M > 1 and len(m.body) == 2 * m.depth, "engine supports one TabM body"
+    lins = [m.body[i] for i in range(0, len(m.body), 2)]
+    return lins, [q8(lin.weight) for lin in lins], q8(m.hw)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("pair")
@@ -49,10 +56,7 @@ def main():
     torch.set_num_threads(4)
     m, h, _ = bowl.run_pair(B, z, "cpu", a.seed, 30)
     m.eval()
-    assert isinstance(m, fx.Body) and m.M > 1 and len(m.body) == 2 * m.depth, "engine supports one TabM body"
-    lins = [m.body[i] for i in range(0, len(m.body), 2)]
-    Q = [q8(lin.weight) for lin in lins]
-    HW = q8(m.hw)
+    lins, Q, HW = quantise(m)
     bi, k, M, W, D = z["bi"], z["k"], m.M, m.w, len(z["cols"])
     s_cal = h.score(m, z["X_cal"], "cpu")
     tau = float(np.sort(s_cal)[::-1][int(np.floor(0.01 * len(s_cal)))])

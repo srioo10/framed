@@ -13,6 +13,8 @@ subsampled to GROOT_ROWS (stratified, seed 1). Verified like RF (leaf benign sha
 Usage: .venv/bin/python scripts/k5_trees.py [--rows 100] [--workers 8] [--pairs nf_ctu13/pair_0 ...] [--models groot]
 """
 import argparse
+import os
+import resource
 import pickle
 import json
 import sys
@@ -145,6 +147,39 @@ def realise(x, preds, y, le):
     return x
 
 
+MEM_GB = float(os.environ.get("MILP_MEM_GB", "0"))  # >0: each MILP runs in a forked child with this much extra address space
+MEMOUT = [0]  # rows whose MILP ran out of that memory (counted undecided, like a time-out)
+
+
+def _milp(c, integ, bounds, cons, opts):
+    """scipy milp; with MILP_MEM_GB set, in a child under RLIMIT_AS so a memory blow-up ends one row, not the run."""
+    if MEM_GB <= 0:
+        return milp(c, integrality=integ, bounds=bounds, constraints=cons, options=opts)
+    rfd, wfd = os.pipe()
+    pid = os.fork()
+    if pid == 0:  # child
+        os.close(rfd)
+        try:
+            vm = int(open("/proc/self/statm").read().split()[0]) * os.sysconf("SC_PAGE_SIZE")
+            resource.setrlimit(resource.RLIMIT_AS, (vm + int(MEM_GB * 2**30),) * 2)
+            r = milp(c, integrality=integ, bounds=bounds, constraints=cons, options=opts)
+            out = pickle.dumps((r.status, r.x, r.fun, getattr(r, "mip_dual_bound", None)))
+        except BaseException:  # MemoryError / bad_alloc: report nothing
+            out = b""
+        with os.fdopen(wfd, "wb") as w:
+            w.write(out)
+        os._exit(0)
+    os.close(wfd)
+    with os.fdopen(rfd, "rb") as rd:
+        data = rd.read()
+    os.waitpid(pid, 0)
+    if not data:  # child died or ran out of memory: no bound, no point -> the row stays undecided
+        MEMOUT[0] += 1
+        return types.SimpleNamespace(status=-1, x=None, fun=np.inf, mip_dual_bound=None)
+    st, x, fun, dual = pickle.loads(data)
+    return types.SimpleNamespace(status=st, x=x, fun=fun, mip_dual_bound=dual)
+
+
 def milp_bound(T, off, lo, hi, x, bi, k, rf, limit=None):
     """(lower bound of s over the box, s at a realised point or None)."""
     L = [(i, node, cond) for i, tr in enumerate(T) for node, cond in leaves(tr, lo, hi)]
@@ -187,8 +222,7 @@ def milp_bound(T, off, lo, hi, x, bi, k, rf, limit=None):
     A = sparse.csr_matrix((vals, (rows, cols)), shape=(len(lb), nv))
     integ = np.r_[np.ones(nP), np.zeros(nL), np.zeros(1 if multi else 0)]
     bnd = (np.r_[np.zeros(nP + nL), [-np.inf] if multi else []], np.r_[np.ones(nP + nL), [np.inf] if multi else []])
-    r = milp(c, integrality=integ, bounds=Bounds(*bnd), constraints=LinearConstraint(A, lb, ub),
-             options={"time_limit": limit or LIMIT, "disp": False})
+    r = _milp(c, integ, Bounds(*bnd), LinearConstraint(A, lb, ub), {"time_limit": limit or LIMIT, "disp": False})
     dual = getattr(r, "mip_dual_bound", None)
     if dual is None or not np.isfinite(dual):
         dual = r.fun if r.status == 0 else -np.inf
@@ -253,7 +287,7 @@ def job(args):
             continue
         lo, hi = bowl.dbox(z, X, M)
         plain, pt = s(X) > tau, low(lo, hi) > tau
-        blk, und = pt.copy(), 0
+        blk, und, m0 = pt.copy(), 0, MEMOUT[0]
         for i in np.flatnonzero(plain & ~pt):
             s_lo, xr, _ = milp_bound(T, off, lo[i], hi[i], X[i], col, k, rf)
             if s_lo > tau:
@@ -262,6 +296,8 @@ def job(args):
                 pass  # attackable: a point in the box drops the score below tau
             else:
                 blk[i], und = True, und + 1  # undecided counts as blocked (favours the trees)
+        if MEM_GB > 0:
+            out[f"memout_{part}"] = MEMOUT[0] - m0
         out |= {f"plain_{part}": plain.mean(), f"pertree_{part}": pt.mean(), f"milp_{part}": blk.mean(),
                 f"undecided_{part}": und, f"n_{part}": len(X)}
         if part == "unk":  # soundness check on 20 rows

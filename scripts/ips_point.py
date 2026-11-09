@@ -37,7 +37,7 @@ def main():
         res.append(r)
         print(r, flush=True)
     tag = "_" + "+".join(sys.argv[2:]) if sys.argv[2:] else ""
-    pd.DataFrame(res).to_csv(sa.OUT / f"ips_tpr_{ds}{tag}.csv", index=False)
+    pd.DataFrame(res).to_csv(sa.out(f"ips_tpr_{ds}{tag}.csv"), index=False)
 
 
 if __name__ == "__main__":
