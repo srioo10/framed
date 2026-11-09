@@ -76,6 +76,9 @@ loaders and leak-free cleaning are in `src/nids/`.
 Native Kitsune needs `git clone https://github.com/ymirsky/Kitsune-py third_party/Kitsune-py` (we used commit
 `7c8ea51`, unmodified). `<B>` is the Veto genome, pinned in `PREREG.md` (CONF rows). The C engine (`engine/certb.h`, `engine/certids.c`) and
 the ESP32 firmware (`firmware/gateway`, `firmware/sensor`) implement the same box and bound on the device.
+To build the sensor firmware, copy `firmware/sensor/sdkconfig.defaults.example` to `sdkconfig.defaults` and fill in
+your own Wi-Fi and MQTT settings. Any credentials in older commits belong to a retired, isolated lab network (no
+Internet route) and are no longer valid.
 `scripts/README.md` says which scripts belong to the paper and which to the earlier phase.
 
 ## Audit your own detector for framing
