@@ -159,6 +159,10 @@ def main():
                  "rule_scan": lambda X: raw(X, "hc_src_n_120s") * (raw(X, "hc_src_newport_120s") + raw(X, "hc_src_newpeer_120s"))}
         for n, f in rules.items():
             dets[n] = (f, f)
+            # RULES-FP: the same count at the deletion box's lower corner; exact for these counts, e.g. (failed - m)+
+            # counts are integers: rounding removes the log/float32 round-trip error (<0.02, scratch check)
+            dets[n + "_fp"] = ((lambda f: lambda X: np.round(f(X)))(f),
+                               (lambda f: lambda X: np.round(f(next(bowl.dbox(z, X, a.m)).astype(np.float64))))(f))
     if a.no_gate:
         dets["b_nogate"] = (dets["gated_net"][0], dets["gated_net"][0])
     if a.at:  # PREREG §9 K18: same genome, PGD adversarial training in the same boxes instead of interval bounds
