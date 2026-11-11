@@ -26,23 +26,27 @@ def main():
     ap.add_argument("--dport", type=int, default=8080)
     ap.add_argument("--fail", type=int, default=0, help="this many of the n flows go to --closed-port (refused)")
     ap.add_argument("--closed-port", type=int, default=9)
+    ap.add_argument("--peers", type=int, default=0, help="LIVE-NAT-ENF: cycle over this many peer aliases (0 = one per flow)")
+    ap.add_argument("--port-step", type=int, default=0, help="LIVE-NAT-ENF: flow i uses port base + i*step (new ports)")
     a = ap.parse_args()
     assert 0 <= a.fail <= a.n
-    assert 100 <= a.first and a.first + a.n <= 200, "lab-only peer /24s 192.168.100-199 (none used by the testbed)"
+    npeer = a.peers or a.n
+    assert 100 <= a.first and a.first + npeer <= 200, "lab-only peer /24s 192.168.100-199 (none used by the testbed)"
     t0, ok, refused = int(time.time() * 1000), 0, 0
     for i in range(a.n):
-        dst = f"192.168.{a.first + i}.1"
+        dst = f"192.168.{a.first + i % npeer}.1"
+        cport, oport = a.closed_port + i * a.port_step, a.dport + i * a.port_step
         if i < a.fail:  # failed flow: SYN to a closed port, peer answers RST
             try:
-                socket.create_connection((dst, a.closed_port), timeout=3).close()
-                print(f"  {dst}:{a.closed_port} unexpectedly open")
+                socket.create_connection((dst, cport), timeout=3).close()
+                print(f"  {dst}:{cport} unexpectedly open")
             except ConnectionRefusedError:
                 refused += 1
             except OSError as e:
-                print(f"  {dst}:{a.closed_port}: {e}")
+                print(f"  {dst}:{cport}: {e}")
             continue
         try:
-            with socket.create_connection((dst, a.dport), timeout=3) as s:
+            with socket.create_connection((dst, oport), timeout=3) as s:
                 s.sendall(b"GET / HTTP/1.0\r\nHost: lab\r\n\r\n")
                 while s.recv(4096):
                     pass
@@ -50,7 +54,7 @@ def main():
         except OSError as e:
             print(f"  {dst}: {e}")
     print(f"{t0} refused {refused}/{a.fail} (failed flows), established {ok}/{a.n - a.fail}"
-          f" flows -> 192.168.{a.first}..{a.first + a.n - 1}.1:{a.dport}")
+          f" flows -> 192.168.{a.first}..{a.first + npeer - 1}.1, ports {a.dport}+{a.port_step}i")
     if ok + refused < a.n:  # not fatal: an ordinary IPS may block the attacker mid-run; the log says which flows were metered
         print("WARNING: not every flow was established (Pi aliases down, or the attacker itself was blocked)")
 
