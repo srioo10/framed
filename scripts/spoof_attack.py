@@ -31,7 +31,8 @@ import host_stream as hs  # noqa: E402
 import score_bank as sb  # noqa: E402
 from nids import hostctx, load, models  # noqa: E402
 
-SEED, N_DAYS, BUDGET_MS = 1, 300, 240_000
+SEED, BUDGET_MS = 1, 240_000
+N_DAYS = int(__import__("os").environ.get("NIDS_NDAYS", "300")) or None  # PREREG MOREHOSTS: 0 = all host-days (same permutation, so the first 300 are unchanged)
 COLS = ["FLOW_START_MILLISECONDS", "IPV4_SRC_ADDR", "IPV4_DST_ADDR", "L4_DST_PORT", "OUT_PKTS", "IN_BYTES"]
 OUT = ROOT / "results" / "cert"
 

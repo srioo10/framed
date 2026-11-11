@@ -31,7 +31,7 @@ subprocess.run([sys.executable, "-c", "import torch, sklearn, xgboost, scipy; pr
 for f in sorted(glob.glob(f"{conf}/{ds}/pair_*.npz")):
     print("md5", "{ds}/" + os.path.basename(f), hashlib.md5(open(f, "rb").read()).hexdigest(), flush=True)
 pairs = ["{ds}/" + os.path.basename(f)[:-4] for f in sorted(glob.glob(f"{conf}/{ds}/pair_*.npz"))]
-env = dict(os.environ, PYTHONPATH="/kaggle/working/w/src", OMP_NUM_THREADS="1", BOWL_DATASETS="{ds}")
+env = dict(os.environ, PYTHONPATH="/kaggle/working/w/src", OMP_NUM_THREADS="1", MILP_MEM_GB="20", BOWL_DATASETS="{ds}")  # MILP_MEM_GB: LONGMILP amendment 1fa01dc, COVER600
 S = "/kaggle/working/w/scripts/"
 for cmd in {cmds}:
     print("RUN", cmd, flush=True)
