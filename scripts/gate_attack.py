@@ -104,6 +104,7 @@ def main():
     ap.add_argument("--recal", type=float, default=0.0)  # RECAL: tau from the earliest q of test benign traffic
     ap.add_argument("--per-family", action="store_true")  # LOWRATE-CLASS: throttle readout per attack family
     ap.add_argument("--m-cert", type=int, nargs="*", default=[])  # FRONTIER: same B certified at extra budgets m0
+    ap.add_argument("--quorum", action="store_true")  # QUORUM: address blocked only with >= m+1 certified flows / 240 s
     ap.add_argument("--rekey", type=int, default=0)  # shared-key (NAT) attacker: N draws of real bot flows re-keyed
     a = ap.parse_args()
     TS = a.train_seed or sa.SEED
@@ -609,6 +610,16 @@ def smoothed(f, t, sg, mask, box, N=10000, alpha=0.001, seed=0):
     return (lambda X: run(X)[0]), (lambda X: run(X)[1])
 
 
+def quorum_mask(t, src, cert, q):
+    """Per row: its source has >= q certified rows in the trailing 240 s window ending at this row (inclusive)."""
+    out = np.zeros(len(t), bool)
+    for _, idx in pd.Series(np.arange(len(t))).groupby(src, sort=False):
+        idx = idx.to_numpy()[np.argsort(t[idx.to_numpy()], kind="stable")]
+        ct = t[idx][cert[idx]]
+        out[idx] = np.searchsorted(ct, t[idx], side="right") - np.searchsorted(ct, t[idx] - sa.BUDGET_MS, side="right") >= q
+    return out
+
+
 def throttle(a, bank, light, meta, dets, tau, tx, held, harm):
     """PREREG §9 K16: alarm / certified-block TPR on test attack rows when every attacking source keeps <= k of its
     attack flows per 240 s (greedy in time order); host context recomputed on the throttled raw flows."""
@@ -657,6 +668,11 @@ def throttle(a, bank, light, meta, dets, tau, tx, held, harm):
             r[f"{n}_tpr_macro"] = np.nanmean([r[f"{n}_tpr_unk"], r[f"{n}_tpr_known"]])
             r[f"{n}_btpr_macro"] = np.nanmean([r[f"{n}_btpr_unk"], r[f"{n}_btpr_known"]])
             r[f"{n}_clean_block_day"] = harm[n]
+            if a.quorum and k is None and n == "gated_net":  # scored rows are a subsample: count is a lower bound
+                q = quorum_mask(t[tmask][kt], src[tmask][kt], lb > tau[n], a.m + 1)
+                for part, msk in (("unk", is_unk[kt]), ("known", ~is_unk[kt])):
+                    r[f"{n}_qtpr_{part}"] = float(q[msk].mean()) if msk.any() else np.nan
+                r[f"{n}_qtpr_macro"] = np.nanmean([r[f"{n}_qtpr_unk"], r[f"{n}_qtpr_known"]])
             if a.per_family and (n == "gated_net" or n.startswith("veto_m")):  # LOWRATE-CLASS: per attack family
                 fk = bank.fam[rows][kt]
                 for fm in np.unique(fk):
