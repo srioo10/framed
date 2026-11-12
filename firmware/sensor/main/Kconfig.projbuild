@@ -14,6 +14,12 @@ menu "OnePass sensor"
     config OP_MQTT_PASS
         string "MQTT password"
         default ""
+    config OP_NAT_SSID
+        string "NAT SoftAP SSID (empty = plain sensor; set = also a NAPT router, PREREG LIVE-NAT-ENF)"
+        default ""
+    config OP_NAT_PASS
+        string "NAT SoftAP password"
+        default ""
     config OP_PERIOD_MS
         int "Publish period (ms)"
         default 5000

@@ -15,7 +15,8 @@
 #define PROBE 8
 
 typedef struct { int64_t id[B10]; float v[B10][NS]; int64_t id2[B120]; float v2[B120][NS];
-                 int32_t port[TAB]; uint64_t peer[TAB]; int64_t tport[TAB], tpeer[TAB]; } Side;
+                 int32_t port[TAB]; uint64_t peer[TAB]; int64_t tport[TAB], tpeer[TAB];
+                 int64_t tev; } Side;  /* tev: last time a port/peer entry still inside 120 s was evicted */
 typedef struct { uint64_t key; int64_t last, created, blocked_until; Side s[2]; } Host;
 typedef struct { Host *tab; size_t cap; long evictions; } HcTable;  /* cap = power of two */
 
@@ -38,6 +39,7 @@ fresh:
   T->tab[stale].key = key; T->tab[stale].last = T->tab[stale].created = t;
   for (int b = 0; b < B10; b++) T->tab[stale].s[0].id[b] = T->tab[stale].s[1].id[b] = -1;
   for (int b = 0; b < B120; b++) T->tab[stale].s[0].id2[b] = T->tab[stale].s[1].id2[b] = -1;
+  T->tab[stale].s[0].tev = T->tab[stale].s[1].tev = INT64_MIN / 2;
   return &T->tab[stale];
 }
 
@@ -51,13 +53,16 @@ static inline void hc_wsum(const Side *s, int64_t t, int big, float *out) {
   }
 }
 
-static inline int64_t hc_seen(int64_t *ts, void *keys, int is64, uint64_t k, int64_t t) {
+/* LRU novelty table. Evicting an entry seen < 120 s ago makes a later real flow look new: injected flows can then
+ * inflate novelty beyond m, so the eviction time goes to *tev and the certificate widens that side (cb_block_lower). */
+static inline int64_t hc_seen(int64_t *ts, void *keys, int is64, uint64_t k, int64_t t, int64_t *tev) {
   int old = 0;
   for (int i = 0; i < TAB; i++) {
     uint64_t ki = is64 ? ((uint64_t *)keys)[i] : (uint64_t)(uint32_t)((int32_t *)keys)[i];
     if (ts[i] && ki == k) { int64_t p = ts[i]; ts[i] = t; return p; }
     if (ts[i] < ts[old]) old = i;
   }
+  if (ts[old] && t - ts[old] <= 120000) *tev = t;
   if (is64) ((uint64_t *)keys)[old] = k; else ((int32_t *)keys)[old] = (int32_t)k;
   ts[old] = t;
   return INT64_MIN;
@@ -86,8 +91,8 @@ static inline void hc_flow(HcTable *T, uint64_t ks, uint64_t kd, int64_t t, int 
     }
   float v[2][2 * NS];
   for (int k = 0; k < 2; k++) {
-    int64_t tp = hc_seen(side[k]->tport, side[k]->port, 0, (uint32_t)port, t);
-    int64_t tq = hc_seen(side[k]->tpeer, side[k]->peer, 1, k ? ks : kd, t);
+    int64_t tp = hc_seen(side[k]->tport, side[k]->port, 0, (uint32_t)port, t, &side[k]->tev);
+    int64_t tq = hc_seen(side[k]->tpeer, side[k]->peer, 1, k ? ks : kd, t, &side[k]->tev);
     for (int big = 0; big < 2; big++) {
       int64_t wms = big ? 120000 : 10000;
       float *u = v[k] + big * NS;
@@ -97,5 +102,10 @@ static inline void hc_flow(HcTable *T, uint64_t ks, uint64_t kd, int64_t t, int 
     hc_add(side[k], t, v[k]);
   }
   *hs_out = hs; *hd_out = hd;
+}
+
+/* certificate widening mask for the flow just added at t: bit k = side k (0 src, 1 dst) had a recent eviction */
+static inline int hc_wide(const Host *hs, const Host *hd, int64_t t) {
+  return (t - hs->s[0].tev < 130000) | (t - hd->s[1].tev < 130000) << 1;
 }
 #endif

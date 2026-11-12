@@ -1,9 +1,11 @@
 /* ESP32 #2: MQTT temperature sensor for the OnePass lab (PREREG §9 DEPLOY). Joins the Wi-Fi in menuconfig, publishes
  * {"seq":n,"t_c":x,"up_ms":u} to onepass/sensor/temperature every OP_PERIOD_MS. Credentials live only in sdkconfig
- * (gitignored). The reading is simulated: the classic ESP32 has no usable on-chip temperature sensor.
+ * (gitignored). With OP_NAT_SSID set it also runs a SoftAP (192.168.5.1/24) with NAPT, so its clients share the
+ * sensor's own address on the gateway (LIVE-NAT-ENF; needs LWIP_IP_FORWARD and LWIP_IPV4_NAPT). The reading is simulated: the classic ESP32 has no usable on-chip temperature sensor.
  * shortcut: simulated reading, replace read_temp() when an external sensor (DHT22 / DS18B20) is wired. */
 #include <stdio.h>
 #include <math.h>
+#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "esp_event.h"
@@ -50,6 +52,7 @@ void app_main(void) {
   ESP_ERROR_CHECK(esp_netif_init());
   ESP_ERROR_CHECK(esp_event_loop_create_default());
   esp_netif_create_default_wifi_sta();
+  esp_netif_t *ap = CONFIG_OP_NAT_SSID[0] ? esp_netif_create_default_wifi_ap() : NULL;
   wifi_init_config_t wc = WIFI_INIT_CONFIG_DEFAULT();
   ESP_ERROR_CHECK(esp_wifi_init(&wc));
   ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, on_wifi, NULL));
@@ -58,10 +61,23 @@ void app_main(void) {
   snprintf((char *)sta.sta.ssid, sizeof sta.sta.ssid, "%s", CONFIG_OP_WIFI_SSID);
   snprintf((char *)sta.sta.password, sizeof sta.sta.password, "%s", CONFIG_OP_WIFI_PASS);
   sta.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
-  ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+  ESP_ERROR_CHECK(esp_wifi_set_mode(ap ? WIFI_MODE_APSTA : WIFI_MODE_STA));
   ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &sta));
+  if (ap) {
+    wifi_config_t apc = {.ap = {.channel = 6, .max_connection = 4, .authmode = WIFI_AUTH_WPA2_PSK}};
+    snprintf((char *)apc.ap.ssid, sizeof apc.ap.ssid, "%s", CONFIG_OP_NAT_SSID);
+    snprintf((char *)apc.ap.password, sizeof apc.ap.password, "%s", CONFIG_OP_NAT_PASS);
+    apc.ap.ssid_len = strlen(CONFIG_OP_NAT_SSID);
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &apc));
+    esp_netif_ip_info_t ip = {0};  /* not the default 192.168.4.1: that is the gateway's own SoftAP subnet */
+    esp_netif_set_ip4_addr(&ip.ip, 192, 168, 5, 1); esp_netif_set_ip4_addr(&ip.gw, 192, 168, 5, 1); esp_netif_set_ip4_addr(&ip.netmask, 255, 255, 255, 0);
+    esp_netif_dhcps_stop(ap);
+    ESP_ERROR_CHECK(esp_netif_set_ip_info(ap, &ip));
+    esp_netif_dhcps_start(ap);
+  }
   ESP_ERROR_CHECK(esp_wifi_start());
   xEventGroupWaitBits(ev, GOT_IP, pdFALSE, pdTRUE, portMAX_DELAY);
+  if (ap) { ESP_ERROR_CHECK(esp_netif_napt_enable(ap)); ESP_LOGI(TAG, "napt on " CONFIG_OP_NAT_SSID); }
 
   esp_mqtt_client_config_t mc = {.broker.address.uri = CONFIG_OP_BROKER_URI,
                                  .credentials.username = CONFIG_OP_MQTT_USER,

@@ -40,7 +40,7 @@ static double TAU;  /* CONFIG_GW_TAU if set (PREREG tau_lab), else the model's t
 #define ACTIVE_MS 120000 /* = flowmeter.ACTIVE_S */
 #define NFLOW 256
 #define NBLK 16
-#define AGE_MS 130000    /* certids: no block while a host entry is younger than one 120 s window + bucket */
+#define AGE_MS 250000    /* no block while a host entry is younger than one 240 s budget window + bucket */
 
 typedef struct { int64_t t; uint32_t src, dst; uint16_t sport, dport, len; uint8_t proto, flags; } Pkt;
 typedef struct { uint8_t used, proto, fin; uint8_t flags; uint32_t cip, sip; uint16_t cport, sport;
@@ -149,7 +149,7 @@ static void decide(Flow *f, int64_t tc, const char *why) {
 #if ORDINARY
     blk = 1;
 #else
-    lower = cb_block_lower(c, x);
+    lower = cb_block_lower(c, x, hc_wide(hs, hd, tc));
     blk = lower > TAU;
     if (blk && (tc - hs->created < AGE_MS || tc - hd->created < AGE_MS)) { blk = 0; nabst++; }
 #endif

@@ -7,3 +7,5 @@ build_sk*/
 sdkconfig.shed
 # holds lab Wi-Fi / MQTT passwords; copy sensor/sdkconfig.defaults.example and fill in locally
 sensor/sdkconfig.defaults
+sdkconfig.*
+build_*/

@@ -113,10 +113,17 @@ static inline void cb_dbox(const CertB *c, const double *x, double *lo, double *
   for (int i = c->F; i < c->D; i++) { lo[i] = fmin(lo[i], x[i]) - CB_EPS; hi[i] = fmax(hi[i], x[i]) + CB_EPS; }
 }
 
-/* certified block: lower bound over the deletion box > tau (float64, outward margin 1e-6 as fighters.score_lower) */
-static inline double cb_block_lower(const CertB *c, const double *x) {
+/* certified block: lower bound over the deletion box > tau (float64, outward margin 1e-6 as fighters.score_lower).
+ * wide bit k (hostctx.hc_wide): side k's novelty table evicted a live entry, so its newport / newpeer shares are only
+ * known to lie in [0, 1] (bounded-memory gateway; the offline engine has exact tables and passes 0). */
+static inline double cb_block_lower(const CertB *c, const double *x, int wide) {
   double lo[CB_MAXD], hi[CB_MAXD];
   cb_dbox(c, x, lo, hi);
+  for (int g = 0; g < 4; g++)  /* g = window * 2 + side, as hostctx.COLS */
+    if (wide >> (g & 1) & 1)
+      for (int j = c->F + g * 5 + 2; j <= c->F + g * 5 + 3; j++) {
+        lo[j] = fmin(lo[j], (log1p(0.0) - c->mu[j]) / c->sd[j]); hi[j] = fmax(hi[j], (log1p(1.0) - c->mu[j]) / c->sd[j]);
+      }
   return cb_score_lower(c, lo, hi) - 1e-6;
 }
 #endif

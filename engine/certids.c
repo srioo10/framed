@@ -21,7 +21,7 @@
 #include "certb.h"
 #include "hostctx.h"
 
-#define AGE_MS 130000
+#define AGE_MS 250000
 
 static HcTable T_;
 static CertB M_;
@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
     while (fgets(line, sizeof line, stdin)) {
       char *p = line;
       for (int i = 0; i < c->D; i++) { x[i] = strtod(p, &p); if (*p == ',') p++; }
-      printf("%.17g,%.17g\n", cb_score(c, x), cb_block_lower(c, x)); n++;
+      printf("%.17g,%.17g\n", cb_score(c, x), cb_block_lower(c, x, 0)); n++;
     }
     return 0;
   }
@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
     double s = cb_score(c, x), lower = -INFINITY;
     int alarm = s > c->tau, block = 0;
     if (alarm) {
-      lower = cb_block_lower(c, x); block = lower > c->tau; nal++;
+      lower = cb_block_lower(c, x, hc_wide(hs, hd, t)); block = lower > c->tau; nal++;
       if (block && age && (t - hs->created < AGE_MS || t - hd->created < AGE_MS)) { block = 0; nab++; }  /* abstain */
     }
     if (block) {

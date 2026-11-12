@@ -28,7 +28,9 @@ def main():
     ap.add_argument("--closed-port", type=int, default=9)
     ap.add_argument("--peers", type=int, default=0, help="LIVE-NAT-ENF: cycle over this many peer aliases (0 = one per flow)")
     ap.add_argument("--port-step", type=int, default=0, help="LIVE-NAT-ENF: flow i uses port base + i*step (new ports)")
+    ap.add_argument("--src", default="", help="bind to this local address (LIVE-NAT-ENF attacker interface)")
     a = ap.parse_args()
+    sa = (a.src, 0) if a.src else None
     assert 0 <= a.fail <= a.n
     npeer = a.peers or a.n
     assert 100 <= a.first and a.first + npeer <= 200, "lab-only peer /24s 192.168.100-199 (none used by the testbed)"
@@ -38,7 +40,7 @@ def main():
         cport, oport = a.closed_port + i * a.port_step, a.dport + i * a.port_step
         if i < a.fail:  # failed flow: SYN to a closed port, peer answers RST
             try:
-                socket.create_connection((dst, cport), timeout=3).close()
+                socket.create_connection((dst, cport), timeout=3, source_address=sa).close()
                 print(f"  {dst}:{cport} unexpectedly open")
             except ConnectionRefusedError:
                 refused += 1
@@ -46,7 +48,7 @@ def main():
                 print(f"  {dst}:{cport}: {e}")
             continue
         try:
-            with socket.create_connection((dst, oport), timeout=3) as s:
+            with socket.create_connection((dst, oport), timeout=3, source_address=sa) as s:
                 s.sendall(b"GET / HTTP/1.0\r\nHost: lab\r\n\r\n")
                 while s.recv(4096):
                     pass
