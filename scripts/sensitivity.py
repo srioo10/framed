@@ -32,6 +32,41 @@ def _groups(cols):
     return {c.rsplit("_", 2)[0] + "_" + c.rsplit("_", 1)[1] for c in cols if c[:3] in ("hc_", "hl_")}  # hc_src_10s, ...
 
 
+def _damped(X, cols, mu, sd, m, lo, hi, deletion):
+    """Decayed hd_* columns (src/nids/damped.py, appendix proposition): weight w and means of 0/1 flags. Injections add
+    weight <= R = m / (1 - e^{-240 lam}) and, for novelty flags, flip real flags of weight <= F (damped.flip_weight).
+    Insertion (clean -> observed): w' in [w, w+R]; mean' in [(LS-F)+/(w+R), (LS+R)/(w+R)] (mean' = 0 when w = 0, R).
+    Deletion (observed -> clean): w in [(w'-R)+, w']; mean in [(LS'-R)+/(w'-R), (LS'+F)/(w'-R)], [0,1] if w' <= R."""
+    from nids.damped import flip_weight
+    raw = lambda j: np.expm1(np.maximum(X[:, j] * sd[j] + mu[j], 0))  # noqa: E731
+    back = lambda j, v: (np.log1p(v) - mu[j]) / sd[j]  # noqa: E731
+    groups = {c.split("_")[1] + "_" + c.split("_")[3] for c in cols if c[:3] == "hd_"}
+    for g in groups:
+        k, lam = g.split("_")
+        lam_s = float(lam)
+        R = m / (1.0 - np.exp(-240.0 * lam_s))
+        iw = cols.index(f"hd_{k}_w_{lam}")
+        w = raw(iw)
+        if deletion:
+            wr = w - R
+            lo[:, iw] = back(iw, np.maximum(wr, 0))
+        else:
+            hi[:, iw] = back(iw, w + R)
+        for st in ("fail", "newport", "newpeer"):
+            j = cols.index(f"hd_{k}_{st}_{lam}")
+            F = 0.0 if st == "fail" else flip_weight(lam_s, m)
+            LS = np.minimum(raw(j), 1.0) * w
+            if deletion:
+                empty = wr <= 1e-9
+                d = np.where(empty, 1.0, wr)
+                mlo = np.where(empty, 0.0, np.maximum(LS - R, 0) / d)
+                mhi = np.where(empty, 1.0, np.minimum((LS + F) / d, 1.0))
+            else:
+                d = w + R
+                mlo, mhi = np.maximum(LS - F, 0) / d, np.minimum((LS + R) / d, 1.0)
+            lo[:, j], hi[:, j] = back(j, mlo), back(j, mhi)
+
+
 def box(X, cols, mu, sd, m):
     """(n, d) prepped rows -> (lo, hi) of the same shape; mu / sd are Prep's per-column log-space mean / scale."""
     X = np.asarray(X, np.float64)
@@ -50,7 +85,8 @@ def box(X, cols, mu, sd, m):
             c_lo = c if s == "fail" else np.maximum(c - b, 0)
             lo[:, idx[s]], hi[:, idx[s]] = back(idx[s], c_lo / dm), back(idx[s], np.minimum((c + a) / dm, 1))
         lo[:, idx["bytes"]], hi[:, idx["bytes"]] = back(idx["bytes"], raw(idx["bytes"]) * d / dm), np.inf
-    hc = np.array([c[:3] in ("hc_", "hl_") for c in cols])
+    _damped(X, cols, mu, sd, m, lo, hi, deletion=False)
+    hc = np.array([c[:3] in ("hc_", "hl_", "hd_") for c in cols])
     lo[:, hc] = np.minimum(lo[:, hc], X[:, hc]) - EPS
     hi[:, hc] = np.maximum(hi[:, hc], X[:, hc]) + EPS
     return lo, hi
@@ -85,7 +121,8 @@ def deletion_box(X, cols, mu, sd, m):
             s_hi = np.where(empty, 1, np.minimum((c if s == "fail" else c + b) / dr, 1))
             lo[:, idx[s]], hi[:, idx[s]] = back(idx[s], s_lo), back(idx[s], s_hi)
         lo[:, idx["bytes"]], hi[:, idx["bytes"]] = back(idx["bytes"], 0), np.inf
-    hc = np.array([c[:3] in ("hc_", "hl_") for c in cols])
+    _damped(X, cols, mu, sd, m, lo, hi, deletion=True)
+    hc = np.array([c[:3] in ("hc_", "hl_", "hd_") for c in cols])
     lo[:, hc] = np.minimum(lo[:, hc], X[:, hc]) - EPS
     hi[:, hc] = np.maximum(hi[:, hc], X[:, hc]) + EPS
     return lo, hi

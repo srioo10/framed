@@ -18,6 +18,9 @@ import pandas as pd
 WINDOWS_MS = (10_000, 120_000)
 STATS = ("n", "fail", "newport", "newpeer", "bytes")
 COLS = [f"hc_{k}_{s}_{w // 1000}s" for w in WINDOWS_MS for k in ("src", "dst") for s in STATS]
+DAMP_LAMS = (0.01, 0.001)  # per second; DAMPED plan: Kitsune-style decayed per-key statistics
+DAMP_STATS = ("w", "fail", "newport", "newpeer")
+DAMP_COLS = [f"hd_{k}_{s}_{lam:g}" for lam in DAMP_LAMS for k in ("src", "dst") for s in DAMP_STATS]
 LONG_MS = (3_600_000, 86_400_000)  # PREREG §9 K7 long-memory host profile
 LONG_COLS = [f"hl_{k}_{s}_{w // 1000}s" for w in LONG_MS for k in ("src", "dst") for s in STATS]
 KEY_PREFIX = int(os.environ.get("NIDS_KEY_PREFIX", "0"))  # PREREG §9 REKEY24: 24 = host key is the /24, not the IP
@@ -118,6 +121,22 @@ class HostFlows:
                     j += 1
         return out
 
+    def damped(self, pop, lams=DAMP_LAMS):
+        """float32 (n_flows, 8 * len(lams)): per key, decayed weight w = sum e^{-lam age} of earlier population flows
+        (start strictly before the flow) and the decayed means of fail / newport / newpeer (120 s look-back flags)."""
+        out = np.empty((len(self.t), len(DAMP_STATS) * 2 * len(lams)), np.float32)
+        j = 0
+        for lam in lams:
+            for k in ("src", "dst"):
+                g = np.stack([self.fail, self._novel(self.pair_port[k], pop, 120_000),
+                              self._novel(self.pair_peer[k], pop, 120_000)], 1).astype(np.float64)
+                w, ls = _decayed(self.key[k], self.t, np.asarray(pop, bool) if not isinstance(pop, slice) else
+                                 np.ones(len(self.t), bool), g, lam / 1000.0)
+                out[:, j] = w
+                out[:, j + 1:j + 4] = ls / np.maximum(w, 1e-12)[:, None]
+                j += 4
+        return out
+
     def removal(self, R):
         """Features of the kept rows with families R removed from the population (cached per removal set)."""
         R = tuple(sorted(R))
@@ -142,3 +161,29 @@ class HostFlows:
                 out[m] = self.features(ben | m)[m]
             self._cache["iso"] = out[self.keep]
         return self._cache["iso"]
+
+
+def _decayed(key, t, pop, g, lam_ms):
+    """Per flow: decayed weight and value sums over earlier (strictly) population flows of the same key."""
+    import numba
+
+    @numba.njit(cache=True)
+    def run(o, key, t, pop, g, lam):
+        n, d = len(o), g.shape[1]
+        w, ls = np.zeros(n), np.zeros((n, d))
+        i = 0
+        while i < n:
+            kk, W, L, T = key[o[i]], 0.0, np.zeros(d), t[o[i]]
+            while i < n and key[o[i]] == kk:
+                j, tt = i, t[o[i]]
+                f = np.exp(-lam * (tt - T)); W *= f; L *= f; T = tt
+                while j < n and key[o[j]] == kk and t[o[j]] == tt:  # ties: read all, then add all
+                    w[o[j]] = W; ls[o[j]] = L; j += 1
+                for q in range(i, j):
+                    if pop[o[q]]:
+                        W += 1.0; L += g[o[q]]
+                i = j
+        return w, ls
+
+    o = np.lexsort((t, key))
+    return run(o, key.astype(np.int64), t.astype(np.int64), pop, g, lam_ms)

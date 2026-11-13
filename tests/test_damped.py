@@ -110,3 +110,30 @@ def test_novelty_flip_term_needed_and_sufficient():
         assert ml - 1e-9 <= cln[1] <= mh + 1e-9                     # sound with the flip term
         _, (ml0, mh0), _ = box(*obs, lam, m, 1.0, novelty=False)
         assert cln[1] > mh0 + 1e-6, (cln[1], mh0)                   # and the flip term is needed
+
+
+def test_column_boxes_match_damped_box():
+    """scripts/sensitivity.py's hd_* column boxes contain the clean / observed rows of brute-force streams."""
+    import sys; sys.path.insert(0, "scripts")
+    import sensitivity
+    rng = np.random.default_rng(3)
+    cols = [f"hd_src_{s}_0.01" for s in ("w", "fail", "newport", "newpeer")]
+    mu, sd = np.zeros(4), np.ones(4)
+    prep = lambda v: np.log1p(np.asarray(v, float))  # noqa: E731
+    T = 3000.0
+    for _ in range(500):
+        m = int(rng.integers(1, 11))
+        ct = np.sort(rng.random(int(rng.integers(1, 60))) * T); cp = rng.integers(0, 20, len(ct))
+        cf = rng.integers(0, 2, len(ct)).astype(float)
+        it = T - inject_times(rng, m, 240.0, T)
+        ip = rng.integers(0, 20, len(it)); iff = rng.integers(0, 2, len(it)).astype(float)
+        allt, allp, allf = np.r_[ct, it], np.r_[cp, ip], np.r_[cf, iff]
+        def row(times, ports, fails):
+            w, mf, _ = stats(T - times, fails, 0.01)
+            _, mn, _ = stats(T - times, novelty_flags(times, ports), 0.01)
+            return np.array([w, mf, mn, mn])
+        clean, obs = row(ct, cp, cf), row(allt, allp, allf)
+        lo, hi = sensitivity.deletion_box(prep(obs)[None], cols, mu, sd, m)
+        assert np.all(lo[0] <= prep(clean) + 1e-9) and np.all(prep(clean) <= hi[0] + 1e-9), (clean, obs)
+        lo, hi = sensitivity.box(prep(clean)[None], cols, mu, sd, m)
+        assert np.all(lo[0] <= prep(obs) + 1e-9) and np.all(prep(obs) <= hi[0] + 1e-9), (clean, obs)
