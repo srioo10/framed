@@ -5,3 +5,7 @@ idf_component_register(SRCS "gateway.c" "ids.c"
 idf_component_get_property(lwip lwip COMPONENT_LIB)
 target_compile_options(${lwip} PRIVATE "-I${CMAKE_CURRENT_LIST_DIR}")
 target_compile_definitions(${lwip} PRIVATE "ESP_IDF_LWIP_HOOK_FILENAME=\"lwip_hook.h\"")
+# idf.py -D GW_SOUND=1: sound arithmetic build (PREREG LIVE-SOUND)
+if(GW_SOUND)
+  target_compile_definitions(${COMPONENT_LIB} PRIVATE GW_SOUND=1 HC_FLAG_MS=250000)
+endif()

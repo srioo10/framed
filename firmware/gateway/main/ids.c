@@ -149,7 +149,11 @@ static void decide(Flow *f, int64_t tc, const char *why) {
 #if ORDINARY
     blk = 1;
 #else
+#if GW_SOUND  /* outward-rounded bound (Theorem 2) + 250 s eviction flag (Lemma 2(iii)); PREREG LIVE-SOUND */
+    lower = cb_block_lower_sound(c, x, hc_wide(hs, hd, tc));
+#else
     lower = cb_block_lower(c, x, hc_wide(hs, hd, tc));
+#endif
     blk = lower > TAU;
     if (blk && (tc - hs->created < AGE_MS || tc - hd->created < AGE_MS)) { blk = 0; nabst++; }
 #endif

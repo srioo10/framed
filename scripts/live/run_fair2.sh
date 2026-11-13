@@ -42,6 +42,6 @@ for b in ${1:-veto ord}; do
   sleep 45  # the flash can reset the Pi radio a few seconds later (seen Nov 13): settle first
   for r in 1 2 3; do run1 $b clean $((r + ${OFF:-0})); done
   for r in 1 2 3 4 5; do q=$((r + ${OFF:-0})); run1 $b A $q; run1 $b B $q; run1 $b E $q; done
-  if [ $b = veto ] && [ "${2:-1}" = 1 ]; then for r in 1 2 3 4 5; do run1 $b D $((r + ${OFF:-0})); done; att_nat; fi
+  if [ $b != ord ] && [ "${2:-1}" = 1 ]; then for r in 1 2 3 4 5; do run1 $b D $((r + ${OFF:-0})); done; att_nat; fi
 done
 echo "FAIR DONE off ${OFF:-0} $(date +%s)" >> $R
