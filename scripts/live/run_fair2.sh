@@ -36,10 +36,25 @@ run() {  # build variant rep
   [ -n "$A" ]  # PREREG INVALID rule (no attacker address): the caller reruns once
 }
 run1() { run "$@" || { echo "RUN $1 $2 $3 RERUN (invalid)" >> $R; run "$@"; }; }
+alive() {  # a decision (F line) logged by the gateway after time $1 (s), waiting up to 300 s
+  local t=$1; for i in $(seq 30); do
+    awk -F, -v t=$((t * 1000)) '$2 == "F" && $1 > t {f=1} END {exit !f}' $(ls -t /opt/onepass/live/gw/gw-*.log | head -2) && return 0
+    sleep 10; done; return 1
+}
+safe_flash() {  # flash, require esptool's 3 hash checks and a booted gateway; 3 tries
+  local try out t
+  for try in 1 2 3; do
+    systemctl stop onepass-gwlog; out=$($L/fl.sh gw $1 2>&1); systemctl start onepass-gwlog; t=$(date +%s)
+    echo "$out" >> $R
+    if [ $(echo "$out" | grep -c "Hash of data verified") -ge 1 ] && sleep 45 && alive $t; then
+      echo "BUILD $1 flashed $t verified (try $try)" >> $R; return 0; fi
+    echo "FLASH CHECK FAILED $1 try $try $(date +%s)" >> $R; sleep 30
+  done
+  return 1
+}
 for b in ${1:-veto ord}; do
-  systemctl stop onepass-gwlog; $L/fl.sh gw fair_$b >> $R 2>&1; systemctl start onepass-gwlog
-  echo "BUILD fair_$b flashed $(date +%s)" >> $R
-  sleep 45  # the flash can reset the Pi radio a few seconds later (seen Nov 13): settle first
+  if ! safe_flash fair_$b; then  # leave the gateway on a known-good build and skip this one (reported as not run)
+    echo "BUILD fair_$b SKIPPED: flash failed 3 times" >> $R; safe_flash fair_veto; continue; fi
   for r in 1 2 3; do run1 $b clean $((r + ${OFF:-0})); done
   for r in 1 2 3 4 5; do q=$((r + ${OFF:-0})); run1 $b A $q; run1 $b B $q; run1 $b E $q; done
   if [ $b != ord ] && [ "${2:-1}" = 1 ]; then for r in 1 2 3 4 5; do run1 $b D $((r + ${OFF:-0})); done; att_nat; fi
