@@ -106,7 +106,10 @@ static inline void hc_flow(HcTable *T, uint64_t ks, uint64_t kd, int64_t t, int 
 }
 
 /* certificate widening mask for the flow just added at t: bit k = side k (0 src, 1 dst) had a recent eviction */
+#ifndef HC_FLAG_MS
+#define HC_FLAG_MS 130000  /* deployed builds; 250000 makes Lemma 2(iii)'s converse provable (eviction < 240 s back) */
+#endif
 static inline int hc_wide(const Host *hs, const Host *hd, int64_t t) {
-  return (t - hs->s[0].tev < 130000) | (t - hd->s[1].tev < 130000) << 1;
+  return (t - hs->s[0].tev < HC_FLAG_MS) | (t - hd->s[1].tev < HC_FLAG_MS) << 1;
 }
 #endif
