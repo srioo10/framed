@@ -33,7 +33,7 @@ Every test, including the ones that failed, was written down before it ran, with
 
 ## Main results
 
-All of these are from pre-registered tests, with m = 10 flows per key per 240 s.
+All are from pre-registered tests unless marked post hoc, with m = 10 flows per key per 240 s.
 
 | Question | Result |
 |---|---|
@@ -43,9 +43,9 @@ All of these are from pre-registered tests, with m = 10 flows per key per 240 s.
 | How close to the best frame-proof rule? | Veto blocks at least 96% of what the optimal frame-proof rule for the same detector could block (framing-witness search; CTU-13, UGR'16, CIC). Optimality is relative to Veto's own score |
 | Does the certificate hold? | 0 injection-caused blocks over 72 attack patterns, an adaptive attacker and a white-box per-flow optimiser, on all datasets |
 | What does it cost? | Veto's clean block rate is 0.55 / 2.0 / 1.33% of host-days (CTU-13 / UGR'16 / CIC), with 95% intervals containing the 1% budget. ToN-IoT drifts to 4.0% |
-| Versus certified trees? | A certified tree ensemble that fits the same chip (23 KB) trails Veto by 0.159 [0.099, 0.220]. Veto leads full-size certified forests (0.5–17 MB) by +0.104 [0.051, 0.166] under the proof rule; under the "undecided = blocked" convention the lead is +0.030, not significant. With both sides on fast per-tree bounds (the deployable pairing), Veto leads by +0.128 [0.079, 0.182] |
-| Versus a monotone model? | An exact-certified monotone gradient-boosted model (minimum = score at the box corner) ties Veto on certified detection on two of three datasets and wins on CTU-13, but it is 0.5–1.1 MB (does not fit the chip) and its alarms flood under attack (30% of innocent host-days on UGR'16, vs 3% for Veto) |
-| On a $15 gateway? | Inline on an ESP32 access point: 29 / 59 ms per flow, 117 KB heap. An ordinary IPS cuts the sensor off under attack; Veto keeps it online within budget and blocks over budget. An over-rate pre-filter closes the fail-open hole on hardware: under a 10× flood the gateway forwards zero flows unscored (was ~34,500/run), sheds 81% of the flood, and keeps the innocent sensor scored and unblocked |
+| Versus certified trees? | A certified tree ensemble that fits the same chip (23 KB) trails Veto by 0.159 [0.099, 0.220]. Veto leads full-size certified forests (0.5–17 MB) by +0.104 [0.051, 0.166] under the proof rule; under the "undecided = blocked" convention the lead is +0.030, not significant. With both sides on fast per-tree bounds (the deployable pairing), Veto leads by +0.128 [0.079, 0.182] (post hoc) |
+| Versus a monotone model? | An exact-certified monotone gradient-boosted model (minimum = score at the box corner) ties Veto on certified detection on two of three datasets and wins on CTU-13, but it is 0.5–1.1 MB (does not fit the chip; a size-matched 23 KB monotone model is close to a tie with Veto) and its alarms flood under attack (30% of innocent host-days on UGR'16, vs 3% for Veto) |
+| On a $15 gateway? | Inline on an ESP32 access point: 29 / 59 ms per flow, 117 KB heap. Behind a shared NAT address in enforce mode, an ordinary IPS cut the sensor off in 10 of 10 in-budget runs (it also blocked on clean traffic in some runs); Veto never blocked it in 23 runs. An over-rate pre-filter closes the fail-open hole on hardware: under a 10× flood the gateway forwards zero flows unscored (was ~34,500/run), sheds 81% of the flood, and keeps the innocent sensor scored and unblocked |
 
 What it does not do (all reported in the paper and in `PREREG.md`):
 
@@ -77,8 +77,8 @@ Native Kitsune needs `git clone https://github.com/ymirsky/Kitsune-py third_part
 `7c8ea51`, unmodified). `<B>` is the Veto genome, pinned in `PREREG.md` (CONF rows). The C engine (`engine/certb.h`, `engine/certids.c`) and
 the ESP32 firmware (`firmware/gateway`, `firmware/sensor`) implement the same box and bound on the device.
 To build the sensor firmware, copy `firmware/sensor/sdkconfig.defaults.example` to `sdkconfig.defaults` and fill in
-your own Wi-Fi and MQTT settings. Any credentials in older commits belong to a retired, isolated lab network (no
-Internet route) and are no longer valid.
+your own Wi-Fi and MQTT settings. Credentials in older commits belonged to an isolated lab network (no Internet route)
+and were rotated on 13 Nov 2026; they no longer work.
 `scripts/README.md` says which scripts belong to the paper and which to the earlier phase.
 
 ## Audit your own detector for framing
