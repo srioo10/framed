@@ -60,6 +60,9 @@ def cmds(kind, ds):
         return [["test_lean_hostctx.py", "nf_ctu13", "nf_ugr16"], ["spoof_attack.py", ds]]
     if kind == "leanc3":  # memory-lean ToN C3, guarded by the test on CTU-13
         return [["test_lean_hostctx.py", "nf_ctu13"], ["gate_attack.py", ds, "--tau-day", "--genome", B]]
+    if kind == "damped":  # PREREG DAMPED: decayed per-key statistics replace the windows (pairs rebuilt on Kaggle)
+        return [["test_damped_kernel.py"], ["conf_pairs.py", ds],
+                ["conf_clean.py", "--arena", "data/conf_damped", "--models", "B", "--out", f"damped_{ds}.jsonl"]]
     if kind == "c3":
         return [["gate_attack.py", ds, "--tau-day", "--genome", B]]
     K = ["gate_attack.py", ds, "--tau-day", "--genome", B]  # PREREG §9 K16 / K17 / K18
@@ -99,9 +102,9 @@ def cmds(kind, ds):
 
 
 KINDS = ["clean", "baselines", "k5b", "trees2", "trees3", "trees4", "groot", "groot2", "groot3", "groot4", "attack", "c3", "k14", "leank1", "leanc3", "k16", "k17", "k18", "rk24", "rk24sk", "k5bq8",
-         "lmt2", "lmt3", "lmt4", "lmb2", "lmb3", "lmb4", "seed2", "seed3", "seed4"] + ['lmr2', 'lmr3', 'lmr4', 'lmx2', 'lmx3', 'lmx4', 'lmp2', 'lmp3', 'lmp4']
-OPT_IN = ("rk24", "rk24sk", "k5bq8", "lmt2", "lmt3", "lmt4", "lmb2", "lmb3", "lmb4", "seed2", "seed3", "seed4") + tuple(['lmr2', 'lmr3', 'lmr4', 'lmx2', 'lmx3', 'lmx4', 'lmp2', 'lmp3', 'lmp4'])  # started only when named with --kinds (REKEY24 runs only CTU-13 / UGR'16)
-AK = ("attack", "quorum", "union", "unionh", "c3", "k14", "k16", "k17", "k18", "rk24", "rk24sk", "seed2", "seed3", "seed4")  # kinds on the ATTACK kernel + bigp-proc
+         "lmt2", "lmt3", "lmt4", "lmb2", "lmb3", "lmb4", "seed2", "seed3", "seed4", "damped"] + ['lmr2', 'lmr3', 'lmr4', 'lmx2', 'lmx3', 'lmx4', 'lmp2', 'lmp3', 'lmp4']
+OPT_IN = ("damped", "rk24", "rk24sk", "k5bq8", "lmt2", "lmt3", "lmt4", "lmb2", "lmb3", "lmb4", "seed2", "seed3", "seed4") + tuple(['lmr2', 'lmr3', 'lmr4', 'lmx2', 'lmx3', 'lmx4', 'lmp2', 'lmp3', 'lmp4'])  # started only when named with --kinds (REKEY24 runs only CTU-13 / UGR'16)
+AK = ("damped", "attack", "quorum", "union", "unionh", "c3", "k14", "k16", "k17", "k18", "rk24", "rk24sk", "seed2", "seed3", "seed4")  # kinds on the ATTACK kernel + bigp-proc
 B = ('{"family": "tabm", "enc": "raw", "e": 4, "w": 32, "depth": 2, "sn": 0, "act": "relu", "members": 8, "head": "nlog", '
      '"kd": 0.9, "syn": 0.5, "clip": 1, "cert": 4, "gate": 1, "rdet": 2, "ls": 0.0, "focal": 0.0, "lr": 0.003}')
 # CONF C4 (K1 on ToN) and C3 on ToN (B, K4 at tau_day): need data/processed and the bowl champions, not the arena
@@ -117,14 +120,15 @@ for proc in procs:  # every mounted bigp-proc-* dataset (the lean kinds mount se
     shutil.copytree(proc, W + "/data/processed", dirs_exist_ok=True)
 shutil.copytree(os.path.dirname(bowl), W + "/results/bowl", dirs_exist_ok=True)
 os.makedirs(W + "/results/cert", exist_ok=True)  # gate_attack.py writes there without creating it
-env = dict(os.environ, PYTHONPATH=W + "/src", OMP_NUM_THREADS="4", NIDS_LEAN="1", NIDS_KEY_PREFIX="{prefix}")
+env = dict(os.environ, PYTHONPATH=W + "/src", OMP_NUM_THREADS="4", NIDS_LEAN="1", NIDS_KEY_PREFIX="{prefix}",
+           NIDS_DAMPED="{damped}", BOWL_DATASETS="{ds}")
 for cmd in {cmds}:
     print("RUN", cmd, flush=True)
     r = subprocess.run([sys.executable, W + "/scripts/" + cmd[0], *cmd[1:]], env=env, cwd=W)
     print("RC", r.returncode, cmd, flush=True)
     if r.returncode and cmd[0].startswith("test_"):  # never run on a pipeline that failed its exactness test
         break
-for f in glob.glob(W + "/results/cert/*.*"):
+for f in glob.glob(W + "/results/cert/*.*") + glob.glob(W + "/results/conf/*.*"):
     shutil.copy(f, "/kaggle/working/")
 '''
 
@@ -137,6 +141,8 @@ def push(a):
     (data / "k5code" / "scripts").mkdir(parents=True)
     for f in CODE:
         shutil.copy(ROOT / "scripts" / f, data / "k5code" / "scripts" / f)
+    for f in ("test_damped.py", "test_damped_features.py"):  # DAMPED kernel guard runs them before building pairs
+        shutil.copy(ROOT / "tests" / f, data / "k5code" / "scripts" / ("t_" + f[5:]))
     shutil.copytree(ROOT / "src" / "nids", data / "k5code" / "src" / "nids", ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copytree(GROOT, data / "k5code" / "src" / "groot", ignore=shutil.ignore_patterns("__pycache__"))
     (data / "dataset-metadata.json").write_text(json.dumps({"title": "bigp-k5code", "id": f"{u}/bigp-k5code",
@@ -173,6 +179,7 @@ def data(a):
         k.mkdir()
         (k / "run.py").write_text((ATTACK if kind in AK + ("leank1", "leanc3") else KERNEL).replace("{ds}", ds)
                                   .replace("{prefix}", "24" if kind.startswith("rk24") else "0")
+                                  .replace("{damped}", "1" if kind == "damped" else "0")
                                   .replace("{cmds}", repr(cmds(kind, ds))))
         ks = f"bigp-conf-{ds.replace('_', '-')}-{kind}"
         (k / "kernel-metadata.json").write_text(json.dumps({

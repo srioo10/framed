@@ -21,7 +21,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
-OUT = ROOT / "data" / "conf"
+OUT = ROOT / "data" / ("conf_damped" if __import__("os").environ.get("NIDS_DAMPED") == "1" else "conf")
 N_PAIRS, MIN_ROWS, SEED, TRAIN_SEEDS = 6, 100, 1, (2, 3, 4)
 
 

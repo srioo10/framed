@@ -144,6 +144,13 @@ class HostFlows:
             self._cache[R] = self.features(~self._fam_in(R))[self.keep]
         return self._cache[R]
 
+    def damped_removal(self, R):
+        """DAMPED plan: decayed features (DAMP_COLS) of the kept rows, same population rule as removal."""
+        R = ("damped",) + tuple(sorted(R))
+        if R not in self._cache:
+            self._cache[R] = self.damped(~self._fam_in(R[1:]))[self.keep]
+        return self._cache[R]
+
     def long(self, R):
         """PREREG §9 K7: long-window (LONG_MS) features of the kept rows, same population rule as removal."""
         R = ("long",) + tuple(sorted(R))

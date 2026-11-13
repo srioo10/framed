@@ -118,7 +118,7 @@ def drop_bytes(pairs, roster):
 
 def hc_clip(z):
     """Fit-range clip [q0.001, q0.999] of the host-context columns, +-inf elsewhere (PREREG §9 CERT)."""
-    hc = np.array([c.startswith("hc_") for c in z["cols"]])
+    hc = np.array([c.startswith(("hc_", "hd_")) for c in z["cols"]])
     q = np.quantile(z["X_fit"], [0.001, 0.999], axis=0)
     return np.where(hc, q[0], -np.inf), np.where(hc, q[1], np.inf)
 
@@ -165,7 +165,7 @@ def box(z, X, m):
 
 def smooth_mask(cols):
     """Host-context columns the smoothing baseline perturbs (bytes columns are zeroed inputs)."""
-    return np.array([c[:3] == "hc_" and "_bytes_" not in c for c in cols], np.float32)
+    return np.array([c[:3] in ("hc_", "hd_") and "_bytes_" not in c for c in cols], np.float32)
 
 
 def dbox(z, X, m):
@@ -224,7 +224,7 @@ def cert_fpr(g, m, h, z, s_cal, device, ms):
     i = np.sort(np.random.default_rng(0).choice(len(s_cal), min(CERT_ROWS, len(s_cal)), replace=False))
     tau = np.sort(s_cal)[::-1][int(np.floor(0.01 * len(s_cal)))]
     out = {}
-    src = np.array([c.startswith("hc_src") for c in z["cols"]])
+    src = np.array([c.startswith(("hc_src", "hd_src")) for c in z["cols"]])
     for mm in ms:
         lo, hi = box(z, z["X_cal"][i], mm)
         out[mm] = float((fx.score_upper(m, lo, hi, z["bi"], g["head"], device) > tau).mean())

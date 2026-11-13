@@ -163,6 +163,9 @@ class Bank:
             X[hostctx.COLS] = H[rows] if cover is None else H[self.adv.n_kept + cover]  # H holds kept (+ cover) rows
             if os.environ.get("NIDS_LONG") == "1" and cover is None:  # PREREG §9 K7 arena (data/arena_hl)
                 X[hostctx.LONG_COLS] = host.long(R)[rows]
+            if os.environ.get("NIDS_DAMPED") == "1" and cover is None:  # DAMPED: decayed stats replace the windows
+                X = X.drop(columns=hostctx.COLS)
+                X[hostctx.DAMP_COLS] = host.damped_removal(R)[rows]
         return X
 
     def cover_rows(self, unk, R0):
