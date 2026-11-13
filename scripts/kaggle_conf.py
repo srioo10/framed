@@ -133,6 +133,51 @@ for f in glob.glob(W + "/results/cert/*.*") + glob.glob(W + "/results/conf/*.*")
 '''
 
 
+DAMPED2 = '''import glob, os, shutil, subprocess, sys
+code = os.path.dirname(glob.glob("/kaggle/input/**/conf_clean.py", recursive=True)[0])
+nids = os.path.dirname(glob.glob("/kaggle/input/**/nids/models.py", recursive=True)[0])
+src = os.path.dirname(os.path.dirname(glob.glob("/kaggle/input/**/{ds}/pair_0.npz", recursive=True)[0]))
+W = "/tmp/w"
+shutil.copytree(code, W + "/scripts", dirs_exist_ok=True)
+shutil.copytree(os.path.dirname(nids), W + "/src", dirs_exist_ok=True)
+env = dict(os.environ, PYTHONPATH=W + "/src", OMP_NUM_THREADS="4", NIDS_DAMPED="1", BOWL_DATASETS="{ds}")
+for cmd in [["test_damped_kernel.py"], ["conf_teacher.py", src, W + "/data/conf_damped"],
+            ["conf_clean.py", "--arena", "data/conf_damped", "--models", "B", "--out", "damped2_{ds}.jsonl"]]:
+    print("RUN", cmd, flush=True)
+    r = subprocess.run([sys.executable, W + "/scripts/" + cmd[0], *cmd[1:]], env=env, cwd=W)
+    print("RC", r.returncode, cmd, flush=True)
+    if r.returncode:
+        break
+for f in glob.glob(W + "/results/conf/*.*"):
+    shutil.copy(f, "/kaggle/working/")
+'''
+
+
+def damped2(a):
+    """PREREG DAMPED amendment 1: upload locally built feature-only pairs (data/conf_damped/{ds}), start the kernel."""
+    u, ds = user(), a.ds
+    slug = f"bigp-conf-damped-{ds.replace('_', '-')}"
+    d = STAGE / slug
+    shutil.rmtree(d, ignore_errors=True)
+    shutil.copytree(ROOT / "data" / "conf_damped" / ds, d / "conf_damped" / ds)
+    (d / "dataset-metadata.json").write_text(json.dumps({"title": slug, "id": f"{u}/{slug}",
+                                                         "licenses": [{"name": "other"}]}))
+    exists = subprocess.run([KAGGLE, "datasets", "status", f"{u}/{slug}"], capture_output=True).returncode == 0
+    sh("datasets", "version" if exists else "create", "-p", str(d), *(["-m", "damped"] if exists else []), "-r", "zip", "-q")
+    wait_ready(f"{u}/{slug}")
+    k = STAGE / f"damped2_{ds}"
+    shutil.rmtree(k, ignore_errors=True)
+    k.mkdir()
+    (k / "run.py").write_text(DAMPED2.replace("{ds}", ds))
+    ks = f"bigp-damped2-{ds.replace('_', '-')}"
+    (k / "kernel-metadata.json").write_text(json.dumps({
+        "id": f"{u}/{ks}", "title": ks, "code_file": "run.py", "language": "python", "kernel_type": "script",
+        "is_private": True, "enable_gpu": False, "enable_internet": False,
+        "dataset_sources": [f"{u}/{slug}", f"{u}/bigp-k5code"]}))
+    r = subprocess.run([KAGGLE, "kernels", "push", "-p", str(k)], capture_output=True, text=True)
+    print(ks, r.stdout.strip()[-200:], r.stderr.strip()[-200:], flush=True)
+
+
 def push(a):
     """Code as a new version of the bigp-k5code dataset (kaggle_k5.py's layout)."""
     u = user()
@@ -246,10 +291,10 @@ def pull(a):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["push", "data", "proc", "status", "pull"])
+    ap.add_argument("cmd", choices=["push", "data", "proc", "status", "pull", "damped2"])
     ap.add_argument("ds", nargs="?")
     ap.add_argument("--kinds", nargs="+", default=[k for k in KINDS if k not in OPT_IN])
     ap.add_argument("--gpu", nargs="*", default=[])  # kinds to run on GPU sessions (as extra CPU slots)
     ap.add_argument("--no-upload", action="store_true")  # dataset already up: only (re)start kernels
     a = ap.parse_args()
-    {"push": push, "data": data, "proc": proc, "status": status, "pull": pull}[a.cmd](a)
+    {"push": push, "data": data, "proc": proc, "status": status, "pull": pull, "damped2": damped2}[a.cmd](a)

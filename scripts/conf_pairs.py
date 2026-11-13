@@ -25,7 +25,7 @@ OUT = ROOT / "data" / ("conf_damped" if __import__("os").environ.get("NIDS_DAMPE
 N_PAIRS, MIN_ROWS, SEED, TRAIN_SEEDS = 6, 100, 1, (2, 3, 4)
 
 
-def build(ds):
+def build(ds, features_only=False):
     import host_stream as hs
     import score_bank as sb
     from nids import models
@@ -55,6 +55,18 @@ def build(ds):
              "pseudo": prep.transform(bank.frame(rows["pseudo"], sb.role_removal(P, "test_unknown"))),
              "cal": prep.transform(bank.frame(cal, sb.role_removal(P, "cal")))}
         y = {k: np.array([code[f] for f in bank.fam[rows[k]]], np.int64) for k in ("fit", "es")}
+        if features_only:  # DAMPED amendment 1: same rows as CONF, no model fit here (teacher added on Kaggle)
+            ref = np.load(ROOT / "data" / "conf" / ds / f"pair_{i}.npz")
+            assert all(np.array_equal(ref[f"rows_{k}"], v) for k, v in rows.items()), f"{ds} pair {i}: rows != CONF"
+            np.savez_compressed(out / f"pair_{i}.npz", **{f"X_{k}": v for k, v in X.items()},
+                                **{f"y_{k}": v for k, v in y.items()}, bi=code["Benign"],
+                                **{f"rows_{k}": v for k, v in rows.items()})
+            (out / f"pair_{i}.json").write_text(json.dumps({"R0": [], "j": j, "known": known, "feats": bank.feats,
+                                                            "n": {k: int(len(v)) for k, v in rows.items()},
+                                                            "cols": list(dfit.columns), "mu": prep.mu.tolist(),
+                                                            "sd": prep.sd.tolist()}))
+            print(f"{ds} pair {i} j={j} features only, rows == CONF {time.time() - t0:.0f}s", flush=True)
+            continue
         teacher = models.oof_proba(X["fit"], y["fit"], SEED).astype(np.float32)
         bi = code["Benign"]
         boss = {}
@@ -78,4 +90,6 @@ def build(ds):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("dataset")
-    build(ap.parse_args().dataset)
+    ap.add_argument("--features-only", action="store_true")
+    a = ap.parse_args()
+    build(a.dataset, a.features_only)
