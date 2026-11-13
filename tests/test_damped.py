@@ -50,3 +50,63 @@ def test_weight_bound_nearly_tight():
     w = np.exp(-lam * ia).sum()
     S = 1 / (1 - np.exp(-lam * win))
     assert in_budget(ia, m, win) and w <= m * S and (m * S - w) / (m * S) < 1e-4
+
+
+def novelty_flags(times, ports, look=120.0):
+    """flag = 1 if the port was not seen in the `look` s before the flow (all flows in `times` count)."""
+    order = np.argsort(times, kind="stable"); last, out = {}, np.zeros(len(times))
+    for i in order:
+        p, t = ports[i], times[i]
+        out[i] = 1.0 if p not in last or t - last[p] > look else 0.0
+        last[p] = t
+    return out
+
+
+def test_novelty_box_contains_clean():
+    """injections pre-touch the ports of later real flows (the worst case for novelty)."""
+    rng = np.random.default_rng(1)
+    T = 3000.0
+    for trial in range(2000):
+        lam, m = float(rng.choice([0.01, 0.002, 0.0005])), int(rng.integers(1, 11))
+        ct = np.sort(rng.random(int(rng.integers(1, 80))) * T)
+        cp = rng.integers(0, 30, len(ct))
+        ia = inject_times(rng, m, 240.0, T)
+        it = T - ia  # injection times
+        # each injection targets the port of a real flow 0-120 s after it when one exists, else a random port
+        ip = np.array([cp[(ct > x) & (ct <= x + 120)][0] if ((ct > x) & (ct <= x + 120)).any()
+                       else rng.integers(0, 30) for x in it], dtype=int) if len(it) else np.array([], int)
+        allt, allp = np.r_[ct, it], np.r_[cp, ip]
+        fo = novelty_flags(allt, allp)                     # observed flags (injections included)
+        fc = novelty_flags(ct, cp)                         # clean flags
+        obs = stats(T - allt, fo, lam)
+        cln = stats(T - ct, fc, lam)
+        (wl, wh), (ml, mh), _ = box(*obs, lam, m, 1.0, novelty=True)
+        assert wl - 1e-9 <= cln[0] <= wh + 1e-9
+        assert ml - 1e-9 <= cln[1] <= mh + 1e-9, (trial, cln, obs, (ml, mh))
+
+
+def _bridge_stream(rng, lam, m):
+    """worst case for novelty: real flows to port p at t0 and t0 + 200 s (clean: the second is new); one injection to p
+    at t0 + 100 s looks old itself and makes the second real flow look old. m bridges per 240 s window."""
+    ct, cp, it, ip, port = [], [], [], [], 0
+    for k in range(12):
+        for j in range(m):
+            t0 = k * 240.01 + j * 1e-3
+            ct += [t0, t0 + 200.0]; cp += [port, port]; it.append(t0 + 100.0); ip.append(port); port += 1
+    T = max(ct) + 1.0
+    return np.array(ct), np.array(cp), np.array(it), np.array(ip), T
+
+
+def test_novelty_flip_term_needed_and_sufficient():
+    rng = np.random.default_rng(2)
+    for lam in (0.01, 0.002):
+        m = 10
+        ct, cp, it, ip, T = _bridge_stream(rng, lam, m)
+        assert in_budget(T - it, m, 240.0)
+        allt, allp = np.r_[ct, it], np.r_[cp, ip]
+        obs = stats(T - allt, novelty_flags(allt, allp), lam)
+        cln = stats(T - ct, novelty_flags(ct, cp), lam)
+        _, (ml, mh), _ = box(*obs, lam, m, 1.0, novelty=True)
+        assert ml - 1e-9 <= cln[1] <= mh + 1e-9                     # sound with the flip term
+        _, (ml0, mh0), _ = box(*obs, lam, m, 1.0, novelty=False)
+        assert cln[1] > mh0 + 1e-6, (cln[1], mh0)                   # and the flip term is needed
