@@ -126,4 +126,95 @@ static inline double cb_block_lower(const CertB *c, const double *x, int wide) {
       }
   return cb_score_lower(c, lo, hi) - 1e-6;
 }
+/* Sound variant of cb_block_lower (2026-11-13): no 1e-6 margin. Every float64 operation rounds to nearest, so its error
+ * is at most half an ulp of the result and one nextafter step outward makes each partial result a valid bound
+ * (no rounding-mode control is needed, so this works with the ESP32's soft-float double; cb_dn / cb_up step
+ * outward by at least one ulp). exp / log1p / log are
+ * library calls: their results are widened by a relative CB_LIBM (1e-12), far above the few-ulp error glibc and newlib
+ * document; that is the only assumption. Input-box endpoints are already widened by CB_EPS = 1e-4 in cb_dbox. */
+#define CB_LIBM 1e-12
+/* one outward step without a library call: p is a rounded result (error <= ulp(p)/2); subtracting
+ * d = (|p| + 1e-290) * 2.3e-16 >= ulp(p) (2.3e-16 > 2^-52; the 1e-290 keeps d normal, so p = 0 also moves and no
+ * operation produces a subnormal) and rounding again gives <= p - ulp/2 <= exact. */
+static inline double cb_dn(double v) { return v - (fabs(v) + 1e-290) * 2.3e-16; }
+static inline double cb_up(double v) { return v + (fabs(v) + 1e-290) * 2.3e-16; }
+static inline double cb_ldn(double v) { return cb_dn(v - fabs(v) * CB_LIBM); }  /* lower bound of a libm result */
+static inline double cb_lup(double v) { return cb_up(v + fabs(v) * CB_LIBM); }
+
+/* lower bound of lse(v) = log sum exp v_i, with v given exactly */
+static inline double cb_lse_dn(const double *v, int n) {
+  double mx = v[0], s = 0;
+  for (int i = 1; i < n; i++) if (v[i] > mx) mx = v[i];
+  if (isinf(mx)) return mx;
+  for (int i = 0; i < n; i++) s = cb_dn(s + cb_ldn(exp(cb_dn(v[i] - mx))));
+  return cb_dn(mx + cb_ldn(log(s)));
+}
+static inline double cb_lse_up(const double *v, int n) {
+  double mx = v[0], s = 0;
+  for (int i = 1; i < n; i++) if (v[i] > mx) mx = v[i];
+  if (isinf(mx)) return mx;
+  for (int i = 0; i < n; i++) s = cb_up(s + cb_lup(exp(cb_up(v[i] - mx))));
+  return cb_up(mx + cb_lup(log(s)));
+}
+
+/* gamma_k = k u / (1 - k u), u = 2^-53 (Higham, Accuracy and Stability, Lemma 3.1 / eq. 3.5): a k-step float64
+ * dot-product-with-bias evaluation errs by at most gamma_k * (sum of |terms|); 1.001 covers 1/(1 - k u) for k < 1e12. */
+static inline double cb_gamma(int k) { return k * 1.1102230246251565e-16 * 1.001; }  /* k <= 70 here */
+
+/* member m: sound lower bounds of z_k - z_bi over the box. Same centre/radius IBP as cb_margins; after each layer
+ * the centre and radius are widened by a rigorous float64 error bound, so [mu - rad, mu + rad] always contains the
+ * exact-arithmetic interval. Cost: one extra accumulation per neuron. */
+static inline void cb_margins_sound(const CertB *c, int m, const double *lo, const double *hi, double *d) {
+  double mu[CB_MAXC], rad[CB_MAXC], mu2[CB_MAXW], rad2[CB_MAXW];
+  for (int i = 0; i < c->D; i++) {
+    double l = fmin(fmax(lo[i], c->clo[i]), c->chi[i]), h = fmin(fmax(hi[i], c->clo[i]), c->chi[i]);
+    l = fmax(fmin(l, 1e30), -1e30); h = fmax(fmin(h, 1e30), -1e30);
+    double ri = c->M > 1 ? c->r[m][i] : 1, a = cb_dn(ri >= 0 ? l * ri : h * ri), b = cb_up(ri >= 0 ? h * ri : l * ri);
+    mu[i] = (a + b) / 2; rad[i] = cb_up(cb_up((b - a) / 2) + fabs(mu[i]) * 2.3e-16);  /* covers mu's rounding */
+  }
+  for (int l = 0; l < c->L; l++) {
+    int n = c->cols[l]; double g = cb_gamma(n + 3);
+    for (int o = 0; o < c->rows[l]; o++) {
+      double zm = 0, zr = 0, mag = 0; const int8_t *w = c->w[l] + o * n;
+      for (int i = 0; i < n; i++) {
+        double wi = w[i] * c->ws[l], aw = fabs(wi);
+        zm += wi * mu[i]; zr += aw * rad[i]; mag += aw * (fabs(mu[i]) + rad[i]);
+      }
+      zm += c->b[l][o]; mag += fabs(c->b[l][o]);
+      double e = cb_up(cb_up(g * mag) * 1.001);  /* zm and zr each err by <= g * mag */
+      double lo2 = fmax(cb_dn(cb_dn(zm - zr) - 2 * e), 0), hi2 = fmax(cb_up(cb_up(zm + zr) + 2 * e), 0);
+      mu2[o] = (lo2 + hi2) / 2; rad2[o] = cb_up(cb_up((hi2 - lo2) / 2) + fabs(mu2[o]) * 2.3e-16);
+    }
+    for (int o = 0; o < c->rows[l]; o++) { mu[o] = mu2[o]; rad[o] = rad2[o]; }
+  }
+  double g = cb_gamma(c->W + 3);
+  for (int k = 0; k < c->K; k++) {
+    double hb = c->hb[m][k] - c->hb[m][c->BI], dm = hb, dr = 0, mag = fabs(hb);
+    for (int j = 0; j < c->W; j++) {
+      double dk = (c->hw[m][j * c->K + k] - c->hw[m][j * c->K + c->BI]) * c->hws, ak = fabs(dk);  /* int diff exact */
+      dm += dk * mu[j]; dr += ak * rad[j]; mag += ak * (fabs(mu[j]) + rad[j]);
+    }
+    d[k] = k == c->BI ? 0 : cb_dn(cb_dn(dm - dr) - 2 * cb_up(cb_up(g * mag) * 1.001));
+  }
+}
+
+/* sound lower bound of s over [lo, hi]: s = log M - lse_m(-lse_k(d_mk)); d lower => -lse(d) upper => s lower */
+static inline double cb_score_lower_sound(const CertB *c, const double *lo, const double *hi) {
+  double lp[CB_MAXM] = {0}, d[CB_MAXK];
+  for (int m = 0; m < c->M; m++) { cb_margins_sound(c, m, lo, hi, d); lp[m] = -cb_lse_dn(d, c->K); }
+  double s = cb_dn(cb_ldn(log((double)c->M)) - cb_lse_up(lp, c->M));
+  return isnan(s) ? -INFINITY : s;
+}
+
+static inline double cb_block_lower_sound(const CertB *c, const double *x, int wide) {
+  double lo[CB_MAXD], hi[CB_MAXD];
+  cb_dbox(c, x, lo, hi);
+  for (int g = 0; g < 4; g++)
+    if (wide >> (g & 1) & 1)
+      for (int j = c->F + g * 5 + 2; j <= c->F + g * 5 + 3; j++) {
+        lo[j] = fmin(lo[j], cb_dn((log1p(0.0) - c->mu[j]) / c->sd[j]));
+        hi[j] = fmax(hi[j], cb_up((cb_lup(log1p(1.0)) - c->mu[j]) / c->sd[j]));
+      }
+  return cb_score_lower_sound(c, lo, hi);
+}
 #endif
