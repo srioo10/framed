@@ -75,7 +75,8 @@ static inline void hc_add(Side *s, int64_t t, const float *v) {
   for (int j = 0; j < NS; j++) { s->v[b][j] += v[j]; s->v2[b2][j] += v[j + NS]; }
 }
 
-/* One flow (start t ms, hashed hosts ks -> kd): writes the 20 context features seen BEFORE this flow into hc[20],
+/* One flow (t ms: the caller's clock, close time on the gateway; must not go backwards, or a live bucket is reused;
+ * hashed hosts ks -> kd): writes the 20 context features seen BEFORE this flow into hc[20],
  * then adds the flow to both hosts. Returns the source host (for blocking) via *hs, the destination via *hd. */
 static inline void hc_flow(HcTable *T, uint64_t ks, uint64_t kd, int64_t t, int port, double out_pkts, double in_bytes,
                            double *hc, Host **hs_out, Host **hd_out) {
