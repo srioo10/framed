@@ -37,10 +37,12 @@ def _damped(X, cols, mu, sd, m, lo, hi, deletion):
     weight <= R = m / (1 - e^{-240 lam}) and, for novelty flags, flip real flags of weight <= F (damped.flip_weight).
     Insertion (clean -> observed): w' in [w, w+R]; mean' in [(LS-F)+/(w+R), (LS+R)/(w+R)] (mean' = 0 when w = 0, R).
     Deletion (observed -> clean): w in [(w'-R)+, w']; mean in [(LS'-R)+/(w'-R), (LS'+F)/(w'-R)], [0,1] if w' <= R."""
+    groups = {c.split("_")[1] + "_" + c.split("_")[3] for c in cols if c[:3] == "hd_"}
+    if not groups:
+        return
     from nids.damped import flip_weight
     raw = lambda j: np.expm1(np.maximum(X[:, j] * sd[j] + mu[j], 0))  # noqa: E731
     back = lambda j, v: (np.log1p(v) - mu[j]) / sd[j]  # noqa: E731
-    groups = {c.split("_")[1] + "_" + c.split("_")[3] for c in cols if c[:3] == "hd_"}
     for g in groups:
         k, lam = g.split("_")
         lam_s = float(lam)
