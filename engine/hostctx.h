@@ -2,7 +2,7 @@
  * Header-only, no stdio or malloc: the caller owns the Host table. Bounded memory: 1 s / 10 s buckets for the
  * 10 s / 120 s windows and per-host LRU novelty tables, as engine/onepass.c. Feature order = nids.hostctx.COLS:
  * window (10 s, 120 s) x side (src, dst) x stat (n, fail, newport, newpeer, bytes); shares are over max(n, 1).
- * The bucketed windows span at most w + one bucket (<= 130 s < 240 s), so the injection budget per window stays m. */
+ * The bucketed windows span w - one bucket to w (110-120 s; engine/test_horizon.c), so with the 120 s novelty lookback an injection reaches < 240 s, so the injection budget per window stays m. */
 #ifndef HOSTCTX_H
 #define HOSTCTX_H
 #include <stdint.h>
