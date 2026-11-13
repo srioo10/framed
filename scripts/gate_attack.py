@@ -191,6 +191,11 @@ def main():
         tau = {n: float(hs.threshold(hs.day_max(ck, f(Xr)))) for n, (f, _) in dets.items()}
         dets["gated_net_c0"], tau["gated_net_c0"] = dets["gated_net"], tau0["gated_net"]  # same days, original tau
         print(f"RECAL q={a.recal}: {len(rec)} rows, tau", json.dumps({n: round(v, 4) for n, v in tau.items()}), flush=True)
+    if a.rules:  # RULES-UNION: any shifted rule at its own tau (not recalibrated); max(count_i - tau_i) > 0
+        U = [(dets[n], tau[n]) for n in ("rule_rate_fp", "rule_f2b_fp", "rule_scan_fp")]
+        dets["rule_union_fp"] = (lambda X: np.max([f(X) - t for (f, _), t in U], axis=0),
+                                 lambda X: np.max([b(X) - t for (_, b), t in U], axis=0))
+        tau["rule_union_fp"] = 0.0
     for sg in a.smooth:  # PREREG §9 RS: randomized smoothing, block iff the certified L2 radius covers the deletion box
         ms, hs_, _ = bowl.run_pair(g | {"cert": 0, "rdet": 0, "gnoise": sg}, z, "cpu", sa.SEED, 30)
         ck = meta["src"][cal].astype(np.int64) * hs.MUL + meta["t"][cal] // hs.DAY_MS

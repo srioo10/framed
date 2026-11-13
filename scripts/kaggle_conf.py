@@ -63,6 +63,10 @@ def cmds(kind, ds):
     if kind == "c3":
         return [["gate_attack.py", ds, "--tau-day", "--genome", B]]
     K = ["gate_attack.py", ds, "--tau-day", "--genome", B]  # PREREG §9 K16 / K17 / K18
+    if kind == "union":  # PREREG RULES-UNION (2026-11-13): detection
+        return [K + ["--rules", "--throttle", "1000000000", "--tag", "uniontpr"]]
+    if kind == "unionh":  # PREREG RULES-UNION: harm
+        return [K + ["--rules", "--random", "8", "--no-bytes-grid", "--tag", "unionh"]]
     if kind == "quorum":  # PREREG QUORUM (2026-11-12): m+1 address quorum readout on the unthrottled pass
         return [K + ["--throttle", "1000000000", "--quorum", "--tag", "quorum"]]
     if kind == "k16":  # K19 throttle run (carries the K16 rows)
