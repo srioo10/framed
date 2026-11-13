@@ -29,13 +29,17 @@ def main():
     ap.add_argument("--peers", type=int, default=0, help="LIVE-NAT-ENF: cycle over this many peer aliases (0 = one per flow)")
     ap.add_argument("--port-step", type=int, default=0, help="LIVE-NAT-ENF: flow i uses port base + i*step (new ports)")
     ap.add_argument("--src", default="", help="bind to this local address (LIVE-NAT-ENF attacker interface)")
+    ap.add_argument("--gap-ms", type=int, default=0, help="LIVE-FAIR scan: pause between connections (ms)")
     a = ap.parse_args()
     sa = (a.src, 0) if a.src else None
     assert 0 <= a.fail <= a.n
     npeer = a.peers or a.n
+    assert 0 <= a.gap_ms <= 1000
     assert 100 <= a.first and a.first + npeer <= 200, "lab-only peer /24s 192.168.100-199 (none used by the testbed)"
     t0, ok, refused = int(time.time() * 1000), 0, 0
     for i in range(a.n):
+        if a.gap_ms and i:
+            time.sleep(a.gap_ms / 1000)
         dst = f"192.168.{a.first + i % npeer}.1"
         cport, oport = a.closed_port + i * a.port_step, a.dport + i * a.port_step
         if i < a.fail:  # failed flow: SYN to a closed port, peer answers RST
