@@ -40,7 +40,7 @@ def score(d):
         s = ps[m]
         nb = B[(B.ms >= a) & (B.ms < b) & (B.ip == NAT)]
         ab = B[(B.ms >= a) & (B.ms < b) & (B.ip == r.att)]
-        scans = {"E": [1020], "D": [300, 1020]}.get(r.variant, [])
+        scans = {"E": [1020], "D": [300, 1020], "H": [1020], "DH": [300, 1020]}.get(r.variant, [])
         hit = lambda bl: any(((bl.ms >= a + 1000 * x) & (bl.ms <= a + 1000 * (x + 120))).any() for x in scans)  # noqa: E731
         f = F[(F.ms >= a) & (F.ms < b)]
         out.append({**r.to_dict(), "nat_blocks": len(nb), "att_blocks": len(ab),
@@ -66,10 +66,25 @@ def bars(S, build_veto="veto"):
     return res
 
 
+def scan_bars(S):
+    """PREREG LIVE-SCAN: S1 safety, S2 horizontal scan behind the NAT, S3 horizontal scan on its own key."""
+    v = S[S.build == "scan"]
+    vi, h, dh, e = (v[v.variant.isin(["clean", "A", "B"])], v[v.variant == "H"], v[v.variant == "DH"],
+                    v[v.variant == "E"])
+    return {"S1_nat_blocks": int(vi.nat_blocks.sum()), "S1_runs": len(vi), "S1_pass": int(vi.nat_blocks.sum()) == 0,
+            "S2": (int(h.nat_hit.sum()), len(h)), "S2_pass": int(h.nat_hit.sum()) >= 4,
+            "S3": (int(dh.att_hit.sum()), len(dh), int((dh.nat_blocks > 0).sum())),
+            "S3_pass": int(dh.att_hit.sum()) >= 4 and int((dh.nat_blocks > 0).sum()) == 0,
+            "E_vertical_reported": (int(e.nat_hit.sum()), len(e))}
+
+
 if __name__ == "__main__":
     assert int(np.clip(np.diff(np.array([1, 2, 5])) - 1, 0, None).sum()) == 2
     d = sys.argv[1]
     S = score(d)
     S.to_csv(Path(d) / "fair_scored.csv", index=False)
-    for g, r in bars(S, sys.argv[2] if len(sys.argv) > 2 else "veto").items():
-        print("replicate", g, r)
+    if len(sys.argv) > 2 and sys.argv[2] == "scan":
+        print("LIVE-SCAN", scan_bars(S))
+    else:
+        for g, r in bars(S, sys.argv[2] if len(sys.argv) > 2 else "veto").items():
+            print("replicate", g, r)
