@@ -217,4 +217,26 @@ static inline double cb_block_lower_sound(const CertB *c, const double *x, int w
       }
   return cb_score_lower_sound(c, lo, hi);
 }
+
+/* LIVE-SCAN (15 Nov): sound bound with the evicted-live filter (hostctx HC_BLOOM). Eviction can make a real flow look
+ * new only if its key is in the filter, so the low end of each novelty share drops by u[g][s] such flows (not to 0);
+ * the converse (a flow looking old) still widens the high end to 1 under the eviction flag (wide). */
+static inline double cb_block_lower_unc(const CertB *c, const double *x, int wide, const double u[4][2]) {
+  const double CB_EPS = 1e-4;
+  double lo[CB_MAXD], hi[CB_MAXD];
+  cb_dbox(c, x, lo, hi);
+  int a = c->m_budget;
+  for (int g = 0; g < 4; g++) {
+    int o = c->F + g * 5;
+    double n = rint(expm1(fmax(x[o] * c->sd[o] + c->mu[o], 0))), r = fmax(n - a, 0), dr = fmax(r, 1);
+    for (int s = 2; s <= 3; s++) {
+      int j = o + s;
+      double cc = expm1(fmax(x[j] * c->sd[j] + c->mu[j], 0)) * fmax(n, 1);
+      double slo = r < 1 ? 0 : fmax(cc - a - u[g][s - 2], 0) / dr;
+      lo[j] = fmin(lo[j], fmin(cb_dn((cb_ldn(log1p(slo)) - c->mu[j]) / c->sd[j]), x[j]) - CB_EPS);
+      if (wide >> (g & 1) & 1) hi[j] = fmax(hi[j], cb_up((cb_lup(log1p(1.0)) - c->mu[j]) / c->sd[j]));
+    }
+  }
+  return cb_score_lower_sound(c, lo, hi);
+}
 #endif

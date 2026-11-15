@@ -9,3 +9,7 @@ target_compile_definitions(${lwip} PRIVATE "ESP_IDF_LWIP_HOOK_FILENAME=\"lwip_ho
 if(GW_SOUND)
   target_compile_definitions(${COMPONENT_LIB} PRIVATE GW_SOUND=1 HC_FLAG_MS=250000)
 endif()
+# idf.py -D GW_SOUND=1 -D GW_BLOOM=1: sound build + evicted-live filter (PREREG LIVE-SCAN)
+if(GW_BLOOM)
+  target_compile_definitions(${COMPONENT_LIB} PRIVATE HC_BLOOM=1)
+endif()

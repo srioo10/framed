@@ -149,7 +149,10 @@ static void decide(Flow *f, int64_t tc, const char *why) {
 #if ORDINARY
     blk = 1;
 #else
-#if GW_SOUND  /* outward-rounded bound (Theorem 2) + 250 s eviction flag (Lemma 2(iii)); PREREG LIVE-SOUND */
+#if GW_SOUND && defined(HC_BLOOM)  /* + evicted-live filter: novelty low end drops by u, not to 0 (PREREG LIVE-SCAN) */
+    double u[4][2]; hc_unc(hs, hd, tc, u);
+    lower = cb_block_lower_unc(c, x, hc_wide(hs, hd, tc), u);
+#elif GW_SOUND  /* outward-rounded bound (Theorem 2) + 250 s eviction flag (Lemma 2(iii)); PREREG LIVE-SOUND */
     lower = cb_block_lower_sound(c, x, hc_wide(hs, hd, tc));
 #else
     lower = cb_block_lower(c, x, hc_wide(hs, hd, tc));

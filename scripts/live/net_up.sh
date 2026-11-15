@@ -13,5 +13,6 @@ sysctl -qw net.ipv4.conf.wlsta.accept_local=1 net.ipv4.conf.wlsta.rp_filter=0 ne
 sysctl -qw net.ipv4.conf.wlan0.accept_local=1
 ip route replace 192.168.4.0/24 via 192.168.77.2 dev wlan0 table 102
 ip rule show | grep -q "lookup 102" || ip rule add pref 48 to 192.168.4.0/24 iif lo lookup 102
-for k in 120 121 122 123; do ip addr show dev wlan0 | grep -q "192.168.$k.1/32" || ip addr add 192.168.$k.1/32 dev wlan0; done
+# lab peers 192.168.k.1 on the Pi: 120-123 before; 120-199 for the LIVE-SCAN horizontal scan (80 hosts)
+for k in $(seq 120 199); do ip addr show dev wlan0 | grep -q "192.168.$k.1/32" || ip addr add 192.168.$k.1/32 dev wlan0; done
 echo "attacker $A"; ip rule show
