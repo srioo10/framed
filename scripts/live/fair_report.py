@@ -44,7 +44,7 @@ def score(d):
         hit = lambda bl: any(((bl.ms >= a + 1000 * x) & (bl.ms <= a + 1000 * (x + 120))).any() for x in scans)  # noqa: E731
         f = F[(F.ms >= a) & (F.ms < b)]
         out.append({**r.to_dict(), "nat_blocks": len(nb), "att_blocks": len(ab),
-                    "missed": int(np.clip(np.diff(s) - 1, 0, None).sum()) if len(s) > 1 else 0,
+                    "pubs300": int((m & (pt < r.t0 + 300)).sum()), "missed": int(np.clip(np.diff(s) - 1, 0, None).sum()) if len(s) > 1 else 0,
                     "nat_hit": hit(nb), "att_hit": hit(ab), "flows": len(f)})
     return pd.DataFrame(out)
 
@@ -83,6 +83,10 @@ if __name__ == "__main__":
     d = sys.argv[1]
     S = score(d)
     S.to_csv(Path(d) / "fair_scored.csv", index=False)
+    bad = S.pubs300 == 0  # PREREG LIVE-FAIR INVALID rule: the sensor publishes nothing in the first 300 s
+    if bad.any():
+        print("INVALID (no sensor publish in first 300 s):", S[bad][["build", "variant", "rep"]].to_dict("records"))
+    S = S[~bad]
     if len(sys.argv) > 2 and sys.argv[2] == "scan":
         print("LIVE-SCAN", scan_bars(S))
     else:
