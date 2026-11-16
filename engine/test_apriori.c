@@ -4,7 +4,7 @@
  * each float op errs by <= u relative; k-term dot products by gamma_k * sum|terms| (Higham); exp/log/log1p by CB_LIBM_REL. */
 #include <math.h>
 #include <stdio.h>
-#include "model_transfer.h"
+#include "model_transfer.h"  /* the only model any live build selects (every sdkconfig: CONFIG_GW_MODEL_TRANSFER) */
 #define U 1.1102230246251565e-16
 #define LIBM 1e-12
 /* raw field limits on the gateway (ids.c Flow): uint16 port, uint8 proto, duration <= ACTIVE_MS, uint32 counters */
@@ -15,10 +15,16 @@ int main(void) {
   for (int m = 0; m < c->M; m++) {
     double A[CB_MAXW + CB_MAXC], E[CB_MAXW + CB_MAXC];  /* |value| bound and endpoint error bound per input */
     for (int i = 0; i < c->D; i++) {
-      double a = c->zero[i] ? 0 : (c->clo[i] > -1e29 ? fmax(fabs(c->clo[i]), fabs(c->chi[i])) : (log1p(RAWMAX[i]) + fabs(c->mu[i])) / c->sd[i]);
+      /* magnitude: clipped range for context columns, field width for flow columns */
+      double raw = i < c->F ? RAWMAX[i] : 16777216.0;  /* context counts < 2^24 (Lemma (iv)); shares <= 1 */
+      double base = c->zero[i] ? 0 : (log1p(raw) + fabs(c->mu[i])) / c->sd[i];  /* rounding base of (log1p(v) - mu) / sd */
+      double a = c->zero[i] ? 0 : (c->clo[i] > -1e29 ? fmax(fabs(c->clo[i]), fabs(c->chi[i])) : base);
       double ri = c->M > 1 ? fabs(c->r[m][i]) : 1;
-      /* flow columns: x itself computed with log1p (LIBM) and a sub/div: relative error <= LIBM + 3u, times |r| */
-      A[i] = a * ri; E[i] = A[i] * (8 * LIBM + 16 * U);  /* box endpoint: expm1, rint, mul, log1p, sub, div: <= 4 libm calls, 8 ops; doubled */ if (A[i] > amax_in) amax_in = A[i];
+      /* endpoint error, counted per op (cb_dbox): v = x*sd + mu (2 ops), expm1 (LIBM), rint or the share's mul/sub/div
+       * (<= 4 ops), log1p (LIBM), - mu, / sd (2 ops); then the member scale * r (1 op). Each op errs by u relative to
+       * at most base; each libm call by LIBM; error entering a libm call is passed on with factor <= 1 in log space.
+       * Total <= base * (2 LIBM + 9u); we use 4 LIBM + 16u, twice that. */
+      A[i] = a * ri; E[i] = base * ri * (4 * LIBM + 16 * U); if (A[i] > amax_in) amax_in = A[i];
     }
     int n = c->D;
     for (int l = 0; l < c->L; l++) {
