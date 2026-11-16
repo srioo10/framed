@@ -8,7 +8,7 @@ loaders rebuild our cleaning and splits (cached under `data/processed/`).
 | CIC (CSE-CIC-IDS2018) | NetFlow v3 feature set, `NF-CICIDS2018-v3.csv` | `load.py` `NF_FILES["nf_cic"]` | `data/raw/netflow_v3/<id>/data/NF-CICIDS2018-v3.csv` | University of Queensland NetFlow datasets (Sarhan et al.) |
 | ToN-IoT | NetFlow v3, `NF-ToN-IoT-v3.csv` | `NF_FILES["nf_ton"]` | `data/raw/netflow_v3/<id>/data/NF-ToN-IoT-v3.csv` | same |
 | CTU-13 | bidirectional `.binetflow`, scenarios 1-13 | `load.py` `ctu13()` | `data/raw/ctu13/CTU-13-Dataset/<n>/*.binetflow` | Stratosphere Lab, CTU Prague |
-| UGR'16 | weekly flows, weeks `june_week3` ... `august_week2` | `load.py` `ugr16()` | `data/raw/ugr16/<week>.parquet` | NESG, University of Granada (**parquet conversion: source to be stated by the authors**) |
+| UGR'16 | weekly flows, weeks `june_week3` ... `august_week2` | `load.py` `ugr16()` | `data/raw/ugr16/<week>.parquet` | NESG, University of Granada; parquet conversion from Hugging Face `Lystea/UGR16-PARQUET` (`resolve/main/<week>.parquet`) |
 
 SHA-256 of the files we used:
 
