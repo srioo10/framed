@@ -40,13 +40,30 @@ def score(d):
         s = ps[m]
         nb = B[(B.ms >= a) & (B.ms < b) & (B.ip == NAT)]
         ab = B[(B.ms >= a) & (B.ms < b) & (B.ip == r.att)]
-        scans = {"E": [1020], "D": [300, 1020], "H": [1020], "DH": [300, 1020]}.get(r.variant, [])
+        scans = {"E": [1020], "D": [300, 1020], "H": [1020], "DH": [300, 1020], "P": [1020]}.get(r.variant, [])
         hit = lambda bl: any(((bl.ms >= a + 1000 * x) & (bl.ms <= a + 1000 * (x + 120))).any() for x in scans)  # noqa: E731
         f = F[(F.ms >= a) & (F.ms < b)]
         out.append({**r.to_dict(), "nat_blocks": len(nb), "att_blocks": len(ab),
                     "pubs300": int((m & (pt < r.t0 + 300)).sum()), "missed": int(np.clip(np.diff(s) - 1, 0, None).sum()) if len(s) > 1 else 0,
-                    "nat_hit": hit(nb), "att_hit": hit(ab), "flows": len(f)})
+                    "nat_hit": hit(nb), "att_hit": hit(ab), "flows": len(f),
+                    "brk_blocks": int((B[(B.ms >= a) & (B.ms < b)].ip == BROKER).sum()),
+                    "att_hit_pos": bool(((ab.ms >= a + 1020000) & (ab.ms < a + 1200000)).any()),
+                    "att_mqtt300": int(((f.src == r.att) & (f.dport.astype(str) == "1883") & (f.ms < a + 300000)).sum())})
     return pd.DataFrame(out)
+
+
+BROKER = "192.168.77.1"
+
+
+def pos_bars(S):
+    """PREREG LIVE-POS (ab3fe55): P1 attacker blocked in [1020, 1200) s in >= 4/5 P runs; P2 no sensor or broker
+    block in any P/PC run; P3 no attacker block in PC runs."""
+    v = S[S.build == "pos"]
+    p, pc = v[v.variant == "P"], v[v.variant == "PC"]
+    return {"P1": (int(p.att_hit_pos.sum()), len(p)), "P1_pass": int(p.att_hit_pos.sum()) >= 4,
+            "P2_sensor_blocks": int(v.nat_blocks.sum()), "P2_broker_blocks": int(v.brk_blocks.sum()), "P2_runs": len(v),
+            "P2_pass": int(v.nat_blocks.sum()) == 0 and int(v.brk_blocks.sum()) == 0,
+            "P3": (int(pc.att_blocks.sum()), len(pc)), "P3_pass": int(pc.att_blocks.sum()) == 0}
 
 
 def bars(S, build_veto="veto"):
@@ -84,10 +101,13 @@ if __name__ == "__main__":
     S = score(d)
     S.to_csv(Path(d) / "fair_scored.csv", index=False)
     bad = S.pubs300 == 0  # PREREG LIVE-FAIR INVALID rule: the sensor publishes nothing in the first 300 s
+    bad |= S.build.isin(["pos", "pos_mon"]) & ((S.att_mqtt300 == 0) | (S.att == NAT))  # LIVE-POS INVALID rules
     if bad.any():
         print("INVALID (no sensor publish in first 300 s):", S[bad][["build", "variant", "rep"]].to_dict("records"))
     S = S[~bad]
-    if len(sys.argv) > 2 and sys.argv[2] == "scan":
+    if len(sys.argv) > 2 and sys.argv[2] == "pos":
+        print("LIVE-POS", pos_bars(S))
+    elif len(sys.argv) > 2 and sys.argv[2] == "scan":
         print("LIVE-SCAN", scan_bars(S))
     else:
         for g, r in bars(S, sys.argv[2] if len(sys.argv) > 2 else "veto").items():

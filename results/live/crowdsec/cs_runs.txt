@@ -1,0 +1,21 @@
+R1 rep=1 t0=1794458728 attack_s=17 ssh_flows=10 ban_nat=30 pubs_240s=3/48
+R1 rep=2 t0=1794458988 attack_s=20 ssh_flows=10 ban_nat=30 pubs_240s=3/48
+R1 rep=3 t0=1794459250 attack_s=27 ssh_flows=10 ban_nat=30 pubs_240s=2/48
+R1 rep=4 t0=1794459520 attack_s=27 ssh_flows=10 ban_nat=30 pubs_240s=2/48
+R1 rep=5 t0=1794459790 attack_s=22 ssh_flows=10 ban_nat=30 pubs_240s=2/48
+capacity: 15 capacity: 15 capacity: 20 capacity: 20 capacity: 13  (R2 capacities)
+R2-in rep=1 t0=1794460073 attack_s=12 ssh_flows=10 ban_nat=19 pubs_240s=3/48
+R2-in rep=2 t0=1794460328 attack_s=11 ssh_flows=10 ban_nat=0 pubs_240s=38/48
+R2-in rep=3 t0=1794460581 attack_s=10 ssh_flows=10 ban_nat=0 pubs_240s=39/48
+R2-in rep=4 t0=1794460834 attack_s=10 ssh_flows=10 ban_nat=0 pubs_240s=38/48
+R2-in rep=5 t0=1794461087 attack_s=10 ssh_flows=10 ban_nat=0 pubs_240s=38/48
+R2-over rep=1 t0=1794461340 attack_s=31 ssh_flows=30 ban_nat=0 pubs_240s=42/48
+R2-over rep=2 t0=1794461614 attack_s=31 ssh_flows=30 ban_nat=0 pubs_240s=42/48
+R2-over rep=3 t0=1794461887 attack_s=31 ssh_flows=30 ban_nat=0 pubs_240s=43/48
+R2-over rep=4 t0=1794462161 attack_s=31 ssh_flows=30 ban_nat=0 pubs_240s=43/48
+R0 rep=1 t0=1794463233 attack_s=12 ssh_flows=10 ban_nat=0 pubs_240s=39/48
+R0 rep=2 t0=1794463488 attack_s=12 ssh_flows=10 ban_nat=0 pubs_240s=39/48
+R0 rep=3 t0=1794463743 attack_s=12 ssh_flows=10 ban_nat=0 pubs_240s=39/48
+R0 rep=4 t0=1794463998 attack_s=12 ssh_flows=10 ban_nat=0 pubs_240s=38/48
+R0 rep=5 t0=1794464252 attack_s=13 ssh_flows=10 ban_nat=0 pubs_240s=38/48
+CROWDSEC DONE 1794464507
