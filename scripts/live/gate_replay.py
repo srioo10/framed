@@ -23,14 +23,17 @@ def runs(d, build, variant):
     return {r: (a, b) for r, a, b in out}  # last valid start/end per rep
 
 
+V2 = "--v2" in sys.argv  # PREREG RETRY-GATE v2: no per-flow reply condition, all flows (not only no-reply) count
+
+
 def gated(rows, i):
     """True if the block on rows[i] is suppressed. rows: F lines of one key, time-sorted."""
     p = rows[i]; t = int(p[0]); svc = (p[5], p[6])
-    if int(p[11]) > 0:
+    if not V2 and int(p[11]) > 0:
         return False
     for q in rows[:i + 1]:
         tq = int(q[0])
-        if t - 240_000 <= tq <= t and int(q[11]) == 0 and (q[5], q[6]) != svc:
+        if t - 240_000 <= tq <= t and (V2 or int(q[11]) == 0) and (q[5], q[6]) != svc:
             return False
     return any(t - 600_000 <= int(q[0]) < t and (q[5], q[6]) == svc and int(q[10]) > 0 for q in rows[:i])
 
@@ -50,4 +53,4 @@ def main(d, build, variant, key):
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:])
+    main(*[a for a in sys.argv[1:] if a != "--v2"])

@@ -8,6 +8,7 @@ import sys
 import numpy as np
 import pandas as pd
 
+V2 = "--v2" in sys.argv
 COLS = ["FLOW_START_MILLISECONDS", "IPV4_SRC_ADDR", "IPV4_DST_ADDR", "L4_DST_PORT", "OUT_BYTES", "OUT_PKTS", "family"]
 
 
@@ -16,7 +17,7 @@ def gateable(D):
     t = D.FLOW_START_MILLISECONDS.to_numpy(np.int64)
     svc = D.groupby(["IPV4_DST_ADDR", "L4_DST_PORT"], sort=False).ngroup().to_numpy()
     src = pd.factorize(D.IPV4_SRC_ADDR)[0]
-    nr = D.OUT_PKTS.to_numpy() == 0
+    nr = np.ones(len(D), bool) if V2 else D.OUT_PKTS.to_numpy() == 0  # v2: every flow counts
     g = np.zeros(len(D), bool)
     # A: among no-reply flows of a source, the latest flow with a different svc is the last one of the previous run
     idx = np.flatnonzero(nr)
@@ -51,4 +52,4 @@ def main(dss):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main([a for a in sys.argv[1:] if a != "--v2"])
