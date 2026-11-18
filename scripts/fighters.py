@@ -293,6 +293,75 @@ def score_lower(m, lo, hi, bi, head, device="cpu", bs=50_000, f64=True):
     return np.concatenate(out)
 
 
+def _sound_margins(body, lo, hi, bi):
+    """PREREG SOUND: lower bounds (B, M, k) of z_i - z_bi over [lo, hi] in float64 with rigorous rounding terms.
+    Centre / radius form with the invariant 'the exact reachable set lies in [mu - r, mu + r]'. Each matrix product
+    adds Higham's bound gamma_{n+1} * (|mu| @ |W| + |b|) (and gamma_{n+1} on r @ |W|), valid for any summation order;
+    each ReLU widens its endpoints by 2u relative before clamping. float32 weights are exact in float64."""
+    u = 2.0 ** -53
+    gam = lambda n: n * u / (1 - n * u)  # noqa: E731
+    if not isinstance(body.enc, nn.Identity):
+        raise ValueError("sound bound implemented for the raw encoder only")
+    if hasattr(body, "clo"):
+        lo, hi = (torch.minimum(torch.maximum(v, body.clo.double()), body.chi.double()) for v in (lo, hi))
+    lo, hi = lo.clamp(-1e30, 1e30), hi.clamp(-1e30, 1e30)
+    mu, r = (lo + hi) / 2, (hi - lo) / 2
+    r = r + 2 * u * (mu.abs() + r)
+    if body.M > 1:
+        R = body.r.double()
+        assert torch.all(R.abs() == 1), "member scales must be +-1 (exact products)"
+        mu, r = mu[:, None, :] * R, r[:, None, :] * R.abs()
+    for layer in body.body:
+        if isinstance(layer, nn.Linear):
+            W, b = layer.weight.double(), layer.bias.double()
+            g, Wa = gam(W.shape[1] + 1), W.abs()
+            Mh, Rh = mu @ W.T + b, r @ Wa.T
+            r = (Rh + g * (mu.abs() @ Wa.T + b.abs()) + g * Rh) * (1 + 4 * u)
+            mu = Mh
+        else:
+            assert isinstance(layer, nn.ReLU), "sound bound implemented for ReLU only"
+            l, h = mu - r, mu + r
+            a, c = torch.relu(l - 2 * u * l.abs()), torch.relu(h + 2 * u * h.abs())
+            mu, r = (a + c) / 2, (c - a) / 2
+            r = r + 2 * u * (mu.abs() + r)
+    g = gam(body.w + 1)
+    if body.M > 1:
+        hw, hb = body.hw.double(), body.hb.double()
+        D, hD = hw - hw[:, :, bi:bi + 1], hb - hb[:, bi:bi + 1]  # each entry within u of the exact difference
+        Da = D.abs()
+        Mh = torch.einsum("bmw,mwk->bmk", mu, D) + hD
+        Rh = torch.einsum("bmw,mwk->bmk", r, Da)
+        Ma = torch.einsum("bmw,mwk->bmk", mu.abs(), Da) + hD.abs()
+        Ea = torch.einsum("bmw,mwk->bmk", mu.abs() + r, Da) + hD.abs()
+    else:
+        W, b = body.head.weight.double(), body.head.bias.double()
+        D, hD = W - W[bi], b - b[bi]
+        Da = D.abs()
+        Mh, Rh = mu @ D.T + hD, r @ Da.T
+        Ma, Ea = mu.abs() @ Da.T + hD.abs(), (mu.abs() + r) @ Da.T + hD.abs()
+        Mh, Rh, Ma, Ea = (v[:, None] for v in (Mh, Rh, Ma, Ea))
+    out = Mh - Rh - (g * Ma + g * Rh + 2 * u * Ea) * (1 + 4 * u)
+    return torch.nan_to_num(out, nan=-float("inf"))
+
+
+def score_lower_sound(m, lo, hi, bi, head, bs=50_000):
+    """PREREG SOUND: score_lower with rigorous float64 rounding terms in place of the flat 1e-6 margin (nlog / min
+    heads). The final logsumexps get a margin 1e-10 * (1 + |s| + max|d|), many orders above their rounding error
+    (assumes exp / log accurate to a few ulps, as in glibc)."""
+    assert head in ("nlog", "min"), head
+    bodies = m.bodies if isinstance(m, Ensemble) else [m]
+    out = []
+    with torch.no_grad():
+        for i in range(0, len(lo), bs):
+            box = [torch.as_tensor(np.asarray(v[i:i + bs], np.float64)) for v in (lo, hi)]
+            d = torch.cat([_sound_margins(b, *box, bi) for b in bodies], 1)
+            lp = -torch.logsumexp(d, -1)
+            s = -(torch.logsumexp(lp, 1) - math.log(lp.shape[1])) if head != "min" else -lp.min(1).values
+            dmax = torch.nan_to_num(d.abs(), posinf=0.0).flatten(1).max(1).values
+            out.append((s - 1e-10 * (1 + s.abs() + dmax)).numpy())
+    return np.concatenate(out)
+
+
 def bab_block(m, h, lo, hi, bi, head, tau, max_boxes=8192, time_s=20.0, device="cpu", batch=65536):
     """PREREG §9 K5b: branch and bound by input splitting over one row's box [lo, hi]. Returns (blocked, decided):
     blocked only when the float64 IBP lower bound of every sub-box clears tau; a sub-box centre whose real score is

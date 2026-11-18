@@ -105,6 +105,8 @@ def main():
     ap.add_argument("--per-family", action="store_true")  # LOWRATE-CLASS: throttle readout per attack family
     ap.add_argument("--m-cert", type=int, nargs="*", default=[])  # FRONTIER: same B certified at extra budgets m0
     ap.add_argument("--quorum", action="store_true")  # QUORUM: address blocked only with >= m+1 certified flows / 240 s
+    ap.add_argument("--sound", action="store_true")  # SOUND: veto_sound = rigorous float64 bound on float64 boxes
+    ap.add_argument("--dump", action="store_true")  # SOUND curves: --clean-only per-flow scores to an npz
     ap.add_argument("--rekey", type=int, default=0)  # shared-key (NAT) attacker: N draws of real bot flows re-keyed
     a = ap.parse_args()
     TS = a.train_seed or sa.SEED
@@ -146,6 +148,10 @@ def main():
     for m0 in a.m_cert:  # FRONTIER: block iff the certified radius >= m0 (same model and tau as gated_net)
         dets[f"veto_m{m0}"] = (dets["gated_net"][0], (lambda m0: lambda X: fx.score_lower(
             m, *bowl.dbox(z, X, m0), bi, g["head"]))(m0))
+    if a.sound:  # PREREG SOUND: same model and tau as gated_net; float64 deletion box (EPS-widened, no float32 cast)
+        import sensitivity
+        dets["veto_sound"] = (dets["gated_net"][0], lambda X: fx.score_lower_sound(
+            m, *sensitivity.deletion_box(X, cols, prep.mu, prep.sd, a.m), bi, g["head"]))
     if a.mono:  # MONO baseline: binary XGB monotone in every context column -> exact certificate at the box corner
         dets["mono"] = mono_det(Xf, yf, bi, cols, nb, lambda X: bowl.dbox(z, X, a.m))
     if a.mono_tiny:  # MONO-TINY: size-matched (40x4, ~23 KB) monotone model, the device-fitting comparison
@@ -272,11 +278,13 @@ def main():
         T = {"unk": cap(bank.test[held]),
              "known": np.concatenate([cap(r) for f, r in bank.test.items() if f not in (held, "Benign")])}
         XT = {k: tx(bank.frame(r, ())) for k, r in T.items()}
-        res = []
+        res, dump = [], {"key": np.asarray(key)}
         for n, (f, b) in dets.items():
             td = float(hs.threshold(hs.day_max(ck, f(Xcal))))
             s0, b0 = f(X0), b(X0)
             sT = {k: (f(X), b(X)) for k, X in XT.items()}
+            dump |= {f"{n}__s0": s0, f"{n}__b0": b0, f"{n}__td": np.float64(td), f"{n}__tflow": np.float64(tau[n]),
+                     **{f"{n}__{k}_{w}": v for k, sb in sT.items() for w, v in zip("sb", sb)}}
             for mode, t in (("flow", tau[n]), ("day", td)):
                 r = {"detector": n, "tau": mode, "tau_val": float(t), "alarm": (s0 > t).mean(), "block": (b0 > t).mean(),
                      "alarm_day": day(s0 > t), "block_day": day(b0 > t), "violations": int(((b0 > t) & ~(s0 > t)).sum())}
@@ -285,7 +293,10 @@ def main():
                 r["gtpr_macro"] = (r["gtpr_unk"] + r["gtpr_known"]) / 2
                 res.append(r)
                 print(json.dumps({k: round(v, 4) if isinstance(v, float) else v for k, v in r.items()}), flush=True)
-        pd.DataFrame(res).to_csv(sa.out(f"gate_hostday_{a.dataset}.csv"), index=False)
+        tg = f"_{a.tag}" if a.tag else ""
+        if a.dump:
+            np.savez_compressed(sa.out(f"scores_{a.dataset}{tg}.npz"), **dump)
+        pd.DataFrame(res).to_csv(sa.out(f"gate_hostday_{a.dataset}{tg}.csv"), index=False)
         return
     if a.clean_only:
         c = cols.index("hc_src_n_120s")

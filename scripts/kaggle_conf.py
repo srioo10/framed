@@ -76,6 +76,9 @@ def cmds(kind, ds):
         return [K + ["--two-channel", "--throttle", "1", "2", "5", "10", "20", "50", "--tag", "k19"]]
     if kind == "k17":  # K19 pattern run (carries the K17 rows)
         return [K + ["--two-channel", "--m-attack", "10", "50", "100", "--random", "8", "--no-bytes-grid", "--tag", "k19"]]
+    if kind == "sound":  # PREREG SOUND (2026-11-18): rigorous float64 bound, grid run + clean-only TPR / score dump
+        return [["test_sound_bound.py"], K + ["--sound", "--tag", "sound"],
+                K + ["--clean-only", "--sound", "--dump", "--rules", "--tag", "soundtpr"]]
     if kind.startswith("allp"):  # PREREG ALLPAIRS (2026-11-11, Kaggle amendment 2026-11-18): grid on held-out family j
         return [K + ["--held-idx", kind[-1], "--tag", f"pair{kind[-1]}"]]
     if kind.startswith("gseed"):  # same amendment: pair-0 grid at training seed s
@@ -106,9 +109,9 @@ def cmds(kind, ds):
 
 
 KINDS = ["clean", "baselines", "k5b", "trees2", "trees3", "trees4", "groot", "groot2", "groot3", "groot4", "attack", "c3", "k14", "leank1", "leanc3", "k16", "k17", "k18", "rk24", "rk24sk", "k5bq8",
-         "lmt2", "lmt3", "lmt4", "lmb2", "lmb3", "lmb4", "seed2", "seed3", "seed4", "damped"] + ['allp1', 'allp2', 'allp3', 'allp4', 'allp5', 'gseed2', 'gseed3'] + ['lmr2', 'lmr3', 'lmr4', 'lmx2', 'lmx3', 'lmx4', 'lmp2', 'lmp3', 'lmp4']
-OPT_IN = tuple(['allp1', 'allp2', 'allp3', 'allp4', 'allp5', 'gseed2', 'gseed3']) + ("damped", "rk24", "rk24sk", "k5bq8", "lmt2", "lmt3", "lmt4", "lmb2", "lmb3", "lmb4", "seed2", "seed3", "seed4") + tuple(['lmr2', 'lmr3', 'lmr4', 'lmx2', 'lmx3', 'lmx4', 'lmp2', 'lmp3', 'lmp4'])  # started only when named with --kinds (REKEY24 runs only CTU-13 / UGR'16)
-AK = ("damped", "attack", "quorum", "union", "unionh", "c3", "k14", "k16", "k17", "k18", "rk24", "rk24sk", "seed2", "seed3", "seed4") + tuple(['allp1', 'allp2', 'allp3', 'allp4', 'allp5', 'gseed2', 'gseed3'])  # kinds on the ATTACK kernel + bigp-proc
+         "lmt2", "lmt3", "lmt4", "lmb2", "lmb3", "lmb4", "seed2", "seed3", "seed4", "damped"] + ['allp1', 'allp2', 'allp3', 'allp4', 'allp5', 'gseed2', 'gseed3', 'sound'] + ['lmr2', 'lmr3', 'lmr4', 'lmx2', 'lmx3', 'lmx4', 'lmp2', 'lmp3', 'lmp4']
+OPT_IN = tuple(['allp1', 'allp2', 'allp3', 'allp4', 'allp5', 'gseed2', 'gseed3', 'sound']) + ("damped", "rk24", "rk24sk", "k5bq8", "lmt2", "lmt3", "lmt4", "lmb2", "lmb3", "lmb4", "seed2", "seed3", "seed4") + tuple(['lmr2', 'lmr3', 'lmr4', 'lmx2', 'lmx3', 'lmx4', 'lmp2', 'lmp3', 'lmp4'])  # started only when named with --kinds (REKEY24 runs only CTU-13 / UGR'16)
+AK = ("damped", "attack", "quorum", "union", "unionh", "c3", "k14", "k16", "k17", "k18", "rk24", "rk24sk", "seed2", "seed3", "seed4") + tuple(['allp1', 'allp2', 'allp3', 'allp4', 'allp5', 'gseed2', 'gseed3', 'sound'])  # kinds on the ATTACK kernel + bigp-proc
 B = ('{"family": "tabm", "enc": "raw", "e": 4, "w": 32, "depth": 2, "sn": 0, "act": "relu", "members": 8, "head": "nlog", '
      '"kd": 0.9, "syn": 0.5, "clip": 1, "cert": 4, "gate": 1, "rdet": 2, "ls": 0.0, "focal": 0.0, "lr": 0.003}')
 # CONF C4 (K1 on ToN) and C3 on ToN (B, K4 at tau_day): need data/processed and the bowl champions, not the arena
@@ -190,6 +193,7 @@ def push(a):
     (data / "k5code" / "scripts").mkdir(parents=True)
     for f in CODE:
         shutil.copy(ROOT / "scripts" / f, data / "k5code" / "scripts" / f)
+    shutil.copy(ROOT / "tests" / "test_sound_bound.py", data / "k5code" / "scripts" / "test_sound_bound.py")  # SOUND guard
     for f in ("test_damped.py", "test_damped_features.py"):  # DAMPED kernel guard runs them before building pairs
         shutil.copy(ROOT / "tests" / f, data / "k5code" / "scripts" / ("t_" + f[5:]))
     shutil.copytree(ROOT / "src" / "nids", data / "k5code" / "src" / "nids", ignore=shutil.ignore_patterns("__pycache__"))
