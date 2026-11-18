@@ -8,7 +8,8 @@ from saved files on a laptop; rows marked *Kaggle* retrain models (we ran all tr
 | Paper claim | Result file(s) | Command | Cost |
 |---|---|---|---|
 | Ordinary IPS cut the sensor off in 25 of 27 runs; Veto never blocked it in 36; sound build 0 in 13 | `results/live/fair/{fair_runs.txt,sub.log,gw-*.log}` | `python scripts/live/fair_report.py results/live/fair veto` (and `sound`) | recompute, s |
-| Every live block decision follows from the logged flow records (12,255 flows, 0 mismatches) | same logs | `python scripts/live/replay_check.py results/live/fair` | recompute, ~1 min |
+| Every live block decision follows from the logged flow records (12,605 flows incl. LIVE-POS, 0 mismatches) | same logs | `python scripts/live/replay_check.py results/live/fair` | recompute, ~1 min |
+| Live positive control: attacker's own address blocked in 5 of 5 runs; sensor, broker, clean runs 0 | `results/live/pos/{fair_runs.txt,sub.log,gw-*.log}` | `python scripts/live/fair_report.py results/live/pos pos`; `python scripts/live/replay_check.py results/live/pos 0.478` | recompute, ~1 min |
 | 10 of 10 at the clean 99th percentile; 2 of 10 above 0.477 in replay | `results/live/natenf_runs.csv`, `results/live/natenf_timeline.csv` | `python scripts/live/natenf_report.py runs`, `python scripts/live/timeline.py` | recompute |
 | CrowdSec (whitelist removed) banned the shared address in 5 of 5 runs | `results/live/crowdsec/cs_runs.txt` | read directly (R1 rows; R0 = whitelist kept) | — |
 | Re-implemented KitNET / HorusEye / Deep SAD alarm on 92–100% of innocent host-days | `results/cert/gate_k4_{ds}.csv` | `python scripts/gate_attack.py {ds} --genome '<Veto genome>'` (genome in `PREREG.md`, CONF rows) | Kaggle |
