@@ -36,12 +36,12 @@ def gateable(D):
     M = pd.merge_asof(Q, R.rename(columns={"t": "tr"}), left_on="t", right_on="tr", by="k", allow_exact_matches=False)
     okB = pd.Series(((M.t - M.tr) <= 600_000).to_numpy(), index=M.i).reindex(idx).fillna(False).to_numpy()
     g[idx] = okA & okB
-    return D.family.to_numpy(), D.y.to_numpy() if "y" in D else None, g
+    return D.family.to_numpy(), (D.family != "Benign").to_numpy().astype(int), g
 
 
 def main(dss):
     for ds in dss:
-        D = pd.read_parquet(f"data/processed/{ds}.parquet", columns=COLS + ["y"])
+        D = pd.read_parquet(f"data/processed/{ds}.parquet", columns=COLS)
         fam, y, g = gateable(D)
         T = pd.DataFrame({"family": fam, "y": y, "g": g})
         per = T[T.y == 1].groupby("family").g.mean().sort_values(ascending=False)
