@@ -309,8 +309,8 @@ def _sound_margins(body, lo, hi, bi):
     r = r + 2 * u * (mu.abs() + r)
     if body.M > 1:
         R = body.r.double()
-        assert torch.all(R.abs() == 1), "member scales must be +-1 (exact products)"
-        mu, r = mu[:, None, :] * R, r[:, None, :] * R.abs()
+        mu, r = mu[:, None, :] * R, r[:, None, :] * R.abs()  # trained scales: products are rounded, not exact
+        r = r * (1 + 4 * u) + 2 * u * mu.abs()
     for layer in body.body:
         if isinstance(layer, nn.Linear):
             W, b = layer.weight.double(), layer.bias.double()

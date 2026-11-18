@@ -17,6 +17,9 @@ def main():
     d, k, bi = 27, 5, 2
     for members in (8, 1):
         m = fx.Body(nn.Identity(), d, k, 32, 2, members=members, clip=(np.full(d, -6.0), np.full(d, 6.0))).eval()
+        if members > 1:  # trained member scales drift from +-1
+            with torch.no_grad():
+                m.r.mul_(torch.empty_like(m.r).uniform_(0.3, 1.7))
         x = rng.normal(size=(400, d))
         w = np.abs(rng.normal(size=(400, d))) * rng.choice([0, 0.05, 1.0], size=(400, 1))
         lo, hi = x - w, x + w
