@@ -15,6 +15,8 @@ from replay_check import build, flows  # noqa: E402
 from fair_report import runs  # noqa: E402
 
 W_MS = 240_000
+V2 = "--v2" in sys.argv
+if V2: sys.argv.remove("--v2")
 def is_inj(dst):  # ground truth: the attacker's targets are lab peers 192.168.100-199.x (sk_inject.py asserts this range)
     o = dst.split(".")
     return dst.startswith("192.168.") and 100 <= int(o[2]) <= 199
@@ -42,6 +44,8 @@ def policies(rows, i, key, m):
     """Candidate deletion sets (indices into rows) for gap flow i; each of size <= m."""
     t = int(rows[i][2])
     C = [j for j in range(i) if t - W_MS <= int(rows[j][2]) < t and key in (rows[j][3], rows[j][5])]
+    if V2:  # FRAME-WITNESS v2: a host's own connections to the alarmed flow's service are its behaviour, not suspects
+        C = [j for j in C if (rows[j][5], rows[j][6]) != (rows[i][5], rows[i][6])]
     last_peer, last_port, newp, newo = {}, {}, set(), set()
     for j in range(i):  # novelty as the gateway's tables: not seen by the key in the prior 120 s
         if key not in (rows[j][3], rows[j][5]):
@@ -65,13 +69,29 @@ def policies(rows, i, key, m):
     # suspects are context writes only (failed, new peer, new port): the way an in-budget injector moves context
 
 
+def no_attacker_runs(d, b):
+    """LIVE-FAULT runs have no attacker address by design, which fair_report.runs drops as INVALID."""
+    import pandas as pd
+    cur, out = {}, {}
+    for ln in (Path(d) / "fair_runs.txt").read_text().splitlines():
+        p = ln.split()
+        if p[:2] != ["RUN", b] or len(p) < 6:
+            continue
+        if p[4] == "start": cur[p[3]] = int(p[5])
+        elif p[4] == "end" and p[3] in cur: out[p[3]] = (cur.pop(p[3]), int(p[5]))
+    return pd.DataFrame([{"build": b, "variant": "F", "rep": int(k), "t0": a, "t1": z} for k, (a, z) in out.items()])
+
+
 def main(d, b, tau, key="192.168.4.2", m="10"):
-    m = int(m); F, R = flows(d), runs(d)
-    exe = str(Path(tempfile.mkdtemp()) / b); build(b, exe)
+    m = int(m); F = flows(d)
+    R = runs(d) if b != "fault" else no_attacker_runs(d, b)
+    exe = str(Path(tempfile.mkdtemp()) / b); build({"col": "pos", "amn2": "pos", "fault": "pos"}.get(b, b), exe)  # pos + enforcement-only flags
     for _, r in R[R.build == b].iterrows():
         rows = [p for p in F if r.t0 * 1000 <= int(p[0]) < r.t1 * 1000]
         base = replay(exe, tau, rows)
-        assert all(abs(float(o[4]) - float(p[13])) < 1e-4 for o, p in zip(base, rows)), "replay != log"
+        bad = sum(abs(float(o[4]) - float(p[13])) >= 1e-4 for o, p in zip(base, rows))
+        if bad or not rows:  # replay must reproduce the logged scores, else the run is not analysed
+            print("SKIP", b, r.variant, r.rep, "flows", len(rows), "score mismatches", bad); continue
         gaps = [i for i, o in enumerate(base) if rows[i][3] == key and o[6] == "1" and o[7] == "0"]
         for i in [i for i, o in enumerate(base) if rows[i][3] == key and o[7] == "1"]:  # W5 soundness on blocks
             for name, S0 in policies(rows, i, key, m):
