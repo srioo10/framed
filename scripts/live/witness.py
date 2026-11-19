@@ -19,7 +19,10 @@ V2 = "--v2" in sys.argv
 if V2: sys.argv.remove("--v2")
 def is_inj(dst):  # ground truth: the attacker's targets are lab peers 192.168.100-199.x (sk_inject.py asserts this range)
     o = dst.split(".")
-    return dst.startswith("192.168.") and 100 <= int(o[2]) <= 199
+    return dst.startswith("192.168.") and 100 <= int(o[2]) <= INJ_HI
+
+
+INJ_HI = int(__import__("os").environ.get("INJ_HI", "199"))  # BG arm: 149 (attack 120-149, benign co-tenant 150-199)
 
 
 def injected(p):
