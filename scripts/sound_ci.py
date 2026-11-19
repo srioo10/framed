@@ -39,7 +39,7 @@ def main(paths, B=2000, seed=0):
                 f = lambda n: tpr_at(D[n][0][ik], D[n][1][iu], D[n][2][ikn], h)
                 diff.append(f("veto_sound") - f(riv))
             lo, hi = np.percentile(diff, [2.5, 97.5])
-            print(f"{p.split('scores_')[1][:-15]} harm {h:.0%}: Veto {pt['veto_sound']:.3f} vs {riv} {pt[riv]:.3f}; "
+            print(f"{p.split('scores_')[1].rsplit('_', 1)[0]} harm {h:.0%}: Veto {pt['veto_sound']:.3f} vs {riv} {pt[riv]:.3f}; "
                   f"lead {pt['veto_sound'] - pt[riv]:+.3f} [{lo:+.3f}, {hi:+.3f}] -> {'LEADS' if lo > 0 else ('BEHIND' if hi < 0 else 'LEVEL')}")
 
 
