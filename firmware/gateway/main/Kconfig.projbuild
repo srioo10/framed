@@ -40,6 +40,9 @@ menu "Veto gateway"
     config GW_BLOCK_TTL_S
         int "Block duration (s)"
         default 300
+    config GW_AMNESTY
+        bool "Amnesty: a blocked key's veteran connections (open >= 240 s before the block) keep passing"
+        default n
     config GW_SHED
         bool "Shed over-rate sources when the decision queue is over half full (fail-open fix)"
         default n

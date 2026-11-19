@@ -69,6 +69,24 @@ static int shed(uint32_t src, int64_t t, int opens) {
 #endif
 static volatile uint32_t blk_ip[NBLK];
 static volatile int64_t blk_until[NBLK];
+#ifdef CONFIG_GW_AMNESTY
+/* AMNESTY (PREREG 2026-11-19): a blocked key's packet passes iff its tuple is a veteran: seen continuously (gaps <= IDLE_MS)
+   since >= VET_W_MS before the block's onset. Direct-mapped; a collision never evicts a live entry, so a flood cannot push a
+   veteran out (an untracked tuple is simply dropped: only adds drops). Applies only to drops; decisions are unchanged. */
+#define NVET 128
+#define VET_W_MS 240000
+typedef struct { uint32_t src, dst; uint16_t sport, dport; uint8_t proto; int64_t first, last; } Vet;
+static Vet vet[NVET];
+static volatile int64_t blk_onset[NBLK];
+static volatile uint32_t namn;
+static Vet *vet_slot(const Pkt *k) {
+  uint32_t h = (k->src ^ (k->dst * 2654435761u) ^ ((uint32_t)k->sport << 16 | k->dport) ^ k->proto) * 2654435761u;
+  return &vet[h >> (32 - 7)];  /* NVET = 128 */
+}
+static int vet_match(const Vet *v, const Pkt *k) {
+  return v->src == k->src && v->dst == k->dst && v->sport == k->sport && v->dport == k->dport && v->proto == k->proto;
+}
+#endif
 static Flow fl[NFLOW];
 static Host hosts[CONFIG_GW_HOSTS];
 static HcTable T = {hosts, CONFIG_GW_HOSTS, 0};
@@ -85,8 +103,25 @@ int gw_ip4_input_hook(struct pbuf *p, struct netif *inp) {
   memcpy(&k.src, h + 12, 4);
   memcpy(&k.dst, h + 16, 4);
   k.t = now_ms();
+#ifdef CONFIG_GW_AMNESTY
+  { int ihl0 = (h[0] & 15) * 4, frag0 = ((h[6] & 0x1f) << 8) | h[7];
+    k.proto = h[9];
+    if (!frag0 && (k.proto == 6 || k.proto == 17) && p->len >= ihl0 + 4) {
+      k.sport = (h[ihl0] << 8) | h[ihl0 + 1]; k.dport = (h[ihl0 + 2] << 8) | h[ihl0 + 3]; }
+    Vet *v = vet_slot(&k);
+    int live = v->src && k.t - v->last <= IDLE_MS;
+    if (live && vet_match(v, &k)) v->last = k.t;
+    else if (!live) *v = (Vet){k.src, k.dst, k.sport, k.dport, k.proto, k.t, k.t};
+    for (int i = 0; i < NBLK; i++)
+      if (blk_ip[i] == k.src && blk_until[i] > k.t) {
+        if (vet_match(v, &k) && v->first <= blk_onset[i] - VET_W_MS) { namn++; break; }  /* veteran: pass */
+        bdrop++; pbuf_free(p); return 1;
+      }
+  }
+#else
   for (int i = 0; i < NBLK; i++)
     if (blk_ip[i] == k.src && blk_until[i] > k.t) { bdrop++; pbuf_free(p); return 1; }  /* eaten: lwIP stops here */
+#endif
   uint8_t d0 = ((const uint8_t *)&k.dst)[0];
   if (k.dst == self_ip[0] || k.dst == self_ip[1] || k.dst == 0xffffffff || (d0 & 0xf0) == 0xe0 || k.src == 0)
     return 0;  /* traffic to the gateway itself, broadcast, multicast: not metered (the Pi cannot see it either) */
@@ -117,6 +152,9 @@ static void block(uint32_t ip, int64_t t) {
     if (blk_ip[i] == ip) { slot = i; break; }
     if (blk_until[i] < blk_until[slot]) slot = i;
   }
+#ifdef CONFIG_GW_AMNESTY
+  if (blk_ip[slot] != ip || blk_until[slot] <= t) blk_onset[slot] = t;  /* new block episode */
+#endif
   blk_until[slot] = t + (int64_t)CONFIG_GW_BLOCK_TTL_S * 1000;
   blk_ip[slot] = ip;
   char s[16]; ipstr(ip, s);
@@ -231,6 +269,9 @@ static void ids_task(void *arg) {
              (unsigned long)bdrop, open, T.evictions, (unsigned long)nevict_flow, (unsigned long)nflow,
              (unsigned long)nalarm, (unsigned long)nblock, (unsigned long)nabst);
       printf("Q,%lld,%lu,%lu\n", t, (unsigned long)qdrop, (unsigned long)nshed);
+#ifdef CONFIG_GW_AMNESTY
+      printf("A,%lld,%lu\n", t, (unsigned long)namn);
+#endif
       next_stat = t + 10000;
     }
   }
