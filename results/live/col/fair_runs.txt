@@ -1,0 +1,456 @@
+CALIB start 1794551071
+NOTE 1794551172 attacker iface briefly joined bigp-iot (profile test, no flows sent) then back to bigp-nat-att
+CALIB end 1794561871
+NOTE 1794562017 D-path smoke test: attacker joined bigp-iot (192.168.4.5), 2 pings to gateway, back to bigp-nat-att, no injection
+Hash of data verified.
+Hash of data verified.
+BUILD fair_veto flashed 1794562035
+RUN veto clean 1 INVALID no attacker address
+RUN veto clean 1 start 1794562045 att 
+NOTE 1794562206 campaign restart: Pi radio reset ~7 s after flashing fair_veto dropped wlsta; veto clean 1 aborted (INVALID, no injections sent); runner now recreates wlsta and reruns INVALID runs once; full campaign restarted from the flash
+Hash of data verified.
+Hash of data verified.
+BUILD fair_veto flashed 1794562225
+RUN veto clean 1 start 1794562282 att 192.168.5.2
+RUN veto clean 1 end 1794563482
+RUN veto clean 2 start 1794563494 att 192.168.5.2
+RUN veto clean 2 end 1794564694
+RUN veto clean 3 start 1794564704 att 192.168.5.2
+RUN veto clean 3 end 1794565904
+RUN veto A 1 start 1794565915 att 192.168.5.2
+RUN veto A 1 end 1794567115
+RUN veto B 1 start 1794567126 att 192.168.5.2
+RUN veto B 1 end 1794568326
+RUN veto E 1 start 1794568337 att 192.168.5.2
+RUN veto E 1 end 1794569537
+RUN veto A 2 start 1794569548 att 192.168.5.2
+RUN veto A 2 end 1794570748
+RUN veto B 2 start 1794570761 att 192.168.5.2
+RUN veto B 2 end 1794571961
+RUN veto E 2 start 1794571971 att 192.168.5.2
+RUN veto E 2 end 1794573171
+RUN veto A 3 start 1794573181 att 192.168.5.2
+RUN veto A 3 end 1794574381
+RUN veto B 3 start 1794574393 att 192.168.5.2
+RUN veto B 3 end 1794575593
+RUN veto E 3 start 1794575604 att 192.168.5.2
+RUN veto E 3 end 1794576804
+RUN veto A 4 start 1794576815 att 192.168.5.2
+RUN veto A 4 end 1794578015
+RUN veto B 4 start 1794578027 att 192.168.5.2
+RUN veto B 4 end 1794579227
+RUN veto E 4 start 1794579240 att 192.168.5.2
+RUN veto E 4 end 1794580440
+RUN veto A 5 start 1794580450 att 192.168.5.2
+RUN veto A 5 end 1794581650
+RUN veto B 5 start 1794581662 att 192.168.5.2
+RUN veto B 5 end 1794582862
+RUN veto E 5 start 1794582873 att 192.168.5.2
+RUN veto E 5 end 1794584073
+RUN veto D 1 start 1794584084 att 192.168.4.4
+RUN veto D 1 end 1794585445
+RUN veto D 2 start 1794585456 att 192.168.4.4
+RUN veto D 2 end 1794586814
+RUN veto D 3 start 1794586825 att 192.168.4.4
+RUN veto D 3 end 1794588167
+RUN veto D 4 start 1794588178 att 192.168.4.4
+RUN veto D 4 end 1794589509
+RUN veto D 5 start 1794589520 att 192.168.4.4
+RUN veto D 5 end 1794590878
+Hash of data verified.
+Hash of data verified.
+BUILD fair_ord flashed 1794590905
+RUN ord clean 1 start 1794590961 att 192.168.5.2
+RUN ord clean 1 end 1794592161
+RUN ord clean 2 start 1794592173 att 192.168.5.2
+RUN ord clean 2 end 1794593373
+RUN ord clean 3 start 1794593384 att 192.168.5.2
+RUN ord clean 3 end 1794594584
+RUN ord A 1 start 1794594596 att 192.168.5.2
+RUN ord A 1 end 1794595796
+RUN ord B 1 start 1794595807 att 192.168.5.2
+RUN ord B 1 end 1794597007
+RUN ord E 1 start 1794597017 att 192.168.5.2
+RUN ord E 1 end 1794598217
+RUN ord A 2 start 1794598228 att 192.168.5.2
+RUN ord A 2 end 1794599428
+RUN ord B 2 start 1794599439 att 192.168.5.2
+RUN ord B 2 end 1794600639
+RUN ord E 2 start 1794600650 att 192.168.5.2
+RUN ord E 2 end 1794602273
+RUN ord A 3 start 1794602284 att 192.168.5.2
+RUN ord A 3 end 1794603484
+RUN ord B 3 start 1794603496 att 192.168.5.2
+RUN ord B 3 end 1794604696
+RUN ord E 3 start 1794604707 att 192.168.5.2
+RUN ord E 3 end 1794606328
+RUN ord A 4 start 1794606339 att 192.168.5.2
+RUN ord A 4 end 1794607539
+RUN ord B 4 start 1794607550 att 192.168.5.2
+RUN ord B 4 end 1794608750
+RUN ord E 4 start 1794608761 att 192.168.5.2
+RUN ord E 4 end 1794609961
+RUN ord A 5 start 1794609973 att 192.168.5.2
+RUN ord A 5 end 1794611173
+RUN ord B 5 start 1794611184 att 192.168.5.2
+RUN ord B 5 end 1794612384
+RUN ord E 5 start 1794612397 att 192.168.5.2
+RUN ord E 5 end 1794614020
+FAIR DONE 1794614020
+NOTE 1794614038 LIVE-FAIR-REP queue starting replicates (OFF 5, 10)
+Hash of data verified.
+Hash of data verified.
+BUILD fair_veto flashed 1794614056 verified (try 1)
+RUN veto clean 6 start 1794614223 att 192.168.5.2
+RUN veto clean 6 end 1794615423
+RUN veto clean 7 start 1794615435 att 192.168.5.2
+RUN veto clean 7 end 1794616635
+RUN veto clean 8 start 1794616646 att 192.168.5.2
+RUN veto clean 8 end 1794617846
+RUN veto A 6 start 1794617857 att 192.168.5.2
+RUN veto A 6 end 1794619057
+RUN veto B 6 start 1794619068 att 192.168.5.2
+RUN veto B 6 end 1794620268
+RUN veto E 6 start 1794620280 att 192.168.5.2
+RUN veto E 6 end 1794621480
+RUN veto A 7 start 1794621491 att 192.168.5.2
+RUN veto A 7 end 1794622691
+RUN veto B 7 start 1794622704 att 192.168.5.2
+RUN veto B 7 end 1794623904
+RUN veto E 7 start 1794623915 att 192.168.5.2
+RUN veto E 7 end 1794625115
+RUN veto A 8 start 1794625127 att 192.168.5.2
+RUN veto A 8 end 1794626327
+RUN veto B 8 start 1794626338 att 192.168.5.2
+RUN veto B 8 end 1794627538
+RUN veto E 8 start 1794627550 att 192.168.5.2
+RUN veto E 8 end 1794628860
+RUN veto A 9 start 1794628871 att 192.168.5.2
+RUN veto A 9 end 1794630071
+RUN veto B 9 start 1794630082 att 192.168.5.2
+RUN veto B 9 end 1794631282
+RUN veto E 9 start 1794631293 att 192.168.5.2
+RUN veto E 9 end 1794632493
+RUN veto A 10 start 1794632503 att 192.168.5.2
+RUN veto A 10 end 1794633703
+RUN veto B 10 start 1794633714 att 192.168.5.2
+RUN veto B 10 end 1794634914
+RUN veto E 10 start 1794634925 att 192.168.5.2
+RUN veto E 10 end 1794636125
+RUN veto D 6 start 1794636136 att 192.168.4.4
+RUN veto D 6 end 1794637475
+RUN veto D 7 start 1794637486 att 192.168.4.4
+RUN veto D 7 end 1794638822
+RUN veto D 8 start 1794638834 att 192.168.4.4
+RUN veto D 8 end 1794640171
+RUN veto D 9 start 1794640182 att 192.168.4.4
+RUN veto D 9 end 1794641522
+RUN veto D 10 start 1794641534 att 192.168.4.4
+RUN veto D 10 end 1794642874
+Hash of data verified.
+Hash of data verified.
+BUILD fair_ord flashed 1794642901 verified (try 1)
+RUN ord clean 6 start 1794642957 att 192.168.5.2
+RUN ord clean 6 end 1794644157
+RUN ord clean 7 start 1794644168 att 192.168.5.2
+RUN ord clean 7 end 1794645368
+RUN ord clean 8 start 1794645379 att 192.168.5.2
+RUN ord clean 8 end 1794646579
+RUN ord A 6 start 1794646590 att 192.168.5.2
+RUN ord A 6 end 1794647790
+RUN ord B 6 start 1794647801 att 192.168.5.2
+RUN ord B 6 end 1794649001
+RUN ord E 6 start 1794649011 att 192.168.5.2
+RUN ord E 6 end 1794650211
+RUN ord A 7 start 1794650224 att 192.168.5.2
+RUN ord A 7 end 1794651424
+RUN ord B 7 start 1794651436 att 192.168.5.2
+RUN ord B 7 end 1794652637
+RUN ord E 7 start 1794652649 att 192.168.5.2
+RUN ord E 7 end 1794653849
+RUN ord A 8 start 1794653860 att 192.168.5.2
+RUN ord A 8 end 1794655060
+RUN ord B 8 start 1794655071 att 192.168.5.2
+RUN ord B 8 end 1794656271
+RUN ord E 8 start 1794656282 att 192.168.5.2
+RUN ord E 8 end 1794657731
+RUN ord A 9 start 1794657742 att 192.168.5.2
+RUN ord A 9 end 1794658942
+RUN ord B 9 start 1794658953 att 192.168.5.2
+RUN ord B 9 end 1794660153
+RUN ord E 9 start 1794660165 att 192.168.5.2
+RUN ord E 9 end 1794661623
+RUN ord A 10 start 1794661635 att 192.168.5.2
+RUN ord A 10 end 1794662835
+RUN ord B 10 start 1794662847 att 192.168.5.2
+RUN ord B 10 end 1794664047
+RUN ord E 10 start 1794664058 att 192.168.5.2
+RUN ord E 10 end 1794665681
+FAIR DONE off 5 1794665681
+Hash of data verified.
+Hash of data verified.
+BUILD fair_veto flashed 1794665699 verified (try 1)
+RUN veto clean 11 start 1794665845 att 192.168.5.2
+RUN veto clean 11 end 1794667045
+RUN veto clean 12 start 1794667057 att 192.168.5.2
+RUN veto clean 12 end 1794668257
+RUN veto clean 13 start 1794668268 att 192.168.5.2
+RUN veto clean 13 end 1794669468
+RUN veto A 11 start 1794669479 att 192.168.5.2
+RUN veto A 11 end 1794670679
+RUN veto B 11 start 1794670691 att 192.168.5.2
+RUN veto B 11 end 1794671891
+RUN veto E 11 start 1794671902 att 192.168.5.2
+RUN veto E 11 end 1794673102
+RUN veto A 12 start 1794673113 att 192.168.5.2
+RUN veto A 12 end 1794674313
+RUN veto B 12 start 1794674324 att 192.168.5.2
+RUN veto B 12 end 1794675524
+RUN veto E 12 start 1794675535 att 192.168.5.2
+RUN veto E 12 end 1794676735
+RUN veto A 13 start 1794676748 att 192.168.5.2
+RUN veto A 13 end 1794677948
+RUN veto B 13 start 1794677960 att 192.168.5.2
+RUN veto B 13 end 1794679160
+RUN veto E 13 start 1794679171 att 192.168.5.2
+RUN veto E 13 end 1794680371
+RUN veto A 14 start 1794680381 att 192.168.5.2
+RUN veto A 14 end 1794681581
+RUN veto B 14 start 1794681592 att 192.168.5.2
+RUN veto B 14 end 1794682792
+RUN veto E 14 start 1794682803 att 192.168.5.2
+RUN veto E 14 end 1794684003
+RUN veto A 15 start 1794684014 att 192.168.5.2
+RUN veto A 15 end 1794685214
+RUN veto B 15 start 1794685225 att 192.168.5.2
+RUN veto B 15 end 1794686425
+RUN veto E 15 start 1794686436 att 192.168.5.2
+RUN veto E 15 end 1794687636
+RUN veto D 11 start 1794687648 att 192.168.4.4
+RUN veto D 11 end 1794688988
+RUN veto D 12 start 1794688999 att 192.168.4.4
+RUN veto D 12 end 1794690339
+RUN veto D 13 start 1794690350 att 192.168.4.4
+RUN veto D 13 end 1794691696
+RUN veto D 14 start 1794691707 att 192.168.4.4
+RUN veto D 14 end 1794693049
+RUN veto D 15 start 1794693060 att 192.168.4.4
+RUN veto D 15 end 1794694260
+Hash of data verified.
+Hash of data verified.
+BUILD fair_ord flashed 1794694287 verified (try 1)
+RUN ord clean 11 start 1794694345 att 192.168.5.2
+RUN ord clean 11 end 1794695545
+RUN ord clean 12 start 1794695556 att 192.168.5.2
+RUN ord clean 12 end 1794696756
+RUN ord clean 13 start 1794696767 att 192.168.5.2
+RUN ord clean 13 end 1794697967
+RUN ord A 11 start 1794697978 att 192.168.5.2
+RUN ord A 11 end 1794699178
+RUN ord B 11 start 1794699189 att 192.168.5.2
+RUN ord B 11 end 1794700389
+RUN ord E 11 start 1794700400 att 192.168.5.2
+RUN ord E 11 end 1794702023
+RUN ord A 12 start 1794702035 att 192.168.5.2
+RUN ord A 12 end 1794703235
+RUN ord B 12 start 1794703246 att 192.168.5.2
+RUN ord B 12 end 1794704446
+RUN ord E 12 start 1794704457 att 192.168.5.2
+RUN ord E 12 end 1794705657
+RUN ord A 13 start 1794705669 att 192.168.5.2
+RUN ord A 13 end 1794706869
+RUN ord B 13 start 1794706880 att 192.168.5.2
+RUN ord B 13 end 1794708080
+RUN ord E 13 start 1794708091 att 192.168.5.2
+RUN ord E 13 end 1794709291
+RUN ord A 14 start 1794709303 att 192.168.5.2
+RUN ord A 14 end 1794710503
+RUN ord B 14 start 1794710514 att 192.168.5.2
+RUN ord B 14 end 1794711714
+RUN ord E 14 start 1794711725 att 192.168.5.2
+RUN ord E 14 end 1794713345
+RUN ord A 15 start 1794713357 att 192.168.5.2
+RUN ord A 15 end 1794714557
+RUN ord B 15 start 1794714569 att 192.168.5.2
+RUN ord B 15 end 1794715769
+RUN ord E 15 start 1794715780 att 192.168.5.2
+RUN ord E 15 end 1794716980
+FAIR DONE off 10 1794716980
+Hash of data verified.
+Hash of data verified.
+BUILD fair_sound flashed 1794760229 verified (try 1)
+RUN sound clean 1 start 1794760285 att 192.168.5.2
+RUN sound clean 1 end 1794761485
+RUN sound clean 2 start 1794761497 att 192.168.5.2
+RUN sound clean 2 end 1794762697
+RUN sound clean 3 start 1794762710 att 192.168.5.2
+RUN sound clean 3 end 1794763910
+RUN sound A 1 start 1794763922 att 192.168.5.2
+RUN sound A 1 end 1794765122
+RUN sound B 1 start 1794765134 att 192.168.5.2
+RUN sound B 1 end 1794766334
+RUN sound E 1 start 1794766345 att 192.168.5.2
+RUN sound E 1 end 1794767545
+RUN sound A 2 start 1794767556 att 192.168.5.2
+RUN sound A 2 end 1794768756
+RUN sound B 2 start 1794768767 att 192.168.5.2
+RUN sound B 2 end 1794769967
+RUN sound E 2 start 1794769978 att 192.168.5.2
+RUN sound E 2 end 1794771178
+RUN sound A 3 start 1794771189 att 192.168.5.2
+RUN sound A 3 end 1794772389
+RUN sound B 3 start 1794772401 att 192.168.5.2
+RUN sound B 3 end 1794773601
+RUN sound E 3 start 1794773613 att 192.168.5.2
+RUN sound E 3 end 1794774813
+RUN sound A 4 start 1794774826 att 192.168.5.2
+RUN sound A 4 end 1794776026
+RUN sound B 4 start 1794776037 att 192.168.5.2
+RUN sound B 4 end 1794777237
+RUN sound E 4 start 1794777248 att 192.168.5.2
+RUN sound E 4 end 1794778448
+RUN sound A 5 start 1794778460 att 192.168.5.2
+RUN sound A 5 end 1794779660
+RUN sound B 5 start 1794779672 att 192.168.5.2
+RUN sound B 5 end 1794780872
+RUN sound E 5 start 1794780883 att 192.168.5.2
+RUN sound E 5 end 1794782083
+RUN sound D 1 start 1794782094 att 192.168.4.4
+RUN sound D 1 end 1794783294
+RUN sound D 2 start 1794783305 att 192.168.4.2
+RUN sound D 2 end 1794784505
+RUN sound D 3 start 1794784517 att 192.168.4.3
+RUN sound D 3 end 1794785863
+RUN sound D 4 start 1794785874 att 192.168.4.3
+RUN sound D 4 end 1794787074
+RUN sound D 5 start 1794787085 att 192.168.4.3
+RUN sound D 5 end 1794788285
+FAIR DONE off 0 1794788294
+NOTE 1794788308 queue: LIVE-SCAN starting
+Hash of data verified.
+Hash of data verified.
+BUILD fair_scan flashed 1794788326 verified (try 1)
+RUN scan clean 1 start 1794788383 att 192.168.5.2
+RUN scan clean 1 end 1794789583
+RUN scan clean 2 start 1794789594 att 192.168.5.2
+RUN scan clean 2 end 1794790794
+RUN scan clean 3 start 1794790805 att 192.168.5.2
+RUN scan clean 3 end 1794792005
+RUN scan A 1 start 1794792017 att 192.168.5.2
+RUN scan A 1 end 1794793217
+RUN scan B 1 start 1794793229 att 192.168.5.2
+RUN scan B 1 end 1794794429
+RUN scan E 1 start 1794794440 att 192.168.5.2
+RUN scan E 1 end 1794795640
+RUN scan H 1 start 1794795651 att 192.168.5.2
+RUN scan H 1 end 1794796851
+RUN scan A 2 start 1794796862 att 192.168.5.2
+RUN scan A 2 end 1794798062
+RUN scan B 2 start 1794798073 att 192.168.5.2
+RUN scan B 2 end 1794799273
+RUN scan E 2 start 1794799284 att 192.168.5.2
+RUN scan E 2 end 1794800484
+RUN scan H 2 start 1794800496 att 192.168.5.2
+RUN scan H 2 end 1794801696
+RUN scan A 3 start 1794801708 att 192.168.5.2
+RUN scan A 3 end 1794802908
+RUN scan B 3 start 1794802919 att 192.168.5.2
+RUN scan B 3 end 1794804119
+RUN scan E 3 start 1794804130 att 192.168.5.2
+RUN scan E 3 end 1794805330
+RUN scan H 3 start 1794805342 att 192.168.5.2
+RUN scan H 3 end 1794806542
+RUN scan A 4 start 1794806554 att 192.168.5.2
+RUN scan A 4 end 1794807754
+RUN scan B 4 start 1794807766 att 192.168.5.2
+RUN scan B 4 end 1794808966
+RUN scan E 4 start 1794808978 att 192.168.5.2
+RUN scan E 4 end 1794810178
+RUN scan H 4 start 1794810189 att 192.168.5.2
+RUN scan H 4 end 1794811389
+RUN scan A 5 start 1794811401 att 192.168.5.2
+RUN scan A 5 end 1794812601
+RUN scan B 5 start 1794812613 att 192.168.5.2
+RUN scan B 5 end 1794813813
+RUN scan E 5 start 1794813824 att 192.168.5.2
+RUN scan E 5 end 1794815024
+RUN scan H 5 start 1794815035 att 192.168.5.2
+RUN scan H 5 end 1794816235
+RUN scan DH 1 start 1794816246 att 192.168.4.3
+RUN scan DH 1 end 1794817511
+RUN scan DH 2 start 1794817522 att 192.168.4.3
+RUN scan DH 2 end 1794818787
+RUN scan DH 3 start 1794818798 att 192.168.4.3
+RUN scan DH 3 end 1794820062
+RUN scan DH 4 start 1794820075 att 192.168.4.3
+RUN scan DH 4 end 1794821340
+RUN scan DH 5 start 1794821350 att 192.168.4.3
+RUN scan DH 5 end 1794822614
+FAIR DONE off 0 1794822623
+QUEUE DONE 1794822623
+Hash of data verified.
+Hash of data verified.
+BUILD pos_mon flashed 1794828127 verified (try 1)
+NOTE 1794828494 pos_mon cal 1 sensor not publishing after attacker join
+RUN pos_mon cal 1 start 1794828496 att 192.168.4.3
+NOTE 1794828558 pos_mon cal 1 ABORTED: Pi radio firmware reset (brcmfmac bus down) at run start; wlsta lost; rerun
+Hash of data verified.
+Hash of data verified.
+BUILD pos_mon flashed 1794828896 verified (try 1)
+RUN pos_mon cal 1 start 1794828947 att 192.168.4.3
+NOTE 1794829523 pos_mon cal 1 (2nd start) ABORTED: Pi table 102 route (192.168.4.0/24 via 192.168.77.2) lost in the radio reset, so broker replies to the attacker were lost (attacker MQTT flows with 0 reply bytes, score up to 1.6); not used
+Hash of data verified.
+Hash of data verified.
+BUILD pos_mon flashed 1794829579 verified (try 1)
+RUN pos_mon cal 1 start 1794829629 att 192.168.4.3
+RUN pos_mon cal 1 end 1794832029
+POS DONE cal 1794832029
+Hash of data verified.
+Hash of data verified.
+BUILD pos flashed 1794832159 verified (try 1)
+NOTE 1794832286 pos PC 1 attacker MQTT not established after 60 s
+RUN pos PC 1 start 1794832209 att 192.168.4.3
+NOTE 1794832327 pos PC 1 ABORTED at +118 s before any block: sensor_up accepted a publish from before the gateway reset, the attacker joined while the sensor was still reconnecting and the sensor lost its broker path again (amendment 1 failure mode); run not used
+Hash of data verified.
+Hash of data verified.
+BUILD pos flashed 1794839331 verified (try 1)
+RUN pos PC 1 start 1794839381 att 192.168.4.3
+RUN pos PC 1 end 1794840581
+RUN pos P 1 start 1794840586 att 192.168.4.3
+RUN pos P 1 end 1794841786
+RUN pos P 2 start 1794841791 att 192.168.4.3
+RUN pos P 2 end 1794842991
+RUN pos P 3 start 1794842996 att 192.168.4.3
+RUN pos P 3 end 1794844196
+RUN pos P 4 start 1794844201 att 192.168.4.3
+RUN pos P 4 end 1794845401
+RUN pos P 5 start 1794845406 att 192.168.4.3
+RUN pos P 5 end 1794846606
+RUN pos PC 2 start 1794846611 att 192.168.4.3
+RUN pos PC 2 end 1794847811
+POS DONE runs 1794847811
+Hash of data verified.
+Hash of data verified.
+BUILD pos flashed 1794862109 verified (try 1)
+NOTE 1794862459 col PC 1 sensor not publishing 300 s after gateway reset
+RUN col PC 1 start 1794862159 att 192.168.5.2
+NOTE 1794862530 col PC 1 INVALID (registered rule): MQTT subscriber logger not running after the Pi reboot (sub.log stale since 1794849207), restarted 1794862501; sensor was up (gateway logged its 1883 flows). Replacement clean run PC 3 runs after PC 2.
+RUN col PC 1 end 1794863359
+RUN col P 1 start 1794863364 att 192.168.5.2
+RUN col P 1 end 1794864564
+RUN col P 2 start 1794864569 att 192.168.5.2
+RUN col P 2 end 1794865769
+RUN col P 3 start 1794865774 att 192.168.5.2
+RUN col P 3 end 1794866974
+RUN col P 4 start 1794866979 att 192.168.5.2
+RUN col P 4 end 1794868179
+RUN col P 5 start 1794868184 att 192.168.5.2
+RUN col P 5 end 1794869384
+NOTE 1794869689 col PC 2 sensor not publishing 300 s after gateway reset
+NOTE 1794869788 col PC 2 ABORT: sensor silent after attacker join; retry
+RUN col PC 2 start 1794869793 att 192.168.5.2
+RUN col PC 2 end 1794870993
+COL DONE runs 1794870993
+RUN col PC 3 start 1794871056 att 192.168.5.2
+RUN col PC 3 end 1794872256
+COL DONE pc3 1794872256
