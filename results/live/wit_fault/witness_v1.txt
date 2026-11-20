@@ -1,0 +1,9 @@
+SKIP fault F 11 flows 14 score mismatches 2
+G F 12 1195044 real 192.168.77.1 1883 0.489106 ranked 1 0
+R fault F 12 gaps 1 alerts 1 named 1 named_inj 0 injected_flows 0
+R fault F 13 gaps 0 alerts 0 named 0 named_inj 0 injected_flows 0
+G F 14 1190132 real 192.168.77.1 1883 0.500659 ranked 1 0
+R fault F 14 gaps 1 alerts 1 named 1 named_inj 0 injected_flows 0
+G F 15 699042 real 192.168.77.1 1883 0.480775 ranked 1 0
+G F 15 1197086 real 192.168.77.1 1883 0.497417 ranked 1 0
+R fault F 15 gaps 2 alerts 2 named 6 named_inj 0 injected_flows 0
