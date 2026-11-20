@@ -1,0 +1,465 @@
+SKIP veto clean 1 flows 0 score mismatches 0
+SKIP veto clean 2 flows 0 score mismatches 0
+SKIP veto clean 3 flows 0 score mismatches 0
+SKIP veto A 1 flows 0 score mismatches 0
+SKIP veto B 1 flows 0 score mismatches 0
+SKIP veto E 1 flows 0 score mismatches 0
+SKIP veto A 2 flows 0 score mismatches 0
+SKIP veto B 2 flows 0 score mismatches 0
+SKIP veto E 2 flows 0 score mismatches 0
+SKIP veto A 3 flows 0 score mismatches 0
+SKIP veto B 3 flows 0 score mismatches 0
+SKIP veto E 3 flows 0 score mismatches 0
+SKIP veto A 4 flows 0 score mismatches 0
+SKIP veto B 4 flows 0 score mismatches 0
+SKIP veto E 4 flows 0 score mismatches 0
+SKIP veto A 5 flows 0 score mismatches 0
+SKIP veto B 5 flows 0 score mismatches 0
+SKIP veto E 5 flows 0 score mismatches 0
+SKIP veto D 1 flows 0 score mismatches 0
+SKIP veto D 2 flows 0 score mismatches 0
+SKIP veto D 3 flows 0 score mismatches 0
+SKIP veto D 4 flows 0 score mismatches 0
+SKIP veto D 5 flows 0 score mismatches 0
+SKIP veto clean 6 flows 0 score mismatches 0
+SKIP veto clean 7 flows 0 score mismatches 0
+SKIP veto clean 8 flows 0 score mismatches 0
+SKIP veto A 6 flows 0 score mismatches 0
+SKIP veto B 6 flows 0 score mismatches 0
+SKIP veto E 6 flows 0 score mismatches 0
+SKIP veto A 7 flows 0 score mismatches 0
+SKIP veto B 7 flows 0 score mismatches 0
+SKIP veto E 7 flows 0 score mismatches 0
+SKIP veto A 8 flows 0 score mismatches 0
+SKIP veto B 8 flows 0 score mismatches 0
+SKIP veto E 8 flows 0 score mismatches 0
+SKIP veto A 9 flows 0 score mismatches 0
+SKIP veto B 9 flows 0 score mismatches 0
+SKIP veto E 9 flows 0 score mismatches 0
+SKIP veto A 10 flows 0 score mismatches 0
+SKIP veto B 10 flows 0 score mismatches 0
+SKIP veto E 10 flows 0 score mismatches 0
+SKIP veto D 6 flows 0 score mismatches 0
+SKIP veto D 7 flows 0 score mismatches 0
+SKIP veto D 8 flows 0 score mismatches 0
+SKIP veto D 9 flows 0 score mismatches 0
+SKIP veto D 10 flows 0 score mismatches 0
+SKIP veto clean 11 flows 0 score mismatches 0
+SKIP veto clean 12 flows 0 score mismatches 0
+SKIP veto clean 13 flows 0 score mismatches 0
+SKIP veto A 11 flows 0 score mismatches 0
+SKIP veto B 11 flows 0 score mismatches 0
+SKIP veto E 11 flows 0 score mismatches 0
+SKIP veto A 12 flows 0 score mismatches 0
+SKIP veto B 12 flows 0 score mismatches 0
+SKIP veto E 12 flows 0 score mismatches 0
+SKIP veto A 13 flows 0 score mismatches 0
+SKIP veto B 13 flows 0 score mismatches 0
+SKIP veto E 13 flows 0 score mismatches 0
+SKIP veto A 14 flows 0 score mismatches 0
+SKIP veto B 14 flows 0 score mismatches 0
+SKIP veto E 14 flows 0 score mismatches 0
+SKIP veto A 15 flows 0 score mismatches 0
+SKIP veto B 15 flows 0 score mismatches 0
+SKIP veto E 15 flows 0 score mismatches 0
+SKIP veto D 11 flows 0 score mismatches 0
+SKIP veto D 12 flows 0 score mismatches 0
+SKIP veto D 13 flows 0 score mismatches 0
+SKIP veto D 14 flows 0 score mismatches 0
+SKIP veto D 15 flows 0 score mismatches 0
+R veto clean 16 gaps 0 alerts 0 named 0 named_inj 0 injected_flows 0
+R veto clean 17 gaps 0 alerts 0 named 0 named_inj 0 injected_flows 0
+R veto clean 18 gaps 0 alerts 0 named 0 named_inj 0 injected_flows 0
+G A 16 376606 real 192.168.77.1 1883 0.460987 ranked 5 5
+G A 16 616624 real 192.168.77.1 1883 0.461421 ranked 5 5
+G A 16 779353 inj 192.168.120.1 3000 0.445407 ranked 1 0
+G A 16 856638 real 192.168.77.1 1883 0.461421 ranked 5 5
+G A 16 1096657 real 192.168.77.1 1883 0.460987 ranked 5 5
+R veto A 16 gaps 5 alerts 5 named 26 named_inj 20 injected_flows 40
+G B 16 375626 real 192.168.77.1 1883 0.460987 ranked 5 5
+G B 16 615641 real 192.168.77.1 1883 0.461421 ranked 5 5
+G B 16 780325 inj 192.168.123.1 2003 0.447439 ranked 4 3
+G B 16 855656 real 192.168.77.1 1883 0.461421 ranked 5 5
+G B 16 1020530 inj 192.168.120.1 2000 0.448249 ranked 1 0
+G B 16 1095679 real 192.168.77.1 1883 0.460987 ranked 5 5
+R veto B 16 gaps 6 alerts 6 named 37 named_inj 23 injected_flows 40
+G E 16 299875 inj 192.168.120.1 3000 0.445407 ranked 1 0
+G E 16 299915 inj 192.168.122.1 3002 0.455371 ranked 3 2
+G E 16 373653 real 192.168.77.1 1883 0.460987 ranked 5 5
+G E 16 540114 inj 192.168.120.1 3000 0.445407 ranked 1 0
+G E 16 540124 inj 192.168.121.1 3001 0.45414 ranked 2 1
+G E 16 540134 inj 192.168.122.1 3002 0.463958 ranked 3 2
+G E 16 540146 inj 192.168.123.1 3003 0.446892 ranked 4 3
+G E 16 540188 inj 192.168.122.1 3006 0.455092 - 0 0
+G E 16 613667 real 192.168.77.1 1883 0.461421 ranked 5 5
+G E 16 780336 inj 192.168.120.1 3000 0.465561 ranked 1 0
+G E 16 780364 inj 192.168.122.1 3002 0.444491 ranked 3 2
+G E 16 853681 real 192.168.77.1 1883 0.461421 ranked 5 5
+G E 16 1020570 inj 192.168.120.1 4000 0.475335 ranked 1 0
+G E 16 1020634 inj 192.168.120.1 4001 0.448412 ranked 2 1
+R veto E 16 gaps 14 alerts 13 named 74 named_inj 26 injected_flows 230
+G A 17 299887 inj 192.168.121.1 3001 0.447868 ranked 2 1
+G A 17 299910 inj 192.168.122.1 3002 0.450318 ranked 3 2
+G A 17 372549 real 192.168.77.1 1883 0.459581 ranked 5 5
+G A 17 540100 inj 192.168.120.1 3000 0.465561 ranked 1 0
+G A 17 540115 inj 192.168.121.1 3001 0.459576 ranked 2 1
+G A 17 540129 inj 192.168.122.1 3002 0.474472 - 0 0
+G A 17 612558 real 192.168.77.1 1883 0.460987 ranked 5 5
+G A 17 780400 inj 192.168.120.1 3000 0.47066 ranked 1 0
+G A 17 780431 inj 192.168.123.1 3003 0.446892 ranked 4 3
+G A 17 852581 real 192.168.77.1 1883 0.461422 ranked 5 5
+G A 17 1019636 inj 192.168.121.1 3001 0.447868 ranked 2 1
+G A 17 1092591 real 192.168.77.1 1883 0.461348 ranked 5 5
+R veto A 17 gaps 12 alerts 11 named 60 named_inj 28 injected_flows 40
+G B 17 299898 inj 192.168.120.1 2000 0.453544 ranked 1 0
+G B 17 299928 inj 192.168.122.1 2002 0.446451 ranked 3 2
+G B 17 376560 real 192.168.77.1 1883 0.4607 ranked 5 5
+G B 17 540140 inj 192.168.120.1 2000 0.442118 ranked 1 0
+G B 17 540156 inj 192.168.121.1 2001 0.448922 ranked 2 1
+G B 17 540172 inj 192.168.122.1 2002 0.446451 ranked 3 2
+G B 17 540185 inj 192.168.123.1 2003 0.443317 ranked 4 3
+G B 17 540215 inj 192.168.121.1 2005 0.447091 - 0 0
+G B 17 616578 real 192.168.77.1 1883 0.46113 ranked 5 5
+G B 17 780377 inj 192.168.120.1 2000 0.448249 ranked 1 0
+G B 17 780387 inj 192.168.121.1 2001 0.443891 ranked 2 1
+G B 17 780403 inj 192.168.122.1 2002 0.450732 ranked 3 2
+G B 17 856594 real 192.168.77.1 1883 0.46113 ranked 5 5
+G B 17 1096612 real 192.168.77.1 1883 0.4607 ranked 5 5
+R veto B 17 gaps 14 alerts 13 named 69 named_inj 31 injected_flows 40
+G E 17 299909 inj 192.168.120.1 3000 0.459831 ranked 1 0
+G E 17 299921 inj 192.168.121.1 3001 0.464412 ranked 2 1
+G E 17 375221 real 192.168.77.1 1883 0.4607 ranked 5 5
+G E 17 539154 inj 192.168.120.1 3000 0.465561 ranked 1 0
+G E 17 539166 inj 192.168.121.1 3001 0.45414 ranked 2 1
+G E 17 539184 inj 192.168.122.1 3002 0.444491 ranked 3 2
+G E 17 615238 real 192.168.77.1 1883 0.46113 ranked 5 5
+G E 17 779387 inj 192.168.120.1 3000 0.453223 ranked 1 0
+G E 17 779397 inj 192.168.121.1 3001 0.459576 ranked 2 1
+G E 17 779408 inj 192.168.122.1 3002 0.444491 ranked 3 2
+G E 17 779423 inj 192.168.123.1 3003 0.456527 ranked 4 3
+G E 17 855255 real 192.168.77.1 1883 0.46113 ranked 5 5
+G E 17 1019641 inj 192.168.120.1 4000 0.475335 ranked 1 0
+G E 17 1019714 inj 192.168.120.1 4001 0.448412 ranked 2 1
+R veto E 17 gaps 14 alerts 14 named 82 named_inj 26 injected_flows 230
+G A 18 299880 inj 192.168.120.1 3000 0.453223 ranked 1 0
+G A 18 299895 inj 192.168.121.1 3001 0.468794 ranked 2 1
+G A 18 299916 inj 192.168.122.1 3002 0.450318 ranked 3 2
+G A 18 374086 real 192.168.77.1 1883 0.4607 ranked 5 5
+G A 18 540105 inj 192.168.120.1 3000 0.459831 ranked 1 0
+G A 18 540126 inj 192.168.121.1 3001 0.45414 ranked 2 1
+G A 18 540138 inj 192.168.122.1 3002 0.444491 ranked 3 2
+G A 18 540156 inj 192.168.123.1 3003 0.451976 ranked 4 3
+G A 18 540208 inj 192.168.123.1 3007 0.443733 - 0 0
+G A 18 614101 real 192.168.77.1 1883 0.46113 ranked 5 5
+G A 18 780367 inj 192.168.120.1 3000 0.475277 ranked 1 0
+G A 18 780391 inj 192.168.122.1 3002 0.459873 ranked 3 2
+G A 18 780401 inj 192.168.123.1 3003 0.451976 ranked 4 3
+G A 18 854118 real 192.168.77.1 1883 0.46113 ranked 5 5
+G A 18 1020671 inj 192.168.120.1 3000 0.47066 ranked 1 0
+G A 18 1020681 inj 192.168.121.1 3001 0.447868 ranked 2 1
+G A 18 1020694 inj 192.168.122.1 3002 0.450318 ranked 3 2
+G A 18 1020708 inj 192.168.123.1 3003 0.446892 ranked 4 3
+G A 18 1094136 real 192.168.77.1 1883 0.4607 ranked 5 5
+R veto A 18 gaps 19 alerts 18 named 112 named_inj 40 injected_flows 40
+G B 18 299879 inj 192.168.120.1 2000 0.453544 ranked 1 0
+G B 18 299892 inj 192.168.121.1 2001 0.448922 ranked 2 1
+G B 18 376739 real 192.168.77.1 1883 0.46113 ranked 5 5
+G B 18 540109 inj 192.168.120.1 2000 0.442118 ranked 1 0
+G B 18 540124 inj 192.168.121.1 2001 0.457411 ranked 2 1
+G B 18 540133 inj 192.168.122.1 2002 0.446451 ranked 3 2
+G B 18 616750 real 192.168.77.1 1883 0.46113 ranked 5 5
+G B 18 779375 inj 192.168.123.1 2003 0.443317 ranked 4 3
+G B 18 779407 inj 192.168.121.1 2005 0.444666 new_port 6 5
+G B 18 856765 real 192.168.77.1 1883 0.4607 ranked 5 5
+G B 18 1019576 inj 192.168.120.1 2000 0.448249 ranked 1 0
+G B 18 1096781 real 192.168.77.1 1883 0.4607 ranked 5 5
+R veto B 18 gaps 12 alerts 12 named 68 named_inj 32 injected_flows 40
+G E 18 299876 inj 192.168.120.1 3000 0.453223 ranked 1 0
+G E 18 375806 real 192.168.77.1 1883 0.4607 ranked 5 5
+G E 18 540127 inj 192.168.120.1 3000 0.445407 ranked 1 0
+G E 18 615826 real 192.168.77.1 1883 0.461129 ranked 5 5
+G E 18 779335 inj 192.168.120.1 3000 0.445407 ranked 1 0
+G E 18 855838 real 192.168.77.1 1883 0.461129 ranked 5 5
+G E 18 1019533 inj 192.168.120.1 4000 0.454159 ranked 1 0
+R veto E 18 gaps 7 alerts 7 named 35 named_inj 15 injected_flows 230
+G A 19 299885 inj 192.168.120.1 3000 0.475277 ranked 1 0
+G A 19 299896 inj 192.168.121.1 3001 0.45414 ranked 2 1
+G A 19 375343 real 192.168.77.1 1883 0.46113 ranked 5 5
+G A 19 540137 inj 192.168.121.1 3001 0.459576 ranked 2 1
+G A 19 615359 real 192.168.77.1 1883 0.46113 ranked 5 5
+G A 19 780341 inj 192.168.120.1 3000 0.445407 ranked 1 0
+G A 19 780352 inj 192.168.121.1 3001 0.447868 ranked 2 1
+G A 19 780387 inj 192.168.123.1 3003 0.456527 ranked 4 3
+G A 19 855375 real 192.168.77.1 1883 0.460701 ranked 5 5
+G A 19 1020620 inj 192.168.120.1 3000 0.459831 ranked 1 0
+G A 19 1020646 inj 192.168.121.1 3001 0.480052 - 0 0
+G A 19 1095395 real 192.168.77.1 1883 0.460701 ranked 5 5
+R veto A 19 gaps 12 alerts 11 named 60 named_inj 26 injected_flows 40
+G B 19 299893 inj 192.168.121.1 2001 0.453382 ranked 2 1
+G B 19 374412 real 192.168.77.1 1883 0.4607 ranked 5 5
+G B 19 614424 real 192.168.77.1 1883 0.461155 ranked 5 5
+G B 19 854433 real 192.168.77.1 1883 0.4607 ranked 5 5
+G B 19 1020569 inj 192.168.120.1 2000 0.458242 ranked 1 0
+G B 19 1094449 real 192.168.77.1 1883 0.4607 ranked 5 5
+R veto B 19 gaps 6 alerts 6 named 31 named_inj 21 injected_flows 40
+G E 19 299874 inj 192.168.120.1 3000 0.445407 ranked 1 0
+G E 19 299890 inj 192.168.121.1 3001 0.447868 ranked 2 1
+G E 19 373455 real 192.168.77.1 1883 0.4607 ranked 5 5
+G E 19 540086 inj 192.168.120.1 3000 0.459831 ranked 1 0
+G E 19 613468 real 192.168.77.1 1883 0.46113 ranked 5 5
+G E 19 780351 inj 192.168.120.1 3000 0.445407 ranked 1 0
+G E 19 853484 real 192.168.77.1 1883 0.46113 ranked 5 5
+G E 19 1020558 inj 192.168.120.1 4000 0.454159 ranked 1 0
+R veto E 19 gaps 8 alerts 8 named 38 named_inj 16 injected_flows 230
+G A 20 299882 inj 192.168.120.1 3000 0.47066 ranked 1 0
+G A 20 382253 real 192.168.77.1 1883 0.4607 ranked 5 5
+G A 20 540086 inj 192.168.120.1 3000 0.453223 ranked 1 0
+G A 20 540098 inj 192.168.121.1 3001 0.45414 ranked 2 1
+G A 20 540125 inj 192.168.123.1 3003 0.451976 ranked 4 3
+G A 20 622269 real 192.168.77.1 1883 0.46113 ranked 5 5
+G A 20 779318 inj 192.168.120.1 3000 0.453223 ranked 1 0
+G A 20 862292 real 192.168.77.1 1883 0.46113 ranked 5 5
+G A 20 1019538 inj 192.168.120.1 3000 0.453223 ranked 1 0
+G A 20 1019561 inj 192.168.122.1 3002 0.444491 ranked 3 2
+G A 20 1102305 real 192.168.77.1 1883 0.462025 ranked 5 5
+R veto A 20 gaps 11 alerts 11 named 62 named_inj 26 injected_flows 40
+G B 20 299878 inj 192.168.120.1 2000 0.442118 ranked 1 0
+G B 20 299896 inj 192.168.121.1 2001 0.443891 ranked 2 1
+G B 20 376249 real 192.168.77.1 1883 0.462257 ranked 6 6
+G B 20 616264 real 192.168.77.1 1883 0.461129 ranked 5 5
+G B 20 856278 real 192.168.77.1 1883 0.461129 ranked 5 5
+G B 20 1019549 inj 192.168.120.1 2000 0.448249 ranked 1 0
+G B 20 1019561 inj 192.168.121.1 2001 0.443891 ranked 2 1
+G B 20 1096298 real 192.168.77.1 1883 0.462257 ranked 6 6
+R veto B 20 gaps 8 alerts 8 named 44 named_inj 24 injected_flows 40
+G E 20 299883 inj 192.168.120.1 3000 0.459831 ranked 1 0
+G E 20 299893 inj 192.168.121.1 3001 0.447868 ranked 2 1
+G E 20 299909 inj 192.168.123.1 3003 0.446892 ranked 4 3
+G E 20 380435 real 192.168.77.1 1883 0.4607 ranked 5 5
+G E 20 540082 inj 192.168.120.1 3000 0.453223 ranked 1 0
+G E 20 620451 real 192.168.77.1 1883 0.46113 ranked 5 5
+G E 20 860466 real 192.168.77.1 1883 0.46113 ranked 5 5
+G E 20 1019543 inj 192.168.120.1 4000 0.454159 ranked 1 0
+R veto E 20 gaps 8 alerts 8 named 37 named_inj 19 injected_flows 230
+G ABG 1 28912 real 192.168.188.1 2072 0.443026 ranked 1 0
+G ABG 1 110443 real 192.168.163.1 2097 0.458925 ranked 5 0
+G ABG 1 133076 real 192.168.77.1 1883 0.468157 ranked 2 0
+G ABG 1 254036 real 192.168.77.1 1883 0.445231 ranked 1 0
+G ABG 1 263372 real 192.168.196.1 2051 0.442374 new_port 5 0
+G ABG 1 374043 real 192.168.77.1 1883 0.493411 - 0 0
+G ABG 1 502850 real 192.168.193.1 2097 0.446432 new_port 6 0
+G ABG 1 540141 inj 192.168.120.1 3000 0.446364 new_port 7 0
+G ABG 1 614058 real 192.168.77.1 1883 0.508185 - 0 0
+G ABG 1 702522 real 192.168.168.1 2057 0.444064 new_port 6 0
+G ABG 1 734065 real 192.168.77.1 1883 0.449461 new_port 3 0
+G ABG 1 854072 real 192.168.77.1 1883 0.508185 - 0 0
+G ABG 1 974082 real 192.168.77.1 1883 0.444537 new_port 1 0
+G ABG 1 1094089 real 192.168.77.1 1883 0.493411 - 0 0
+G ABG 1 1164878 real 192.168.161.1 2057 0.448507 new_port 6 0
+R veto ABG 1 gaps 15 alerts 11 named 62 named_inj 0 injected_flows 40
+G BBG 1 19381 real 192.168.77.1 1883 0.569125 - 0 0
+R veto BBG 1 gaps 1 alerts 0 named 0 named_inj 0 injected_flows 0
+G ABG 2 134920 real 192.168.77.1 1883 0.468453 ranked 2 0
+G ABG 2 255869 real 192.168.77.1 1883 0.448498 ranked 2 0
+G ABG 2 299881 inj 192.168.121.1 3001 0.443865 new_port 6 1
+G ABG 2 375877 real 192.168.77.1 1883 0.479291 new_port 10 6
+G ABG 2 473128 real 192.168.185.1 2073 0.447475 new_port 7 0
+G ABG 2 495883 real 192.168.77.1 1883 0.457915 new_port 2 0
+G ABG 2 540092 inj 192.168.120.1 3000 0.45964 new_port 6 0
+G ABG 2 540120 inj 192.168.122.1 3002 0.453513 new_port 8 2
+G ABG 2 615891 real 192.168.77.1 1883 0.478949 - 0 0
+G ABG 2 735900 real 192.168.77.1 1883 0.444548 ranked 1 0
+G ABG 2 748918 real 192.168.168.1 2072 0.453328 - 0 0
+G ABG 2 780360 inj 192.168.120.1 3000 0.4492 - 0 0
+G ABG 2 855909 real 192.168.77.1 1883 0.494363 - 0 0
+G ABG 2 958332 real 192.168.181.1 2077 0.445787 new_port 6 0
+G ABG 2 975915 real 192.168.77.1 1883 0.444559 ranked 1 0
+G ABG 2 1019600 inj 192.168.120.1 3000 0.455623 new_port 6 0
+G ABG 2 1095927 real 192.168.77.1 1883 0.467368 new_port 9 6
+R veto ABG 2 gaps 17 alerts 13 named 88 named_inj 15 injected_flows 40
+G BBG 2 43022 real 192.168.197.1 2081 0.448208 ranked 2 0
+G BBG 2 133679 real 192.168.77.1 1883 0.468157 ranked 2 0
+G BBG 2 247546 real 192.168.192.1 2077 0.445992 new_port 7 0
+G BBG 2 254629 real 192.168.77.1 1883 0.458064 ranked 2 0
+G BBG 2 374634 real 192.168.77.1 1883 0.493423 - 0 0
+G BBG 2 494644 real 192.168.77.1 1883 0.458085 new_port 2 0
+G BBG 2 614653 real 192.168.77.1 1883 0.522065 - 0 0
+G BBG 2 734659 real 192.168.77.1 1883 0.444574 new_port 2 0
+G BBG 2 854665 real 192.168.77.1 1883 0.494754 - 0 0
+G BBG 2 897323 real 192.168.197.1 2052 0.459063 new_port 6 0
+G BBG 2 937605 real 192.168.152.1 2089 0.443909 new_port 5 0
+G BBG 2 974675 real 192.168.77.1 1883 0.445141 new_port 1 0
+G BBG 2 989878 real 192.168.187.1 2078 0.446673 new_port 6 0
+G BBG 2 1011012 real 192.168.165.1 2058 0.454837 new_port 5 0
+G BBG 2 1019526 inj 192.168.120.1 2000 0.442322 new_port 6 0
+G BBG 2 1094689 real 192.168.77.1 1883 0.510047 - 0 0
+G BBG 2 1146116 real 192.168.152.1 2078 0.443424 new_port 7 0
+G BBG 2 1173255 real 192.168.183.1 2051 0.451887 new_port 5 0
+R veto BBG 2 gaps 18 alerts 14 named 107 named_inj 0 injected_flows 40
+G ABG 3 36029 real 192.168.158.1 2059 0.442052 ranked 2 0
+G ABG 3 64290 real 192.168.197.1 2080 0.446567 ranked 4 0
+G ABG 3 97552 real 192.168.192.1 2069 0.451114 ranked 6 0
+G ABG 3 119821 real 192.168.174.1 2093 0.444023 ranked 8 0
+G ABG 3 137489 real 192.168.77.1 1883 0.613303 ranked 6 0
+G ABG 3 257496 real 192.168.77.1 1883 0.444596 new_port 2 0
+G ABG 3 279888 real 192.168.161.1 2097 0.444816 new_port 5 0
+G ABG 3 377508 real 192.168.77.1 1883 0.494608 - 0 0
+G ABG 3 448083 real 192.168.154.1 2079 0.446302 new_port 5 0
+G ABG 3 475217 real 192.168.186.1 2076 0.458731 new_port 5 0
+G ABG 3 499354 real 192.168.194.1 2051 0.442374 new_port 5 0
+G ABG 3 525486 real 192.168.166.1 2094 0.446429 new_port 5 0
+G ABG 3 540086 inj 192.168.120.1 3000 0.44772 new_port 5 0
+G ABG 3 540106 inj 192.168.121.1 3001 0.466204 new_port 6 1
+G ABG 3 617521 real 192.168.77.1 1883 0.479285 - 0 0
+G ABG 3 730810 real 192.168.186.1 2075 0.443387 new_port 5 0
+G ABG 3 737532 real 192.168.77.1 1883 0.458116 new_port 2 0
+G ABG 3 753949 real 192.168.169.1 2084 0.445599 new_port 7 0
+G ABG 3 857537 real 192.168.77.1 1883 0.479866 - 0 0
+G ABG 3 907981 real 192.168.175.1 2096 0.448988 new_port 6 0
+G ABG 3 934116 real 192.168.190.1 2072 0.448628 new_port 6 0
+G ABG 3 964256 real 192.168.157.1 2071 0.448007 new_port 5 0
+G ABG 3 977544 real 192.168.77.1 1883 0.444629 new_port 2 0
+G ABG 3 1020565 inj 192.168.123.1 3003 0.444995 new_port 8 3
+G ABG 3 1097553 real 192.168.77.1 1883 0.479493 - 0 0
+R veto ABG 3 gaps 25 alerts 21 named 152 named_inj 4 injected_flows 40
+G BBG 3 38011 real 192.168.184.1 2070 0.442175 ranked 2 0
+G BBG 3 61141 real 192.168.170.1 2081 0.442379 ranked 3 0
+G BBG 3 82273 real 192.168.173.1 2088 0.451381 ranked 4 0
+G BBG 3 92412 real 192.168.163.1 2071 0.458685 ranked 5 0
+G BBG 3 135634 real 192.168.77.1 1883 0.468146 ranked 2 0
+G BBG 3 156821 real 192.168.197.1 2066 0.465198 ranked 6 0
+G BBG 3 191089 real 192.168.188.1 2090 0.451313 new_port 7 0
+G BBG 3 256585 real 192.168.77.1 1883 0.444663 ranked 1 0
+G BBG 3 294898 real 192.168.184.1 2082 0.443326 new_port 7 0
+G BBG 3 376591 real 192.168.77.1 1883 0.507065 - 0 0
+G BBG 3 491458 real 192.168.186.1 2092 0.456355 new_port 6 0
+G BBG 3 496596 real 192.168.77.1 1883 0.449461 new_port 3 0
+G BBG 3 616606 real 192.168.77.1 1883 0.521193 - 0 0
+G BBG 3 673942 real 192.168.172.1 2099 0.444209 new_port 7 0
+G BBG 3 723216 real 192.168.183.1 2078 0.444228 new_port 6 0
+G BBG 3 768516 real 192.168.197.1 2054 0.448134 new_port 6 0
+G BBG 3 856621 real 192.168.77.1 1883 0.494657 - 0 0
+G BBG 3 902446 real 192.168.169.1 2051 0.454774 new_port 5 0
+G BBG 3 930723 real 192.168.172.1 2081 0.456014 new_port 6 0
+G BBG 3 976628 real 192.168.77.1 1883 0.445181 new_port 1 0
+G BBG 3 1096638 real 192.168.77.1 1883 0.47929 - 0 0
+G BBG 3 1142055 real 192.168.174.1 2060 0.452488 new_port 6 0
+G BBG 3 1158190 real 192.168.182.1 2076 0.44866 new_port 6 0
+G BBG 3 1171328 real 192.168.159.1 2071 0.444173 new_port 6 0
+G BBG 3 1194464 real 192.168.153.1 2052 0.446469 new_port 6 0
+R veto BBG 3 gaps 25 alerts 21 named 159 named_inj 0 injected_flows 40
+G ABG 4 13019 real 192.168.77.1 1883 0.447343 ranked 1 0
+G ABG 4 51173 real 192.168.180.1 2097 0.453073 ranked 3 0
+G ABG 4 74307 real 192.168.177.1 2069 0.45542 ranked 4 0
+G ABG 4 115580 real 192.168.171.1 2080 0.446689 ranked 6 0
+G ABG 4 134609 real 192.168.77.1 1883 0.451366 ranked 2 0
+G ABG 4 255569 real 192.168.77.1 1883 0.444668 ranked 1 0
+G ABG 4 272656 real 192.168.195.1 2076 0.445814 new_port 6 0
+G ABG 4 298794 real 192.168.175.1 2077 0.449779 new_port 6 0
+G ABG 4 375575 real 192.168.77.1 1883 0.479781 - 0 0
+G ABG 4 409490 real 192.168.164.1 2051 0.446376 - 0 0
+G ABG 4 435769 real 192.168.196.1 2086 0.45467 new_port 7 0
+G ABG 4 495585 real 192.168.77.1 1883 0.444593 new_port 2 0
+G ABG 4 540110 inj 192.168.120.1 3000 0.456935 new_port 6 0
+G ABG 4 540124 inj 192.168.121.1 3001 0.443948 new_port 6 1
+G ABG 4 540138 inj 192.168.122.1 3002 0.442181 new_port 7 2
+G ABG 4 615601 real 192.168.77.1 1883 0.480446 - 0 0
+G ABG 4 711616 real 192.168.150.1 2085 0.443878 new_port 6 0
+G ABG 4 735610 real 192.168.77.1 1883 0.45746 new_port 2 0
+G ABG 4 855615 real 192.168.77.1 1883 0.479529 - 0 0
+G ABG 4 975620 real 192.168.77.1 1883 0.458343 new_port 2 0
+G ABG 4 1020598 inj 192.168.120.1 3000 0.457844 new_port 7 0
+G ABG 4 1095624 real 192.168.77.1 1883 0.4972 - 0 0
+G ABG 4 1187161 real 192.168.163.1 2080 0.447875 new_port 6 0
+R veto ABG 4 gaps 23 alerts 18 named 112 named_inj 3 injected_flows 40
+G BBG 4 128726 real 192.168.167.1 2087 0.450214 ranked 7 0
+G BBG 4 133470 real 192.168.77.1 1883 0.468157 ranked 2 0
+G BBG 4 242482 real 192.168.187.1 2055 0.450706 new_port 5 0
+G BBG 4 254428 real 192.168.77.1 1883 0.445231 ranked 1 0
+G BBG 4 264625 real 192.168.183.1 2059 0.446134 new_port 5 0
+G BBG 4 277757 real 192.168.151.1 2097 0.446822 new_port 6 0
+G BBG 4 299872 inj 192.168.120.1 2000 0.445916 new_port 6 0
+G BBG 4 374436 real 192.168.77.1 1883 0.494777 - 0 0
+G BBG 4 479991 real 192.168.186.1 2089 0.446759 new_port 6 0
+G BBG 4 494440 real 192.168.77.1 1883 0.445142 new_port 1 0
+G BBG 4 532270 real 192.168.154.1 2076 0.446235 new_port 5 0
+G BBG 4 540114 inj 192.168.120.1 2000 0.458443 new_port 6 0
+G BBG 4 614451 real 192.168.77.1 1883 0.479232 new_port 10 7
+G BBG 4 708353 real 192.168.194.1 2081 0.459364 new_port 6 0
+G BBG 4 771798 real 192.168.156.1 2080 0.444243 new_port 6 0
+G BBG 4 780441 inj 192.168.120.1 2004 0.448954 - 0 0
+G BBG 4 854463 real 192.168.77.1 1883 0.479866 - 0 0
+G BBG 4 928831 real 192.168.177.1 2071 0.443769 new_port 6 0
+G BBG 4 974471 real 192.168.77.1 1883 0.458262 new_port 2 0
+G BBG 4 984233 real 192.168.192.1 2051 0.455719 new_port 6 0
+G BBG 4 1094484 real 192.168.77.1 1883 0.50982 - 0 0
+G BBG 4 1159607 real 192.168.153.1 2092 0.444336 new_port 6 0
+G BBG 4 1198899 real 192.168.189.1 2056 0.452444 new_port 6 0
+R veto BBG 4 gaps 23 alerts 19 named 147 named_inj 7 injected_flows 40
+G BGC 1 59153 real 192.168.191.1 2080 0.442369 ranked 3 0
+G BGC 1 104578 real 192.168.164.1 2068 0.446595 ranked 6 0
+G BGC 1 132472 real 192.168.77.1 1883 0.468402 ranked 2 0
+G BGC 1 133870 real 192.168.176.1 2092 0.461255 ranked 7 0
+G BGC 1 199507 real 192.168.195.1 2097 0.444065 new_port 8 0
+G BGC 1 253420 real 192.168.77.1 1883 0.458237 ranked 2 0
+G BGC 1 261921 real 192.168.154.1 2085 0.444327 new_port 7 0
+G BGC 1 291188 real 192.168.173.1 2079 0.443831 new_port 6 0
+G BGC 1 315319 real 192.168.168.1 2058 0.443668 new_port 6 0
+G BGC 1 373427 real 192.168.77.1 1883 0.53139 new_port 4 0
+G BGC 1 517941 real 192.168.153.1 2063 0.458719 new_port 6 0
+G BGC 1 573267 real 192.168.182.1 2065 0.452004 new_port 5 0
+G BGC 1 590474 real 192.168.168.1 2087 0.443598 new_port 5 0
+G BGC 1 611769 real 192.168.198.1 2076 0.44805 new_port 5 0
+G BGC 1 613443 real 192.168.77.1 1883 0.444629 ranked 1 0
+G BGC 1 670170 real 192.168.166.1 2076 0.450095 new_port 7 0
+G BGC 1 733459 real 192.168.77.1 1883 0.445181 ranked 1 0
+G BGC 1 758755 real 192.168.171.1 2070 0.45026 new_port 6 0
+G BGC 1 817160 real 192.168.164.1 2098 0.448493 new_port 6 0
+G BGC 1 830291 real 192.168.185.1 2059 0.443675 new_port 6 0
+G BGC 1 853463 real 192.168.77.1 1883 0.45805 ranked 2 0
+G BGC 1 1108127 real 192.168.184.1 2087 0.44637 ranked 5 0
+G BGC 1 1151397 real 192.168.191.1 2076 0.446657 ranked 6 0
+G BGC 1 1191660 real 192.168.181.1 2069 0.446602 ranked 6 0
+R veto BGC 1 gaps 24 alerts 24 named 173 named_inj 0 injected_flows 0
+G BGC 2 36026 real 192.168.168.1 2055 0.465333 ranked 2 0
+G BGC 2 136261 real 192.168.77.1 1883 0.4725 ranked 3 0
+G BGC 2 257207 real 192.168.77.1 1883 0.458236 ranked 2 0
+G BGC 2 377215 real 192.168.77.1 1883 0.444595 ranked 1 0
+G BGC 2 400568 real 192.168.168.1 2057 0.459527 - 0 0
+G BGC 2 423705 real 192.168.194.1 2093 0.445949 - 0 0
+G BGC 2 497226 real 192.168.77.1 1883 0.457915 ranked 2 0
+G BGC 2 519242 real 192.168.158.1 2068 0.448252 ranked 6 0
+G BGC 2 594643 real 192.168.188.1 2056 0.449469 new_port 5 0
+G BGC 2 610786 real 192.168.191.1 2069 0.466099 new_port 4 0
+G BGC 2 617235 real 192.168.77.1 1883 0.445234 ranked 1 0
+G BGC 2 687316 real 192.168.161.1 2099 0.444209 new_port 7 0
+G BGC 2 717453 real 192.168.171.1 2093 0.444344 new_port 6 0
+G BGC 2 844255 real 192.168.198.1 2060 0.447364 new_port 6 0
+G BGC 2 857246 real 192.168.77.1 1883 0.444626 ranked 1 0
+G BGC 2 977255 real 192.168.77.1 1883 0.444548 ranked 1 0
+G BGC 2 1082961 real 192.168.166.1 2071 0.468227 new_port 5 0
+G BGC 2 1097267 real 192.168.77.1 1883 0.44518 ranked 1 0
+G BGC 2 1108108 real 192.168.150.1 2075 0.452322 new_port 6 0
+G BGC 2 1136241 real 192.168.158.1 2064 0.4479 ranked 4 0
+R veto BGC 2 gaps 20 alerts 18 named 105 named_inj 0 injected_flows 0
+G BGC 3 25905 real 192.168.152.1 2082 0.449312 ranked 1 0
+G BGC 3 85299 real 192.168.161.1 2069 0.451201 ranked 4 0
+G BGC 3 112428 real 192.168.155.1 2089 0.443505 ranked 5 0
+G BGC 3 127560 real 192.168.194.1 2081 0.443847 ranked 6 0
+G BGC 3 135170 real 192.168.77.1 1883 0.468191 ranked 2 0
+G BGC 3 148692 real 192.168.151.1 2096 0.452497 ranked 6 0
+G BGC 3 169833 real 192.168.177.1 2075 0.448308 ranked 6 0
+G BGC 3 256129 real 192.168.77.1 1883 0.444668 ranked 1 0
+G BGC 3 268538 real 192.168.196.1 2061 0.449647 new_port 6 0
+G BGC 3 328963 real 192.168.151.1 2080 0.453798 new_port 7 0
+G BGC 3 376136 real 192.168.77.1 1883 0.445142 ranked 1 0
+G BGC 3 431540 real 192.168.198.1 2062 0.443279 new_port 5 0
+G BGC 3 461748 real 192.168.155.1 2094 0.455814 new_port 5 0
+G BGC 3 500047 real 192.168.195.1 2051 0.445541 new_port 5 0
+G BGC 3 736167 real 192.168.77.1 1883 0.444744 ranked 1 0
+G BGC 3 800822 real 192.168.194.1 2067 0.445376 ranked 6 0
+G BGC 3 858236 real 192.168.199.1 2051 0.444934 new_port 6 0
+G BGC 3 976176 real 192.168.77.1 1883 0.457916 ranked 2 0
+G BGC 3 1096182 real 192.168.77.1 1883 0.444571 ranked 1 0
+G BGC 3 1110190 real 192.168.170.1 2063 0.44571 new_port 6 0
+R veto BGC 3 gaps 20 alerts 20 named 110 named_inj 0 injected_flows 0
