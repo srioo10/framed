@@ -36,7 +36,8 @@ def pubs(d):
     for ln in (Path(d) / "sub.log").read_text().splitlines():
         a, _, b = ln.partition(" ")
         try:
-            s.append(json.loads(b)["seq"]); t.append(float(a))
+            q, x = json.loads(b)["seq"], float(a)  # parse both before appending: a torn line must not desync t and s
+            s.append(q); t.append(x)
         except (ValueError, KeyError):
             pass
     return np.array(t), np.array(s)
